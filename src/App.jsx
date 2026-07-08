@@ -19944,18 +19944,17 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   const dateLabel = (() => { const d = selectedDate || new Date(); return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })();
   const stepTime = (delta) => setStartMin((m) => Math.max(6 * 60, Math.min(21 * 60, m + delta)));
 
-  const [showTimePick, setShowTimePick] = useState(false);
-  const [showDatePick, setShowDatePick] = useState(false);
+  // Rebook flow: open straight onto the right picker on FIRST PAINT (no flash of the form
+  // underneath). Day already chosen (a rebook chip jumped there) → time picker, with the same
+  // settings-aware slots a client sees online; no day yet → date picker (choose day → times).
+  const [showTimePick, setShowTimePick] = useState(!!(smartTimes && slot && slot.dayChosen));
+  const [showDatePick, setShowDatePick] = useState(!!(smartTimes && !(slot && slot.dayChosen)));
   const [showAllTimes, setShowAllTimes] = useState(false); // smart (no-gap) times by default; reveal every open time on demand
   const scrollRef = useRef(null);
   useLayoutEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     try { window.scrollTo(0, 0); } catch (e) {}
   }, []);
-  // Rebook flow: guide "choose the day → then pick from smart times" by opening the date picker
-  // first. If the day was already chosen (a rebook chip jumped the calendar there), skip straight
-  // to the time picker — the same settings-aware slots a client sees booking online.
-  useEffect(() => { if (smartTimes) { if (slot && slot.dayChosen) setShowTimePick(true); else setShowDatePick(true); } }, []);
   // search by first name, last name, OR any part of the phone number (digits only)
   const qd = q.replace(/\D/g, "");
   const matches = q.trim() ? clients.filter((c) => {
@@ -19998,7 +19997,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   return createPortal((
     <div className="fade-in" style={{ position: "fixed", inset: 0, background: "var(--bg)", zIndex: 800, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* header bar — title only; Book/Cancel moved to the sticky footer below so the thumb reach is natural */}
-      <div style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "17px 18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <div style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "max(17px, env(safe-area-inset-top)) 18px 17px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.2 }}>New Appointment</span>
       </div>
 
@@ -20189,17 +20188,14 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
       {/* time picker — fills the form from the top, always in view */}
       {showTimePick && (
         <div style={{ position: "absolute", inset: 0, background: "var(--bg)", zIndex: 5, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "17px 18px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "max(17px, env(safe-area-inset-top)) 18px 17px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
             <button onClick={() => setShowTimePick(false)} style={{ background: "none", color: "var(--gold)", fontSize: 16 }}>Cancel</button>
-            <span style={{ fontSize: 17, fontWeight: 600 }}>Start time</span>
+            <span style={{ fontSize: 17, fontWeight: 600 }}>Pick a time</span>
             <span style={{ width: 50 }} />
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 40px" }}>
-            <div style={{ maxWidth: 460, margin: "0 auto 14px", display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4 }}>
-              <span style={{ width: 12, height: 12, borderRadius: 3, background: "var(--wash)", border: "1px solid var(--gold)", flexShrink: 0 }} />
-              {showAllTimes
-                ? "Every open time. Gold sits flush against another appointment — no gap left behind."
-                : "Smart times only — these keep the day gap-free. Gold sits flush against another appointment."}
+            <div style={{ maxWidth: 460, margin: "0 auto 14px", fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4, textAlign: "center" }}>
+              {showAllTimes ? "Every open time" : "Best open times"}{provObj ? ` for ${provObj.name.split(" ")[0]}` : ""} · {dateLabel}
             </div>
             {pickerSlots.length === 0 ? (
               <div style={{ maxWidth: 460, margin: "0 auto", color: "var(--sub)", fontSize: 14.5, textAlign: "center", padding: "30px 0", lineHeight: 1.5 }}>No openings that fit this service{provObj ? ` in ${provObj.name.split(" ")[0]}'s day` : ""}. Try another day or someone else.</div>
@@ -20218,7 +20214,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
       )}
       {showDatePick && (
         <div style={{ position: "absolute", inset: 0, background: "var(--bg)", zIndex: 5, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "17px 18px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "max(17px, env(safe-area-inset-top)) 18px 17px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
             <button onClick={() => setShowDatePick(false)} style={{ background: "none", color: "var(--gold)", fontSize: 16 }}>Cancel</button>
             <span style={{ fontSize: 17, fontWeight: 600 }}>Pick a date</span>
             <span style={{ width: 50 }} />
