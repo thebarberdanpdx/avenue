@@ -1995,6 +1995,7 @@ function App() {
     return () => clearTimeout(t);
   }, [saveFailed]);
   const [loadIncomplete, setLoadIncomplete] = useState(false); // a load errored → saves are blocked; surface it instead of failing silently
+  const [usingCache, setUsingCache] = useState(false); // showing the last-synced calendar from the on-device cache (server unreachable) — drives an honest banner
 
   // Save a whole in-memory list to its shop-scoped table.
   // Strategy: upsert current items first (never destroys data), then delete rows that aren't in the list.
@@ -2100,6 +2101,32 @@ function App() {
   // any save loop between two devices.
   const lastRemoteRef = useRef({});
   const lastSaveAt = useRef({}); // when this device last saved each table — used to ignore the echo of our own write
+  // ---- OFFLINE READ-CACHE ---------------------------------------------------------------------
+  // Every SUCCESSFUL server load is mirrored to localStorage. If a later load fails (Supabase or
+  // network down), the app hydrates READ-ONLY from this cache so the barber still sees their last-
+  // synced calendar instead of a blank screen — the way mature booking apps ride out backend blips.
+  // Photos/galleries (base64) are stripped so the cache stays well under the localStorage quota, and
+  // cache-mode forces saves OFF (loadedRef=false) so a stripped cached copy can NEVER be written back.
+  const CACHE_PREFIX = `vero_cache_${SHOP_ID}_`;
+  const slimForCache = (table, list) => {
+    if (table === 'appointments') return (list || []).map((a) => { if (!a) return a; const { photoData, ...rest } = a; return rest; });
+    if (table === 'clients') return (list || []).map((c) => { if (!c) return c; const { gallery, photo, ...rest } = c; return rest; });
+    return list || [];
+  };
+  const writeCache = (table, list) => { try { if (Array.isArray(list)) localStorage.setItem(CACHE_PREFIX + table, JSON.stringify(slimForCache(table, list))); } catch (e) { /* quota — ignore */ } };
+  const readCache = (table) => { try { const raw = localStorage.getItem(CACHE_PREFIX + table); const v = raw ? JSON.parse(raw) : null; return Array.isArray(v) ? v : null; } catch (e) { return null; } };
+  // Hydrate one table read-only from cache after a failed load. Blocks all saves (degraded state) and
+  // sets lastRemoteRef to the same reference so the save effect sees "no change" and never writes.
+  const hydrateFromCache = (table, current, setter) => {
+    if ((current || []).length) return false;          // already have live data — don't overwrite
+    const c = readCache(table);
+    if (!c || !c.length) return false;
+    lastRemoteRef.current[table] = c;
+    setter(c);
+    loadedRef.current = false;                          // degraded: block every save until a clean reload
+    setUsingCache(true);
+    return true;
+  };
   const tableSetters = { clients: setClients, appointments: setAppts, waitlist: setWaitlist, services: setServices, providers: setProviders };
   const refetchTable = async (table) => {
     try {
@@ -2127,6 +2154,7 @@ function App() {
       }
       lastRemoteRef.current[table] = list;
       const set = tableSetters[table]; if (set) set(list);
+      if (table === 'appointments' || table === 'clients') { writeCache(table, list); setUsingCache(false); }
     } catch (e) { console.error('[vero] live-sync refetch error:', e); }
   };
 
@@ -2219,8 +2247,14 @@ function App() {
         if ((linkChanged || didConsolidate) && sv && sv.length) setServices(consolidated);
       }
 
+      // Mirror the columns/services the calendar needs to render into the offline cache on success.
+      // Only fall back to the cache when a load actually ERRORED (!allLoaded) — never over a
+      // genuinely-empty shop, which would show stale rows.
+      if (pr && pr.length) writeCache('providers', pr); else if (!allLoaded) { const c = readCache('providers'); if (c && c.length && !providersFullRef.current) { lastRemoteRef.current.providers = c; setProviders(c); } }
+      if (sv && sv.length) writeCache('services', sv); else if (!allLoaded) { const c = readCache('services'); if (c && c.length) { lastRemoteRef.current.services = c; setServices(c); } }
+
       // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
-      if (allLoaded) { loadedRef.current = true; setLoadIncomplete(false); }
+      if (allLoaded) { loadedRef.current = true; setLoadIncomplete(false); setUsingCache(false); }
       else { console.error('[vero] one or more loads failed — saves are blocked until reload to protect existing data'); setLoadIncomplete(true); }
       setDataLoaded(true);
     })();
@@ -2252,11 +2286,12 @@ function App() {
     (async () => {
       const { data, error } = await supabase.from('clients').select('data').eq('shop_id', SHOP_ID);
       if (!alive) return;
-      if (error) { console.error('[vero] load clients failed:', error); return; }
+      if (error) { console.error('[vero] load clients failed:', error); hydrateFromCache('clients', clients, setClients); return; }
       if (tableBusy('clients')) return; // a local edit is mid-save — don't stomp it with server state
       const list = data ? data.map((r) => r.data) : [];
       lastRemoteRef.current.clients = list;
       setClients(list);
+      writeCache('clients', list);
     })();
     return () => { alive = false; };
   }, [sessionUid]);
@@ -2317,11 +2352,13 @@ function App() {
       }
       const { data, error } = await supabase.from('appointments').select('data').eq('shop_id', SHOP_ID);
       if (!alive) return;
-      if (error) { console.error('[vero] load appointments failed:', error); return; }
+      if (error) { console.error('[vero] load appointments failed:', error); hydrateFromCache('appointments', appts, setAppts); return; }
       if (tableBusy('appointments')) return; // a local edit (e.g. a just-deleted appt) is mid-save — don't resurrect it
       const list = data ? data.map((r) => r.data) : [];
       lastRemoteRef.current.appointments = list;
       setAppts(list);
+      writeCache('appointments', list);
+      setUsingCache(false); // fresh server data — leave cache mode
     })();
     return () => { alive = false; };
   }, [sessionUid]);
@@ -2647,7 +2684,17 @@ function App() {
       )}
 
       {/* Loud, non-silent version of the save-gate: a load errored, so saving is paused. Reload re-runs the load. */}
-      {loadIncomplete && session && !saveFailed && (
+      {/* Offline read-cache banner — calm + honest: the calendar is showing the last-synced day
+          because the server can't be reached (e.g. a Supabase outage or dead shop wifi). The data
+          is all there; the app is just read-only until it reconnects. Takes precedence over the red
+          "saving paused" banner because here the barber CAN still see their schedule. */}
+      {usingCache && session && (
+        <div role="status" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#8A6D3B", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
+          <span>Showing your last synced schedule — can't reach the server right now. Your data is safe; changes are paused until it reconnects.</span>
+          <button onClick={() => { try { window.location.reload(); } catch (e) {} }} style={{ flexShrink: 0, background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600, letterSpacing: 0.5 }}>Retry</button>
+        </div>
+      )}
+      {loadIncomplete && session && !saveFailed && !usingCache && (
         <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#C2563F", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
           <span>Some of your data didn't load, so saving is paused to protect it. Nothing you change right now will be kept until you reload.</span>
           <button onClick={() => { try { window.location.reload(); } catch (e) {} }} style={{ flexShrink: 0, background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600, letterSpacing: 0.5 }}>Reload</button>
