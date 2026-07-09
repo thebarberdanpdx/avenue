@@ -1675,6 +1675,43 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// cross-device-sync — staff cold-start helpers (used before App state initializes).
+// Signed-in devices must NOT boot with the in-code demo seed (TODAY_APPTS / CLIENTS): that seed
+// races the real server load and tableBusy can block the fetch — iPad never sees iPhone bookings.
+function _hasStoredAuth() {
+  try { return typeof window !== "undefined" && Object.keys(localStorage).some((k) => /^sb-.*-auth-token$/.test(k)); } catch (e) { return false; }
+}
+function _shopIdFromUrl() {
+  const FALLBACK = "sanctuary";
+  if (typeof window === "undefined") return FALLBACK;
+  try {
+    const url = new URL(window.location.href);
+    const q = url.searchParams.get("shop");
+    if (q) return q.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    const parts = url.hostname.split(".");
+    if (parts.length > 2) {
+      const sub = parts[0].toLowerCase();
+      if (sub && !["www", "app", "gotvero", "localhost"].includes(sub)) return sub.replace(/[^a-z0-9-]/g, "");
+    }
+    const seg = url.pathname.split("/").filter(Boolean)[0];
+    if (seg) {
+      const s = seg.toLowerCase();
+      if (!["book", "client", "staff", "manage", "review", "terms", "privacy", "preview", "index.html"].includes(s)) {
+        return s.replace(/[^a-z0-9-]/g, "") || FALLBACK;
+      }
+    }
+  } catch (e) {}
+  return FALLBACK;
+}
+function _readStaffCache(table) {
+  if (!_hasStoredAuth()) return null;
+  try {
+    const raw = localStorage.getItem(`vero_cache_${_shopIdFromUrl()}_${table}`);
+    const v = raw ? JSON.parse(raw) : null;
+    return Array.isArray(v) ? v : null;
+  } catch (e) { return null; }
+}
+
 function App() {
   // Two front doors: gotvero.com (root) is the BUSINESS dashboard; gotvero.com/book is the
   // client booking link. Read the URL up front so a client never flashes the staff login.
@@ -1867,12 +1904,13 @@ function App() {
   };
   // Send anyone into a fresh client booking flow (used by "Book here" on the login, and "book another").
   const goBooking = () => { setClientNonce((n) => n + 1); setView("client"); };
-  const [clients, setClients] = useState(CLIENTS);
-  const [appts, setAppts] = useState(TODAY_APPTS);
-  const [waitlist, setWaitlist] = useState([
+  // cross-device-sync: signed-in staff boot from last-synced cache (or empty) — never the demo seed.
+  const [clients, setClients] = useState(() => _readStaffCache("clients") || (_hasStoredAuth() ? [] : CLIENTS));
+  const [appts, setAppts] = useState(() => _readStaffCache("appointments") || (_hasStoredAuth() ? [] : TODAY_APPTS));
+  const [waitlist, setWaitlist] = useState(() => _readStaffCache("waitlist") || (_hasStoredAuth() ? [] : [
     { id: "w1", name: "Andre Foster", phone: "503-555-0277", provider: "Dan", day: "This week", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 3 * 3600e3).toLocaleString() },
     { id: "w2", name: "Sam Rivera", phone: "503-555-0291", provider: "Dan", day: "Any day", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 1 * 3600e3).toLocaleString() },
-  ]);
+  ]));
   const [reviews, setReviews] = useState([]); // customer reviews (pending/published/declined); public submissions land here via RPC
   const [business, setBusiness] = useState(DEFAULT_BUSINESS);
   const [services, setServices] = useState(DEFAULT_SERVICES);
@@ -2057,6 +2095,10 @@ function App() {
   }, [saveFailed]);
   const [loadIncomplete, setLoadIncomplete] = useState(false); // a load errored → saves are blocked; surface it instead of failing silently
   const [usingCache, setUsingCache] = useState(false); // showing the last-synced calendar from the on-device cache (server unreachable) — drives an honest banner
+  // cross-device-sync: block appointment/client SAVES until the first successful server pull for this
+  // sign-in — otherwise the demo seed (or []) races the load and tableBusy can skip the real fetch.
+  const staffApptsLoadedRef = useRef(!!_readStaffCache("appointments")?.length);
+  const staffClientsLoadedRef = useRef(!!_readStaffCache("clients")?.length);
 
   // Save a whole in-memory list to its shop-scoped table.
   // Strategy: upsert current items first (never destroys data), then delete rows that aren't in the list.
@@ -2352,6 +2394,7 @@ function App() {
   useEffect(() => {
     let alive = true;
     if (!session) {
+      staffClientsLoadedRef.current = false;
       const empty = [];
       lastRemoteRef.current.clients = empty;
       setClients(empty);
@@ -2361,8 +2404,9 @@ function App() {
       const { data, error } = await supabase.from('clients').select('data').eq('shop_id', SHOP_ID);
       if (!alive) return;
       if (error) { console.error('[vero] load clients failed:', error); hydrateFromCache('clients', clients, setClients); return; }
-      if (tableBusy('clients')) return; // a local edit is mid-save — don't stomp it with server state
+      if (tableBusy('clients') && staffClientsLoadedRef.current) return; // cross-device-sync: never skip the FIRST pull
       const list = data ? data.map((r) => r.data) : [];
+      staffClientsLoadedRef.current = true;
       lastRemoteRef.current.clients = list;
       setClients(list);
       writeCache('clients', list);
@@ -2415,6 +2459,7 @@ function App() {
     let alive = true;
     (async () => {
       if (!session) {
+        staffApptsLoadedRef.current = false;
         try {
           const { data } = await supabase.rpc('get_availability', { p_shop: SHOP_ID });
           if (!alive) return;
@@ -2427,8 +2472,9 @@ function App() {
       const { data, error } = await supabase.from('appointments').select('data').eq('shop_id', SHOP_ID);
       if (!alive) return;
       if (error) { console.error('[vero] load appointments failed:', error); hydrateFromCache('appointments', appts, setAppts); return; }
-      if (tableBusy('appointments')) return; // a local edit (e.g. a just-deleted appt) is mid-save — don't resurrect it
+      if (tableBusy('appointments') && staffApptsLoadedRef.current) return; // cross-device-sync: never skip the FIRST pull
       const list = data ? data.map((r) => r.data) : [];
+      staffApptsLoadedRef.current = true;
       lastRemoteRef.current.appointments = list;
       setAppts(list);
       writeCache('appointments', list);
@@ -2467,8 +2513,8 @@ function App() {
     if (table === 'providers') syncList('providers', v).finally(() => { providersDirtyRef.current = false; });
     else syncList(table, v);
   };
-  useEffect(() => { if (!loadedRef.current || !session) return; if (clients === lastRemoteRef.current.clients) return; lastSaveAt.current.clients = Date.now(); pendingSaveRef.current.clients = clients; const t = setTimeout(() => firePending('clients'), 800); return () => clearTimeout(t); }, [clients]);
-  useEffect(() => { if (!loadedRef.current || !session) return; if (appts === lastRemoteRef.current.appointments) return; lastSaveAt.current.appointments = Date.now(); pendingSaveRef.current.appointments = appts; const t = setTimeout(() => firePending('appointments'), 800); return () => clearTimeout(t); }, [appts]);
+  useEffect(() => { if (!loadedRef.current || !session || !staffClientsLoadedRef.current) return; if (clients === lastRemoteRef.current.clients) return; lastSaveAt.current.clients = Date.now(); pendingSaveRef.current.clients = clients; const t = setTimeout(() => firePending('clients'), 800); return () => clearTimeout(t); }, [clients]);
+  useEffect(() => { if (!loadedRef.current || !session || !staffApptsLoadedRef.current) return; if (appts === lastRemoteRef.current.appointments) return; lastSaveAt.current.appointments = Date.now(); pendingSaveRef.current.appointments = appts; const t = setTimeout(() => firePending('appointments'), 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; lastSaveAt.current.waitlist = Date.now(); pendingSaveRef.current.waitlist = waitlist; const t = setTimeout(() => firePending('waitlist'), 800); return () => clearTimeout(t); }, [waitlist]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (reviews === lastRemoteRef.current.reviews) return; lastSaveAt.current.reviews = Date.now(); pendingSaveRef.current.reviews = reviews; const t = setTimeout(() => firePending('reviews'), 800); return () => clearTimeout(t); }, [reviews]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (services === lastRemoteRef.current.services) return; lastSaveAt.current.services = Date.now(); pendingSaveRef.current.services = services; const t = setTimeout(() => firePending('services'), 800); return () => clearTimeout(t); }, [services]);
@@ -2489,29 +2535,36 @@ function App() {
   // client made while the app was asleep wouldn't show until a full reload. refetchTable's own
   // guards (mid-save, save-echo window) keep this from ever stomping a local edit.
   const lastFgRefetch = useRef(0);
+  const hiddenAtRef = useRef(0);
+  const pullLiveTables = (tables) => {
+    const list = tables || ["appointments", "clients", "waitlist", "services", "providers"];
+    lastFgRefetch.current = Date.now();
+    list.forEach((t) => refetchTable(t));
+  };
   useEffect(() => {
     if (!sessionUid) return;
     const onFg = () => {
+      if (document.visibilityState === "hidden") { hiddenAtRef.current = Date.now(); return; }
       if (document.visibilityState !== "visible") return;
-      if (Date.now() - lastFgRefetch.current < 15000) return; // at most once per 15s
-      lastFgRefetch.current = Date.now();
-      ["appointments", "clients", "waitlist", "services", "providers"].forEach((t) => refetchTable(t));
+      const awayMs = hiddenAtRef.current ? Date.now() - hiddenAtRef.current : 0;
+      // After any real background stint, pull immediately — don't make a second device wait on throttle.
+      if (awayMs < 2000 && Date.now() - lastFgRefetch.current < 8000) return;
+      pullLiveTables();
     };
     document.addEventListener("visibilitychange", onFg);
     window.addEventListener("focus", onFg);
     return () => { document.removeEventListener("visibilitychange", onFg); window.removeEventListener("focus", onFg); };
   }, [sessionUid]);
   // Heartbeat: while the app is OPEN and visible, quietly re-pull appointments + clients every
-  // 60s. Realtime is the instant path (when the tables are in Supabase's realtime publication);
-  // this is the guaranteed floor — the calendar can never drift more than a minute behind even
+  // 30s. Realtime is the instant path (when the tables are in Supabase's realtime publication);
+  // this is the guaranteed floor — the calendar can never drift more than 30s behind even
   // if the socket silently died. refetchTable's guards keep it from stomping a mid-save edit.
   useEffect(() => {
     if (!sessionUid) return;
     const id = setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      lastFgRefetch.current = Date.now();
-      refetchTable('appointments'); refetchTable('clients');
-    }, 60000);
+      pullLiveTables(["appointments", "clients"]);
+    }, 30000);
     return () => clearInterval(id);
   }, [sessionUid]);
 
@@ -2800,7 +2853,7 @@ function App() {
       {view === "shop" && (session
         ? (masterMode
           ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} />
-          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} />)
+          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
@@ -11470,7 +11523,7 @@ function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
   );
 }
 
-function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled }) {
+function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables }) {
   // Remember where the owner/staff was so leaving the app and coming back (iOS reloads the webview
   // on resume) restores the SAME screen instead of dumping them on the Pulse home. Persisted as
   // { tab, pulseDetail, activeClientId } in localStorage; mirrors the vero_signed_in_as pattern.
@@ -11528,7 +11581,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     setNavStack(navStack.slice(0, -1));
     setTab(prev.tab); setPulseDetail(prev.pulseDetail); setActiveClient(prev.activeClient);
   };
-  const goTab = (id) => { setNavStack([]); setTab(id); setPulseDetail(null); setActiveClient(null); setTabNonce((n) => n + 1); };
+  const goTab = (id) => { setNavStack([]); setTab(id); setPulseDetail(null); setActiveClient(null); setTabNonce((n) => n + 1); if (pullLiveTables && (id === "calendar" || id === "clients" || id === "pulse")) pullLiveTables(["appointments", "clients"]); };
   // Friendly name of a screen, used to label the corner back ("‹ Calendar", "‹ Clients"…).
   const screenLabel = (s) => {
     if (!s) return "Back";
