@@ -2696,6 +2696,15 @@ function App() {
     if (table === 'providers') syncList('providers', v).finally(() => { providersDirtyRef.current = false; });
     else syncList(table, v);
   };
+  // cross-device-sync: calendar actions (check-in, book, checkout) flush to the server immediately
+  // instead of waiting on the 800ms debounce — so the 30s mirror never stomps them.
+  const flushApptsNow = (snap) => {
+    if (!loadedRef.current || !session || !staffApptsLoadedRef.current) return;
+    const list = snap || appts;
+    pendingSaveRef.current.appointments = list;
+    lastSaveAt.current.appointments = Date.now();
+    firePending('appointments');
+  };
   useEffect(() => { if (!loadedRef.current || !session || !staffClientsLoadedRef.current) return; if (clients === lastRemoteRef.current.clients) return; lastSaveAt.current.clients = Date.now(); pendingSaveRef.current.clients = clients; const t = setTimeout(() => firePending('clients'), 800); return () => clearTimeout(t); }, [clients]);
   useEffect(() => { if (!loadedRef.current || !session || !staffApptsLoadedRef.current) return; if (appts === lastRemoteRef.current.appointments) return; lastSaveAt.current.appointments = Date.now(); pendingSaveRef.current.appointments = appts; const t = setTimeout(() => firePending('appointments'), 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; lastSaveAt.current.waitlist = Date.now(); pendingSaveRef.current.waitlist = waitlist; const t = setTimeout(() => firePending('waitlist'), 800); return () => clearTimeout(t); }, [waitlist]);
@@ -3073,7 +3082,7 @@ function App() {
       {view === "shop" && (session
         ? (masterMode
           ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} />
-          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} />)
+          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} syncHealth={syncHealth} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
@@ -11743,7 +11752,7 @@ function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
   );
 }
 
-function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables }) {
+function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables, flushApptsNow, syncHealth }) {
   // Remember where the owner/staff was so leaving the app and coming back (iOS reloads the webview
   // on resume) restores the SAME screen instead of dumping them on the Pulse home. Persisted as
   // { tab, pulseDetail, activeClientId } in localStorage; mirrors the vero_signed_in_as pattern.
@@ -12096,7 +12105,9 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       <div style={{ borderBottom: "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 16px) 20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
         {navStack.length > 0 ? <BackBar to={backLabel} onClick={navBack} style={{ marginBottom: 0 }} /> : <div style={{ width: 50 }} />}
         <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} />
-        <div style={{ width: 50 }} />
+        <div style={{ width: 50, textAlign: "right", fontSize: 11, color: "var(--faint)", lineHeight: 1.3 }}>
+          {syncHealth && syncHealth.at && !syncHealth.err ? (syncHealth.via === "api" ? "Synced" : "Sync") : null}
+        </div>
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
         {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => goTab(t)} onOpenRevenue={() => navTo({ pulseDetail: "revenue" })} onOpenPayments={() => navTo({ pulseDetail: "payments" })} onOpenAppointments={() => navTo({ pulseDetail: "appointments" })} onOpenClients={() => navTo({ pulseDetail: "clients" })} onOpenServices={() => navTo({ pulseDetail: "services" })} onOpenBarbers={() => navTo({ pulseDetail: "barbers" })} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c, pulseDetail: null })} onOpenAppt={(id) => { setPulseOpenApptId(id); navTo({ tab: "calendar", pulseDetail: null, activeClient: null }); }} showToast={showToast} notifCount={unseenCount} onOpenNotifications={() => navTo({ pulseDetail: "notifications" })} />}
@@ -12107,9 +12118,9 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={navBack} onOpenNudge={() => goTab("clients")} onOpenClient={(c) => navTo({ pulseDetail: null, activeClient: c, tab: "clients" })} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={navBack} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={navBack} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} flushApptsNow={flushApptsNow} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
-        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} onOpenAppt={(a) => { setPulseOpenApptId(a.id); navTo({ tab: "calendar", activeClient: null }); }} />}
+        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} onOpenAppt={(a) => { setPulseOpenApptId(a.id); navTo({ tab: "calendar", activeClient: null }); }} flushApptsNow={flushApptsNow} />}
         {tab === "messages" && <MessagesView key={`messages-${tabNonce}`} clients={clients} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} appts={appts} setAppts={setAppts} clients={clients} business={business} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
@@ -21345,7 +21356,7 @@ function ColumnOrderEditor({ providers, setProviders }) {
     </div>
   );
 }
-function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId, deepLinkApptId, onDeepLinkHandled, rebookSeed, onRebookHandled }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId, deepLinkApptId, onDeepLinkHandled, rebookSeed, onRebookHandled, flushApptsNow }) {
   const sizeId = business?.calendarRowSize || "L";
   // Visible calendar window — configurable in Calendar Settings; falls back to 7 AM–10 PM.
   const DAY_START = ((business?.calendar?.dayStartHr ?? 7)) * 60;
@@ -21425,7 +21436,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   useLayoutEffect(() => { scrollStripToWeek("auto"); didStripMount.current = true; }, []);
   useEffect(() => { if (didStripMount.current) scrollStripToWeek("smooth"); }, [dayOffset]); // eslint-disable-line
 
-  const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts((cur) => cur.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } setTimeout(() => handleFreedSlot(freed), 350); } };
+  const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts((cur) => { const next = cur.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a)); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; }); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } setTimeout(() => handleFreedSlot(freed), 350); } };
   // open checkout instead of silently completing
   // #16: an appointment that already carries a payment (checked out once, or a status reverted after
   // payment) must open in balance-only (reopen) mode — never the full-price charge flow — so it can
@@ -21456,7 +21467,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const commitCheckout = (id, summary) => {
     if (committedRef.current[id]) return;
     committedRef.current[id] = true;
-    setAppts((cur) => cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a));
+    setAppts((cur) => { const next = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
     // "Text a reminder instead" stamps the client HERE, at the same commit moment as the ticket —
     // stamping it after the closing dwell (like the old checkout write) could lose the reminder
     // to an app swipe-away. The reminder cron picks it up from client.bookReminder.
@@ -21503,7 +21514,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       }
     } catch (e) {}
   };
-  const applyApptPatch = (id, patch) => { setAppts((cur) => cur.map((a) => a.id === id ? { ...a, ...patch } : a)); setOpen((o) => o && o.id === id ? { ...o, ...patch } : o); };
+  const applyApptPatch = (id, patch) => { setAppts((cur) => { const next = cur.map((a) => a.id === id ? { ...a, ...patch } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; }); setOpen((o) => o && o.id === id ? { ...o, ...patch } : o); };
   // #15: an edit that changes an appointment's time / day / duration / provider must run the SAME
   // overlap check every other write path (create, drag-move) already does — otherwise the Edit sheet
   // silently double-books a chair. On a conflict, pop the conflict modal and RETURN FALSE (the caller
@@ -21784,7 +21795,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     // Functional updater: apply the move to the CURRENT appts, not the stale closure snapshot —
     // otherwise a concurrent live-sync refetch could land on top and make the move "not take"
     // until a later retry. This was the drag-to-reschedule-needs-a-few-tries bug.
-    setAppts((cur) => cur.map((a) => a.id === p.appt.id ? { ...a, start: p.newStart, end: p.newEnd, bookedFor: bf.toISOString() } : a));
+    setAppts((cur) => { const next = cur.map((a) => a.id === p.appt.id ? { ...a, start: p.newStart, end: p.newEnd, bookedFor: bf.toISOString() } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
     if (notifyMove) { const _cl = (clients || []).find((c) => c.id === p.appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: moved, business, providers, contact: { email: _cl.email || "", phone: p.appt.phone || _cl.phone || "" } }); }
     fireStaffPush({ shopId, title: "Appointment moved", appt: moved, event: "rescheduled", business });
     showToast(notifyMove ? `${p.appt.name} moved — client notified.` : `${p.appt.name} moved to ${fmtTime(p.newStart)}.`);
@@ -21971,7 +21982,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     }
 
     const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: (optLabels && optLabels.length) ? `${service.name} · ${optLabels.join(", ")}` : service.name, serviceName: service.name, addonLabels: optLabels || [], lineItems: [{ serviceId: service.id, cutType: null, beardType: null, addons: addons || {} }], manageToken: makeManageToken(), detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), email: bookClient ? (bookClient.email || "") : (walkInEmail || ""), hasPhotos: false, photos: 0, newClient: (!client && !!walkInName) ? true : undefined /* audit #29: a new walk-in counts toward the barber's new-client-per-day cap */ };
-    setAppts((cur) => [...cur, newAppt]);
+    setAppts((cur) => { const next = [...cur, newAppt]; if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
     // Staff-created booking → fire the confirmation too (same engine as online bookings) —
     // unless the form's "Notify client" toggle was switched off (silent booking). Staff-side
     // pushes still fire either way; the toggle only silences the CLIENT.
@@ -26440,7 +26451,7 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
   );
 }
 
-function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, setAppts, business, setBusiness, me, shopId, onBack, showToast, onRebook, onOpenAppt }) {
+function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, setAppts, business, setBusiness, me, shopId, onBack, showToast, onRebook, onOpenAppt, flushApptsNow }) {
   const live = clients.find((c) => c.id === client.id) || client;
   const provider = providers.find((p) => p.id === live.provider) || providers[1] || providers[0] || {};
   const firstName = (live.name || "").split(" ")[0] || "this client";
@@ -26580,11 +26591,11 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   };
   const rebook = (a) => { if (onRebook) onRebook({ clientId: client.id, serviceId: a.serviceId, providerId: a.providerId || live.provider }); setDetail(null); };
 
-  const checkInAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "in-service", serviceStartedAt: x.serviceStartedAt || Date.now() } : x)); setDetail(null); showToast(`${firstName} checked in.`); };
-  const cancelAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "cancelled" } : x)); setDetail(null); showToast("Appointment cancelled."); };
+  const checkInAppt = (a) => { setAppts((cur) => { const next = cur.map((x) => x.id === a.id ? { ...x, status: "in-service", serviceStartedAt: x.serviceStartedAt || Date.now() } : x); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; }); setDetail(null); showToast(`${firstName} checked in.`); };
+  const cancelAppt = (a) => { setAppts((cur) => { const next = cur.map((x) => x.id === a.id ? { ...x, status: "cancelled" } : x); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; }); setDetail(null); showToast("Appointment cancelled."); };
   // Commit runs the moment checkout shows "All done" (idempotent — the close re-runs it harmlessly),
   // so backgrounding the app during the closing animation can't lose the paid/done status.
-  const commitCheckoutLite = (id, summary) => setAppts((cur) => cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt) } : a));
+  const commitCheckoutLite = (id, summary) => setAppts((cur) => { const next = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt) } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
   const finishCheckoutLite = (id, summary) => { commitCheckoutLite(id, summary); setCheckout(null); showToast("Payment recorded."); };
   const sameDayLocal = (iso, ref) => { if (!iso || !ref) return false; const a = new Date(iso); return a.getFullYear() === ref.getFullYear() && a.getMonth() === ref.getMonth() && a.getDate() === ref.getDate(); };
   // Double-booking guard for inline reschedule — mirrors the online-booking guard
@@ -26609,7 +26620,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
     if (reschedClashes(resched.id, resched.date, resched.start)) { showToast(`That overlaps another booking for ${provName(a)} — pick a free time.`); return; }
     const dur = Math.max(5, (a.end - a.start) || 30);
     const bf = new Date(resched.date); bf.setHours(Math.floor(resched.start / 60), resched.start % 60, 0, 0);
-    setAppts((cur) => cur.map((x) => x.id === resched.id ? { ...x, bookedFor: bf.toISOString(), start: resched.start, end: resched.start + dur } : x));
+    setAppts((cur) => { const next = cur.map((x) => x.id === resched.id ? { ...x, bookedFor: bf.toISOString(), start: resched.start, end: resched.start + dur } : x); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
     setResched(null); setDetail(null); showToast("Appointment moved.");
   };
 
