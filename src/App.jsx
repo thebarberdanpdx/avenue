@@ -8638,6 +8638,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   const [pickerOpen, setPickerOpen] = useState(false);
   const [growthOpen, setGrowthOpen] = useState(false); // "How you're growing" full-screen
   const [wrapOpen, setWrapOpen] = useState(false); // wrap-up sheet (opened from the tile)
+  const [wrapDurEdits, setWrapDurEdits] = useState({}); // wrap-up: per-appt learned-time the barber has stepped to
   const [rebookOpen, setRebookOpen] = useState(false); // overdue-regulars card expanded
   // Pulse defaults to a barber-minimal view (money + live action cards). The busy stuff — stat tiles,
   // the nav menus, this week — collapses behind one toggle. Choice is remembered across sessions.
@@ -9031,12 +9032,21 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               {wrapUp.map((a, i) => {
                 const d = a.pendingDurationSave;
                 const client = clients.find((c) => c.id === a.clientId);
+                // Learned-time control: default to the measured time only when it's actually sane
+                // (>=3 min — a 0-min "Ran 0 · Save 5" is meaningless), else to their current/scheduled
+                // time. The barber can step it to anything and save the real custom duration.
+                const svc = d ? services.find((s) => s.id === d.serviceId) : null;
+                const measuredSane = !!(d && d.measuredMin != null && d.measuredMin >= 3);
+                const durDefault = d ? (measuredSane ? d.suggestedMin : (d.currentDur || (svc && svc.duration) || 30)) : 0;
+                const durVal = (d && wrapDurEdits[a.id] != null) ? wrapDurEdits[a.id] : durDefault;
+                const setDurVal = (v) => setWrapDurEdits((m) => ({ ...m, [a.id]: Math.max(5, v) }));
                 const onSave = () => {
-                  setClients((cur) => cur.map((c) => c.id === d.clientId ? { ...c, customDurations: { ...(c.customDurations || {}), [d.serviceId]: d.suggestedMin } } : c));
+                  setClients((cur) => cur.map((c) => c.id === d.clientId ? { ...c, customDurations: { ...(c.customDurations || {}), [d.serviceId]: durVal } } : c));
                   setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, pendingDurationSave: null } : x));
-                  if (showToast) showToast(`Saved — ${d.serviceName} books at ${d.suggestedMin} min for ${(d.clientName || "").split(" ")[0]}.`);
+                  setWrapDurEdits((m) => { const n = { ...m }; delete n[a.id]; return n; });
+                  if (showToast) showToast(`Saved — ${d.serviceName} books at ${durVal} min for ${(d.clientName || "").split(" ")[0]}.`);
                 };
-                const onDismiss = () => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, pendingDurationSave: null } : x)); };
+                const onDismiss = () => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, pendingDurationSave: null } : x)); setWrapDurEdits((m) => { const n = { ...m }; delete n[a.id]; return n; }); };
                 const onClear = () => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, noteLogged: true } : x)); if (showToast) showToast("Cleared from wrap-up."); };
                 const editing = noteFor && noteFor.id === a.id;
                 return (
@@ -9044,15 +9054,18 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 14.5, fontWeight: 500 }}>{d ? `${d.clientName}${d.serviceName ? ` · ${d.serviceName}` : ""}` : (client?.name || a.name || "This client")}</div>
-                        <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.45 }}>{d ? (<>Ran <strong style={{ color: "var(--gold)", fontWeight: 600 }}>{d.measuredMin} min</strong>{d.currentDur != null ? ` · scheduled ${d.currentDur}` : ""} — save as their time?</>) : "Cut done — add a note or photo to their profile."}</div>
+                        <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.45 }}>{d ? (measuredSane ? (<>Ran <strong style={{ color: "var(--gold)", fontWeight: 600 }}>{d.measuredMin} min</strong>{d.currentDur != null ? ` · books at ${d.currentDur}` : ""} — set their time.</>) : `Set what ${(d.clientName || "they").split(" ")[0]} books ${d.serviceName || "this service"} at.`) : "Cut done — add a note or photo to their profile."}</div>
                       </div>
                       {!d && !editing && client && <button onClick={onClear} aria-label="Clear from wrap-up" style={{ background: "none", color: "var(--faint)", fontSize: 20, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}>×</button>}
                     </div>
 
                     {d && (
-                      <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
-                        <button className="lift" onClick={onSave} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: "9px 12px", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none" }}>Save {d.suggestedMin} min</button>
-                        <button onClick={onDismiss} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: "9px 12px", borderRadius: 10, fontSize: 14, fontWeight: 500 }}>Discard</button>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 11 }}>
+                        <button onClick={() => setDurVal(durVal - 5)} aria-label="Less time" style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid var(--border)", background: "var(--panel2)", color: "var(--text)", fontSize: 20, lineHeight: 1, flexShrink: 0, cursor: "pointer" }}>−</button>
+                        <div style={{ minWidth: 66, textAlign: "center", fontSize: 17, fontWeight: 600, color: "var(--text)" }}>{durVal} min</div>
+                        <button onClick={() => setDurVal(durVal + 5)} aria-label="More time" style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid var(--border)", background: "var(--panel2)", color: "var(--text)", fontSize: 20, lineHeight: 1, flexShrink: 0, cursor: "pointer" }}>+</button>
+                        <button className="lift" onClick={onSave} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: "10px 12px", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}>Save time</button>
+                        <button onClick={onDismiss} aria-label="Skip" style={{ background: "none", border: "none", color: "var(--faint)", fontSize: 13.5, fontWeight: 500, padding: "0 4px", flexShrink: 0, cursor: "pointer" }}>Skip</button>
                       </div>
                     )}
 
