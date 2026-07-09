@@ -1757,6 +1757,14 @@ function App() {
         const KEY = "vero_reloaded_for";
         if (sessionStorage.getItem(KEY) === version) return; // already tried for this version — don't loop
         sessionStorage.setItem(KEY, version);
+        // cross-device-sync: drop stale on-device copies when a new build ships — otherwise iPad can
+        // keep showing an old cached calendar and skip the fresh server pull.
+        try {
+          const sid = _shopIdFromUrl();
+          ["appointments", "clients", "waitlist", "services", "providers"].forEach((t) => {
+            localStorage.removeItem(`vero_cache_${sid}_${t}`);
+          });
+        } catch (e) {}
         const u = new URL(window.location.href);
         u.searchParams.set("v", String(version).slice(0, 8)); // change the URL to bust the webview cache
         window.location.replace(u.toString());
@@ -1904,10 +1912,11 @@ function App() {
   };
   // Send anyone into a fresh client booking flow (used by "Book here" on the login, and "book another").
   const goBooking = () => { setClientNonce((n) => n + 1); setView("client"); };
-  // cross-device-sync: signed-in staff boot from last-synced cache (or empty) — never the demo seed.
-  const [clients, setClients] = useState(() => _readStaffCache("clients") || (_hasStoredAuth() ? [] : CLIENTS));
-  const [appts, setAppts] = useState(() => _readStaffCache("appointments") || (_hasStoredAuth() ? [] : TODAY_APPTS));
-  const [waitlist, setWaitlist] = useState(() => _readStaffCache("waitlist") || (_hasStoredAuth() ? [] : [
+  // cross-device-sync: signed-in staff always start empty — server is the source of truth. Booting
+  // from cache showed stale calendars on iPad and could skip the real pull.
+  const [clients, setClients] = useState(() => (_hasStoredAuth() ? [] : CLIENTS));
+  const [appts, setAppts] = useState(() => (_hasStoredAuth() ? [] : TODAY_APPTS));
+  const [waitlist, setWaitlist] = useState(() => (_hasStoredAuth() ? [] : [
     { id: "w1", name: "Andre Foster", phone: "503-555-0277", provider: "Dan", day: "This week", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 3 * 3600e3).toLocaleString() },
     { id: "w2", name: "Sam Rivera", phone: "503-555-0291", provider: "Dan", day: "Any day", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 1 * 3600e3).toLocaleString() },
   ]));
@@ -2097,8 +2106,8 @@ function App() {
   const [usingCache, setUsingCache] = useState(false); // showing the last-synced calendar from the on-device cache (server unreachable) — drives an honest banner
   // cross-device-sync: block appointment/client SAVES until the first successful server pull for this
   // sign-in — otherwise the demo seed (or []) races the load and tableBusy can skip the real fetch.
-  const staffApptsLoadedRef = useRef(!!_readStaffCache("appointments")?.length);
-  const staffClientsLoadedRef = useRef(!!_readStaffCache("clients")?.length);
+  const staffApptsLoadedRef = useRef(false);
+  const staffClientsLoadedRef = useRef(false);
 
   // Save a whole in-memory list to its shop-scoped table.
   // Strategy: upsert current items first (never destroys data), then delete rows that aren't in the list.
@@ -2231,7 +2240,8 @@ function App() {
     return true;
   };
   const tableSetters = { clients: setClients, appointments: setAppts, waitlist: setWaitlist, services: setServices, providers: setProviders };
-  const refetchTable = async (table) => {
+  const refetchTable = async (table, opts = {}) => {
+    const force = !!(opts && opts.force);
     try {
       if (table === 'appointments' && !session) {
         const { data } = await supabase.rpc('get_availability', { p_shop: SHOP_ID });
@@ -2243,10 +2253,17 @@ function App() {
       const { data, error } = await supabase.from(table).select('data').eq('shop_id', SHOP_ID);
       if (error) { console.error(`[vero] live-sync refetch '${table}' failed:`, error); return; }
       let list = data ? data.map((r) => r.data) : [];
-      // Ignore the realtime echo of our OWN recent save: a read right after a write can come back
-      // stale and stomp the very edit we just made (this was the email/phone "disappears" bug).
       const sv = savingRef.current[table];
-      if ((sv && (sv.running || sv.queued)) || (lastSaveAt.current[table] && Date.now() - lastSaveAt.current[table] < 2500)) return;
+      if (!force) {
+        // Ignore the realtime echo of our OWN recent save: a read right after a write can come back
+        // stale and stomp the very edit we just made (this was the email/phone "disappears" bug).
+        if ((sv && (sv.running || sv.queued)) || (lastSaveAt.current[table] && Date.now() - lastSaveAt.current[table] < 2500)) return;
+      } else if (sv && sv.running) {
+        return; // never stomp a write that's actively in flight
+      } else if (table === 'appointments' || table === 'clients') {
+        // cross-device-sync: server wins over a stale pending local snapshot
+        delete pendingSaveRef.current[table];
+      }
       if (table === 'services') list.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
       if (table === 'providers') {
         // Don't clobber an in-flight local edit (title/role/reorder) with a realtime echo,
@@ -2257,7 +2274,11 @@ function App() {
       }
       lastRemoteRef.current[table] = list;
       const set = tableSetters[table]; if (set) set(list);
-      if (table === 'appointments' || table === 'clients') { writeCache(table, list); setUsingCache(false); }
+      if (table === 'appointments' || table === 'clients') {
+        writeCache(table, list); setUsingCache(false);
+        if (table === 'appointments') { staffApptsLoadedRef.current = true; setSaveFailed(false); }
+        if (table === 'clients') staffClientsLoadedRef.current = true;
+      }
     } catch (e) { console.error('[vero] live-sync refetch error:', e); }
   };
 
@@ -2479,6 +2500,7 @@ function App() {
       setAppts(list);
       writeCache('appointments', list);
       setUsingCache(false); // fresh server data — leave cache mode
+      setSaveFailed(false);
     })();
     return () => { alive = false; };
   }, [sessionUid]);
@@ -2539,8 +2561,13 @@ function App() {
   const pullLiveTables = (tables) => {
     const list = tables || ["appointments", "clients", "waitlist", "services", "providers"];
     lastFgRefetch.current = Date.now();
-    list.forEach((t) => refetchTable(t));
+    list.forEach((t) => refetchTable(t, { force: t === "appointments" || t === "clients" }));
   };
+  // cross-device-sync: once signed in and the shell is ready, immediately pull the live calendar.
+  useEffect(() => {
+    if (!dataLoaded || !sessionUid) return;
+    pullLiveTables(["appointments", "clients"]);
+  }, [dataLoaded, sessionUid]);
   useEffect(() => {
     if (!sessionUid) return;
     const onFg = () => {
