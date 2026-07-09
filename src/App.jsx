@@ -2388,6 +2388,8 @@ function App() {
     const run = (async () => {
       setSyncHealth((h) => ({ ...h, pulling: true }));
       await ensureFreshSession();
+      try { await supabase.auth.refreshSession(); } catch (e) {}
+      let apiErr = null;
       try {
         const headers = await authedHeaders();
         const r = await fetch(API_BASE + "/api/sync-pull", {
@@ -2401,9 +2403,17 @@ function App() {
           applyServerMirror({ ...body, via: "api" });
           return true;
         }
-        console.error("[vero] mirrorFromServer api failed:", body.error || r.status, body.email || "");
+        apiErr = body.error || `sync-pull HTTP ${r.status}`;
+        console.error("[vero] mirrorFromServer api failed:", apiErr, body.email || "");
       } catch (e) {
+        apiErr = (e && e.message) || String(e);
         console.error("[vero] mirrorFromServer api threw:", e);
+      }
+      // Never treat a failed server mirror as success with empty direct rows — that
+      // was the iPad "Cloud: 0 · via direct" false empty state.
+      if (apiErr) {
+        setSyncHealth((h) => ({ ...h, err: apiErr, at: Date.now(), pulling: false, via: "api-failed" }));
+        return false;
       }
       const [clRes, apRes] = await Promise.all([
         fetchStaffTable("clients", SHOP_ID),
