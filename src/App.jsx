@@ -3509,6 +3509,49 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject, ex
   } catch (e) {}
 }
 
+// Actually SEND the running-late heads-up to the next client. This is the real send behind the
+// "Let them know" prompt, which used to only flip a flag + toast "Sent" while nothing left the
+// device. Goes through the SAME /api/notify pipeline as reminders (server-side on-file guard +
+// SMS_LIVE gating). channel:"text" → SMS once 10DLC is live, otherwise it bridges to email.
+// Returns a result so the caller can report HONESTLY (which channel actually sent, or why not).
+async function fireRunningLate({ shopId, business, providers, appt, client, range }) {
+  try {
+    if (!appt || !business) return { ok: false, reason: "missing" };
+    const tpl = (business.runningLate || {}).message;
+    if (!tpl) return { ok: false, reason: "no-template" };
+    const prov = (providers || []).find((p) => p.id === appt.providerId) || {};
+    const email = String((client && client.email) || appt.email || "").trim();
+    const phone = String((client && client.phone) || appt.phone || "").replace(/\D/g, "");
+    if (!email && !phone) return { ok: false, reason: "no-contact", email, phone };
+    const ctx = {
+      client: String((client && client.name) || appt.name || "there").split(" ")[0],
+      provider: prov.name || appt.providerName || "your barber",
+      shop: business.name || "the shop", business: business.name || "the shop",
+      range: String(range),
+    };
+    const r = await fetch(API_BASE + "/api/notify", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shop: shopId || _stripeShop, channel: "text", to: { email, phone, smsOptOut: !!(client && client.smsOptOut) }, subject: `${business.name}: running a little behind`, template: tpl, context: ctx }),
+    });
+    const j = await r.json().catch(() => ({}));
+    const results = (j && j.results) || {};
+    const sentVia = results.sms === "sent" ? "text" : results.email === "sent" ? "email" : null;
+    return { ok: !!sentVia, sentVia, results, smsLive: !!(j && j.smsLive), email, phone };
+  } catch (e) { return { ok: false, reason: "network" }; }
+}
+
+// Plain-English reason a running-late heads-up didn't go out — so the toast tells the truth instead
+// of claiming "Sent" when nothing left. Mirrors what /api/notify actually reports back.
+function runningLateFailReason(res) {
+  if (!res) return "it couldn't be delivered";
+  if (res.reason === "no-contact" || (!res.email && !res.phone)) return "no phone or email on file";
+  const rr = res.results || {};
+  if (typeof rr.email === "string" && rr.email.startsWith("error")) return "the email failed to send";
+  if (typeof rr.sms === "string" && rr.sms.startsWith("error")) return "the text failed to send";
+  if (res.smsLive === false && !res.email) return "texting isn't switched on yet and they have no email on file";
+  return "it couldn't be delivered";
+}
+
 // Buzz the shop's phones (native app push) about a staff-side appointment event.
 // Same server endpoint the online-booking path uses, so closed-app notifications
 // behave identically no matter where the change came from. Fire-and-forget — a
@@ -8957,7 +9000,14 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           <button onClick={() => {
             const lateMin = (business?.runningLate?.defaultMin) || 10;
             setAppts((cur) => cur.map((a) => a.id === nextAppt.id ? { ...a, lateNotified: lateMin } : a));
-            if (showToast) showToast(`Sent ${(nextAppt.name || "").split(" ")[0]} a heads-up — running ${lateMin} min behind.`);
+            const rec = (clients || []).find((c) => c.id === nextAppt.clientId) || null;
+            const first = (nextAppt.name || "there").split(" ")[0];
+            // ACTUALLY send it — text when SMS is live, else email. Toast reflects the real result.
+            fireRunningLate({ business, providers, appt: nextAppt, client: rec, range: lateMin }).then((res) => {
+              if (!showToast) return;
+              if (res && res.ok) showToast(`Heads-up ${res.sentVia === "text" ? "texted" : "emailed"} to ${first} — running ${lateMin} min behind.`);
+              else showToast(`Couldn't reach ${first} — ${runningLateFailReason(res)}. Nothing was sent.`);
+            });
           }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "9px 16px", borderRadius: 22, fontSize: 13.5, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>LET THEM KNOW</button>
         </div>
       )}
@@ -24486,17 +24536,19 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const [lateOpen, setLateOpen] = useState(false);
   const [lateCascade, setLateCascade] = useState(null); // { ci, idx } — asking about laterClients[idx] with band ranges[ci-idx]
   const sendRunningLate = (range) => {
-    if (nextClient) onUpdate(nextClient.id, { lateNotified: range });
     const rl = (business && business.runningLate) || {};
-    if (rl.message && nextClient) {
-      const filled = rl.message
-        .replace(/\{client\}/g, (nextClient.name || "there").split(" ")[0])
-        .replace(/\{provider\}/g, provider.name)
-        .replace(/\{shop\}/g, (business && business.name) || "the shop")
-        .replace(/\{range\}/g, range);
-      showToast(`Sent to ${nextClient.name}: "${filled}"`);
+    if (nextClient) {
+      onUpdate(nextClient.id, { lateNotified: range });
+      const rec = (clients || []).find((c) => c.id === nextClient.clientId) || null;
+      const first = (nextClient.name || "there").split(" ")[0];
+      // ACTUALLY send it (this is the fix): text if SMS is live, otherwise bridge to email. Toast
+      // reports the real result — no more claiming "Sent" when nothing left the phone.
+      fireRunningLate({ shopId, business, providers, appt: nextClient, client: rec, range }).then((res) => {
+        if (res && res.ok) showToast(`Heads-up ${res.sentVia === "text" ? "texted" : "emailed"} to ${first} — running ${range} min behind.`);
+        else showToast(`Couldn't reach ${first} — ${runningLateFailReason(res)}. Nothing was sent.`);
+      });
     } else {
-      showToast(nextClient ? `In-app notice sent to ${nextClient.name}: running ${range} min behind.` : `Running-late notice sent.`);
+      showToast("No next client to notify.");
     }
     // Cascade: offer to warn the client after next, with a lighter band as you catch up — asked one at a time.
     const ranges = (rl.ranges) || ["5–10", "10–15"];
@@ -24512,7 +24564,13 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     const band = ranges[ci - idx];
     if (target && band != null) {
       onUpdate(target.id, { lateNotified: band });
-      if (showToast) showToast(`Also let ${(target.name || "").split(" ")[0]} know — running ${band} min behind.`);
+      const rec = (clients || []).find((c) => c.id === target.clientId) || null;
+      const first = (target.name || "").split(" ")[0];
+      fireRunningLate({ shopId, business, providers, appt: target, client: rec, range: band }).then((res) => {
+        if (!showToast) return;
+        if (res && res.ok) showToast(`Also ${res.sentVia === "text" ? "texted" : "emailed"} ${first} — running ${band} min behind.`);
+        else showToast(`Couldn't reach ${first} — ${runningLateFailReason(res)}.`);
+      });
     }
     // Offer the next one down too, if there is one and you haven't caught up yet.
     const nextIdx = idx + 1;
