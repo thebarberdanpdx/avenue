@@ -125,6 +125,7 @@ const GUARDS = [
   { needle: "outage-honest-menu", label: "public booking shows an honest 'can't load — call us' state on a failed menu load, never the DEFAULT_SERVICES demo menu masquerading as the shop's real one" },
   { needle: "cross-device-sync", label: "staff cold-start never seeds demo appts / block the first server pull (iPad must see iPhone bookings)" },
   { needle: "fetchStaffTable", label: "staff table reads refresh stale iOS JWT before pull (iPad empty calendar/clients)" },
+  { needle: "Sync problem on this device", label: "sync-gap banner when cloud has data but device shows empty" },
   { needle: "card-on-file-verified-only", label: "a saved card-on-file (brand + last-4) shows ONLY to a verified/signed-in client — never to an unverified booker who typed a matching phone (card disclosure + enumeration hole)" },
 ];
 try {

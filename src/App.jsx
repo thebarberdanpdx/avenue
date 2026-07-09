@@ -63,20 +63,29 @@ async function ensureFreshSession() {
 // cross-device-sync — staff table reads must refresh stale iOS tokens too. Writes already
 // called ensureFreshSession; reads didn't, so iPad could cold-open with a dead JWT, fail the
 // pull, show an empty calendar/clients, and never retry until a full sign-out.
-async function fetchStaffTable(table, shopId) {
+async function fetchStaffTable(table, shopId, opts = {}) {
+  const tries = Math.max(1, opts.tries || 3);
   const query = () => supabase.from(table).select("data").eq("shop_id", shopId);
-  await ensureFreshSession();
-  let { data, error } = await query();
-  if (error) {
+  let lastErr = null;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 800 * attempt));
+    await ensureFreshSession();
+    let { data, error } = await query();
+    if (!error) return { data, error: null };
+    lastErr = error;
     const msg = String((error && error.message) || error);
     const authish = /jwt|expired|401|42501|not authenticated/i.test(msg) || (error && error.code === "PGRST301");
     if (authish) {
       try { await supabase.auth.refreshSession(); } catch (e) {}
       await ensureFreshSession();
       ({ data, error } = await query());
+      if (!error) return { data, error: null };
+      lastErr = error;
     }
+    const netish = /fetch|network|timeout|load failed/i.test(msg);
+    if (!netish && !authish) break;
   }
-  return { data, error };
+  return { data: null, error: lastErr };
 }
 
 // ============================================================
@@ -1785,6 +1794,7 @@ function App() {
         } catch (e) {}
         const u = new URL(window.location.href);
         u.searchParams.set("v", String(version).slice(0, 8)); // change the URL to bust the webview cache
+        if (IS_NATIVE) u.searchParams.set("_", String(Date.now())); // Capacitor WKWebView: query-only bust is not always enough
         window.location.replace(u.toString());
       } catch (e) {}
     };
@@ -2121,6 +2131,8 @@ function App() {
   // feed NEVER populates a signed-in owner's staff list (root cause of staff email/phone vanishing). DO NOT REMOVE.
   const hasStoredSession = () => { try { return Object.keys(localStorage).some((k) => /^sb-.*-auth-token$/.test(k)); } catch (e) { return false; } };
   const [saveFailed, setSaveFailed] = useState(false); // drives a banner if a save to the server errors out
+  // cross-device-sync: honest pull status so a device that failed to download never looks "empty by design".
+  const [syncHealth, setSyncHealth] = useState({ serverClients: null, serverAppts: null, err: null, at: 0, pulling: false });
   // Only nag about a failed save if it STAYS failed for a few seconds — a transient blip that the
   // next save fixes shouldn't flash the orange banner. Dismissible; auto-resets when a save succeeds.
   const [showSaveBanner, setShowSaveBanner] = useState(false);
@@ -2279,14 +2291,24 @@ function App() {
         return;
       }
       const { data, error } = await fetchStaffTable(table, SHOP_ID);
-      if (error) { console.error(`[vero] live-sync refetch '${table}' failed:`, error); return; }
+      if (error) {
+        console.error(`[vero] live-sync refetch '${table}' failed:`, error);
+        if (table === "appointments" || table === "clients") {
+          setSyncHealth((h) => ({ ...h, err: String((error && error.message) || error), at: Date.now(), pulling: false }));
+        }
+        return;
+      }
       let list = data ? data.map((r) => r.data) : [];
       const sv = savingRef.current[table];
       if (!force) {
         // Ignore the realtime echo of our OWN recent save: a read right after a write can come back
         // stale and stomp the very edit we just made (this was the email/phone "disappears" bug).
-        if ((sv && (sv.running || sv.queued)) || (lastSaveAt.current[table] && Date.now() - lastSaveAt.current[table] < 2500)) return;
+        if ((sv && (sv.running || sv.queued)) || (lastSaveAt.current[table] && Date.now() - lastSaveAt.current[table] < 2500)) {
+          if (table === "appointments" || table === "clients") setSyncHealth((h) => ({ ...h, pulling: false }));
+          return;
+        }
       } else if (sv && sv.running) {
+        if (table === "appointments" || table === "clients") setSyncHealth((h) => ({ ...h, pulling: false }));
         return; // never stomp a write that's actively in flight
       } else if (table === 'appointments' || table === 'clients') {
         // cross-device-sync: server wins over a stale pending local snapshot
@@ -2306,6 +2328,14 @@ function App() {
         writeCache(table, list); setUsingCache(false);
         if (table === 'appointments') { staffApptsLoadedRef.current = true; setSaveFailed(false); }
         if (table === 'clients') staffClientsLoadedRef.current = true;
+        setSyncHealth((h) => ({
+          ...h,
+          serverClients: table === 'clients' ? list.length : h.serverClients,
+          serverAppts: table === 'appointments' ? list.length : h.serverAppts,
+          err: null,
+          at: Date.now(),
+          pulling: false,
+        }));
       }
     } catch (e) { console.error('[vero] live-sync refetch error:', e); }
   };
@@ -2452,13 +2482,19 @@ function App() {
     (async () => {
       const { data, error } = await fetchStaffTable('clients', SHOP_ID);
       if (!alive) return;
-      if (error) { console.error('[vero] load clients failed:', error); hydrateFromCache('clients', clients, setClients); return; }
+      if (error) {
+        console.error('[vero] load clients failed:', error);
+        setSyncHealth((h) => ({ ...h, err: String((error && error.message) || error), at: Date.now(), pulling: false }));
+        hydrateFromCache('clients', clients, setClients);
+        return;
+      }
       if (tableBusy('clients') && staffClientsLoadedRef.current) return; // cross-device-sync: never skip the FIRST pull
       const list = data ? data.map((r) => r.data) : [];
       staffClientsLoadedRef.current = true;
       lastRemoteRef.current.clients = list;
       setClients(list);
       writeCache('clients', list);
+      setSyncHealth((h) => ({ ...h, serverClients: list.length, err: null, at: Date.now(), pulling: false }));
     })();
     return () => { alive = false; };
   }, [sessionUid]);
@@ -2520,7 +2556,12 @@ function App() {
       }
       const { data, error } = await fetchStaffTable('appointments', SHOP_ID);
       if (!alive) return;
-      if (error) { console.error('[vero] load appointments failed:', error); hydrateFromCache('appointments', appts, setAppts); return; }
+      if (error) {
+        console.error('[vero] load appointments failed:', error);
+        setSyncHealth((h) => ({ ...h, err: String((error && error.message) || error), at: Date.now(), pulling: false }));
+        hydrateFromCache('appointments', appts, setAppts);
+        return;
+      }
       if (tableBusy('appointments') && staffApptsLoadedRef.current) return; // cross-device-sync: never skip the FIRST pull
       const list = data ? data.map((r) => r.data) : [];
       staffApptsLoadedRef.current = true;
@@ -2529,6 +2570,7 @@ function App() {
       writeCache('appointments', list);
       setUsingCache(false); // fresh server data — leave cache mode
       setSaveFailed(false);
+      setSyncHealth((h) => ({ ...h, serverAppts: list.length, err: null, at: Date.now(), pulling: false }));
     })();
     return () => { alive = false; };
   }, [sessionUid]);
@@ -2589,12 +2631,19 @@ function App() {
   const pullLiveTables = (tables) => {
     const list = tables || ["appointments", "clients", "waitlist", "services", "providers"];
     lastFgRefetch.current = Date.now();
+    if (list.some((t) => t === "appointments" || t === "clients")) {
+      setSyncHealth((h) => ({ ...h, pulling: true }));
+    }
     list.forEach((t) => refetchTable(t, { force: t === "appointments" || t === "clients" }));
   };
   // cross-device-sync: once signed in and the shell is ready, immediately pull the live calendar.
+  // iPad WebViews can miss the first pull (stale token, slow network) — retry a few times.
   useEffect(() => {
     if (!dataLoaded || !sessionUid) return;
     pullLiveTables(["appointments", "clients"]);
+    const t2 = setTimeout(() => pullLiveTables(["appointments", "clients"]), 3000);
+    const t3 = setTimeout(() => pullLiveTables(["appointments", "clients"]), 10000);
+    return () => { clearTimeout(t2); clearTimeout(t3); };
   }, [dataLoaded, sessionUid]);
   useEffect(() => {
     if (!sessionUid) return;
@@ -2701,6 +2750,17 @@ function App() {
     document.addEventListener("click", onTap, true);
     return () => document.removeEventListener("click", onTap, true);
   }, []);
+
+  // cross-device-sync: surface when the cloud has rows but this device shows none (or the pull errored).
+  const showSyncGapBanner = !!(session && syncHealth.at && !syncHealth.pulling && (
+    syncHealth.err ||
+    (typeof syncHealth.serverClients === "number" && syncHealth.serverClients > 0 && clients.length === 0) ||
+    (typeof syncHealth.serverAppts === "number" && syncHealth.serverAppts > 0 && appts.length === 0) ||
+    (clients.length === 0 && appts.length === 0 && typeof syncHealth.serverClients === "number" && typeof syncHealth.serverAppts === "number")
+  ));
+  const syncGapDetail = syncHealth.err
+    ? syncHealth.err
+    : `Cloud: ${syncHealth.serverClients ?? "?"} clients, ${syncHealth.serverAppts ?? "?"} appointments · This device: ${clients.length} clients, ${appts.length} appointments`;
 
   return (
     <div id="app-root" className={`theme-${appliedTheme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--canvas, var(--bg))", color: "var(--text)", position: "relative" }}>
@@ -2862,6 +2922,16 @@ function App() {
         @keyframes slotSweep { 0% { transform: translateX(-130%);} 55%,100% { transform: translateX(130%);} }
         .vslot-sel::after { content:""; position:absolute; inset:0; background:linear-gradient(115deg, transparent 32%, rgba(255,255,255,.6) 50%, transparent 68%); transform:translateX(-130%); animation:slotSweep 3s ease-in-out infinite; pointer-events:none; }
       `}</style>
+
+      {showSyncGapBanner && !usingCache && (
+        <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3001, background: "#1B4D3E", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", fontSize: 13, fontFamily: FONT_BODY, lineHeight: 1.45, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
+          <div style={{ marginBottom: 8 }}><strong>Sync problem on this device.</strong> {syncGapDetail}. Signed in as {session?.user?.email || "unknown"} · shop {SHOP_ID}.</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => pullLiveTables(["appointments", "clients"])} style={{ background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600 }}>Sync now</button>
+            <button onClick={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} style={{ background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,0.45)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600 }}>Sign out</button>
+          </div>
+        </div>
+      )}
 
       {showSaveBanner && !saveBannerDismissed && session && (
         <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#C2563F", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
