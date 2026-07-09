@@ -2321,7 +2321,39 @@ function App() {
     if (table === "providers") return providers;
     return [];
   };
-  const mergeLocalOverServer = (serverList, localList) => {
+  const mergeApptRow = (server, local) => {
+    if (!server) return local;
+    if (!local) return server;
+    const sDone = server.status === "done";
+    const lDone = local.status === "done";
+    // cross-device-sync: a completed checkout on ANY device must beat a stale "in service" copy on
+    // another — the old "local always wins" merge kept iPad on CHECKOUT after iPhone paid (Edward Ochs bug).
+    if (sDone && !lDone) return server;
+    if (lDone && !sDone) return local;
+    if (sDone && lDone) {
+      const sPaid = server.paid && Number(server.paid.total) > 0;
+      const lPaid = local.paid && Number(local.paid.total) > 0;
+      if (sPaid && !lPaid) return server;
+      if (lPaid && !sPaid) return local;
+      const se = Number(server.serviceEndedAt) || 0;
+      const le = Number(local.serviceEndedAt) || 0;
+      if (le !== se) return le > se ? local : server;
+      return local;
+    }
+    // In-progress visit edits (check-in, move, timer) still win over a stale server row.
+    if (JSON.stringify(local) !== JSON.stringify(server)) return local;
+    return server;
+  };
+  const mergeAppointments = (serverList, localList) => {
+    const byId = new Map((serverList || []).map((a) => [String(a && a.id), a]));
+    for (const la of (localList || [])) {
+      if (!la || la.id == null) continue;
+      byId.set(String(la.id), mergeApptRow(byId.get(String(la.id)), la));
+    }
+    return Array.from(byId.values());
+  };
+  const mergeLocalOverServer = (serverList, localList, table) => {
+    if (table === "appointments") return mergeAppointments(serverList, localList);
     const byId = new Map((serverList || []).map((a) => [String(a && a.id), a]));
     for (const la of (localList || [])) {
       if (!la || la.id == null) continue;
@@ -2365,7 +2397,7 @@ function App() {
       // cross-device-sync: ALWAYS merge server rows with local — foreground pulls and realtime used
       // to replace the whole table and revert edits that hadn't finished saving (the iPhone reset bug).
       const local = localTableState(table);
-      list = mergeLocalOverServer(list, local);
+      list = mergeLocalOverServer(list, local, table);
       if (table === 'services') list.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
       if (table === 'providers') list = sortProviders(list);
       lastRemoteRef.current[table] = data ? data.map((r) => r.data) : [];
@@ -2395,8 +2427,8 @@ function App() {
     // cross-device-sync: ALWAYS merge — never blind-replace with server rows. The old "only merge when
     // dirty" path let the 30s heartbeat / foreground pull revert check-ins and edits that had already
     // landed locally but looked "clean" because lastRemoteRef matched appts (the iPhone reset bug).
-    const finalAp = mergeLocalOverServer(serverAp, appts);
-    const finalCl = mergeLocalOverServer(serverCl, clients);
+    const finalAp = mergeLocalOverServer(serverAp, appts, "appointments");
+    const finalCl = mergeLocalOverServer(serverCl, clients, "clients");
     // Baseline stays the raw server copy so the save effect still pushes local edits up.
     lastRemoteRef.current.clients = serverCl;
     lastRemoteRef.current.appointments = serverAp;
@@ -2726,7 +2758,7 @@ function App() {
     if (lastSaveAt.current[table] && Date.now() - lastSaveAt.current[table] < SYNC_GUARD_MS) return true;
     const local = localTableState(table);
     const base = lastRemoteRef.current[table] || [];
-    if (Array.isArray(local) && JSON.stringify(mergeLocalOverServer(base, local)) !== JSON.stringify(base)) return true;
+    if (Array.isArray(local) && JSON.stringify(mergeLocalOverServer(base, local, table)) !== JSON.stringify(base)) return true;
     return false;
   };
   const hasUnsavedWork = () => {
@@ -12150,8 +12182,9 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       <div style={{ borderBottom: "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 16px) 20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
         {navStack.length > 0 ? <BackBar to={backLabel} onClick={navBack} style={{ marginBottom: 0 }} /> : <div style={{ width: 50 }} />}
         <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} />
-        <div style={{ width: 50, textAlign: "right", fontSize: 11, color: "var(--faint)", lineHeight: 1.3 }}>
+        <div style={{ width: 50, textAlign: "right", fontSize: 10, color: "var(--faint)", lineHeight: 1.25 }}>
           {syncHealth && syncHealth.at && !syncHealth.err ? (syncHealth.via === "api" ? "Synced" : "Sync") : null}
+          {authEmail ? <div style={{ marginTop: 2, maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={authEmail}>{authEmail.split("@")[0]}</div> : null}
         </div>
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
@@ -21498,6 +21531,23 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     if (recs.length) return recs.reduce((s, r) => s + (r.amount || 0) - (r.refunded || 0), 0);
     return (appt.paid && appt.paid.total) || 0;
   };
+  // Heal tickets where payment landed but status never flipped to done (app closed mid-checkout).
+  const healedPaidRef = useRef(new Set());
+  useEffect(() => {
+    const stuck = (appts || []).filter((a) => a && a.status === "in-service" && ((a.paid && Number(a.paid.total) > 0) || paidForAppt(a) > 0.009));
+    const todo = stuck.filter((a) => !healedPaidRef.current.has(a.id));
+    if (!todo.length) return;
+    todo.forEach((a) => healedPaidRef.current.add(a.id));
+    setAppts((cur) => {
+      const next = cur.map((a) => {
+        if (!todo.some((t) => t.id === a.id)) return a;
+        const tot = (a.paid && Number(a.paid.total) > 0) ? Number(a.paid.total) : paidForAppt(a);
+        return { ...a, status: "done", serviceEndedAt: a.serviceEndedAt || Date.now(), paid: a.paid || { total: tot, totalLabel: `$${tot.toFixed(2)}`, tip: 0 } };
+      });
+      if (flushApptsNow) queueMicrotask(() => flushApptsNow(next));
+      return next;
+    });
+  }, [appts, clients, business]);
   // #13: the credit for a REOPENED ticket must exclude tips — crediting a prior tip against the
   // newly-added items silently nets it out and undercharges them. This is items-only paid.
   const paidTowardItems = (appt) => {
@@ -22985,6 +23035,8 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const chargeBase = reopen ? balance : +(netDue + tipAmt).toFixed(2);
   const total = +(subtotal + tipAmt).toFixed(2); // grand total of the ticket (incl. what was paid at booking)
   const fullyPaidAtBooking = !reopen && bookingCredit > 0 && netDue === 0; // nothing left to charge — settle & close
+  const nothingToCharge = (reopen ? balance : netDue) <= 0;
+  const canCloseOut = fullyPaidAtBooking || nothingToCharge;
   // Card-on-file surcharge — only when the shop turned it on in Checkout & money.
   const scCfg = (business?.checkout && business.checkout.cofSurcharge) || {};
   const scOn = !!scCfg.on;
@@ -23054,17 +23106,26 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     const paidTot = +((Number(appt.prepaidTotal) || bookingCredit) || 0).toFixed(2);
     const paidTip = +(Number(appt.prepaidTip) || 0).toFixed(2);
     recordSale({ id: "pay_" + Date.now().toString(36), ts: Date.now(), apptId: appt.id, type: "sale", status: "paid", method: "prepaid", amount: paidTot, tip: paidTip, surcharge: 0, paymentIntentId: appt.prepaidIntentId || null, brand: null, last4: null, note: "Paid in full at booking · " + lines.map((l) => l.name).join(" · ") + (provider ? ` — with ${provider.name}` : ""), items: lines.map((l) => ({ name: l.name, price: +(Number(l.price) || 0).toFixed(2), productId: l.productId || null, qty: 1 })), staffId: (provider && provider.id) || appt.providerId || null, refunded: 0 });
-    onDone(appt.id, { total: paidTot, totalLabel: money(paidTot), tip: paidTip, discount: 0 });
+    const summary = { total: paidTot, totalLabel: money(paidTot), tip: paidTip, discount: 0 };
+    if (onCommit) onCommit(appt.id, summary);
+    setStage(((!reopen || rebookOnReopen) && rebookCfg.enabled) ? "rebook" : "done");
+  };
+  const buildCheckoutSummary = () => {
+    const grandTotal = reopen ? +(alreadyPaid + (paidRec ? paidRec.amount : 0)).toFixed(2) : total;
+    const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt;
+    return { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, discount: discountAmt, discountName: reopen ? ((appt.paid && appt.paid.discountName) || null) : (checkoutDiscount ? checkoutDiscount.name : null), rebookJump: (rebookOutcome && rebookOutcome.kind === "calendar") ? { date: rebookOutcome.date, label: rebookOutcome.label } : null, bookReminder: (rebookOutcome && rebookOutcome.kind === "reminder") ? { at: rebookOutcome.at, label: rebookOutcome.label } : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null };
   };
   useEffect(() => {
-    if (stage === "approved") { const t = setTimeout(() => setStage(((!reopen || rebookOnReopen) && rebookCfg.enabled) ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
+    if (stage === "approved") {
+      // Commit the moment payment succeeds — don't wait for rebook / "All done". If the app
+      // backgrounds here, the ticket is already done+paid on the server (Edward Ochs / $1 deposit bug).
+      const summary = buildCheckoutSummary();
+      if (onCommit) onCommit(appt.id, summary);
+      const t = setTimeout(() => setStage(((!reopen || rebookOnReopen) && rebookCfg.enabled) ? "rebook" : "done"), 1300);
+      return () => clearTimeout(t);
+    }
     if (stage === "done") {
-      const grandTotal = reopen ? +(alreadyPaid + (paidRec ? paidRec.amount : 0)).toFixed(2) : total;
-      const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt;
-      const summary = { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, discount: discountAmt, discountName: reopen ? ((appt.paid && appt.paid.discountName) || null) : (checkoutDiscount ? checkoutDiscount.name : null), rebookJump: (rebookOutcome && rebookOutcome.kind === "calendar") ? { date: rebookOutcome.date, label: rebookOutcome.label } : null, bookReminder: (rebookOutcome && rebookOutcome.kind === "reminder") ? { at: rebookOutcome.at, label: rebookOutcome.label } : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null };
-      // Commit the ticket (status → done + paid summary) the INSTANT "All done" appears — the
-      // dwell below is purely visual. Before this, the write only happened after the 1.2s dwell,
-      // so swiping the app away right at "All done" silently lost the whole checkout.
+      const summary = buildCheckoutSummary();
       if (onCommit) onCommit(appt.id, summary);
       const t = setTimeout(() => onDone(appt.id, summary), 1200);
       return () => clearTimeout(t);
@@ -23163,11 +23224,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 44, marginBottom: 8 }}>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text)", padding: 4, cursor: "pointer", width: 44, textAlign: "left" }}><X size={19} /></button>
         <span style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>Checkout</span>
-        {fullyPaidAtBooking
-          ? <button onClick={settlePrepaid} disabled={payBusy} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer", padding: 4, width: 60, textAlign: "right", opacity: payBusy ? 0.5 : 1 }}>Done</button>
-          : (reopen && balance <= 0)
-          ? <button onClick={() => setStage("done")} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer", padding: 4, width: 60, textAlign: "right" }}>Done</button>
-          : <button onClick={() => { if ((reopen ? balance : netDue) > 0) { setPayErr(""); setStage("method"); } }} disabled={(reopen ? balance : netDue) <= 0} style={{ background: "none", border: "none", color: (reopen ? balance : netDue) > 0 ? "var(--gold)" : "var(--faint)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: (reopen ? balance : netDue) > 0 ? "pointer" : "default", padding: 4, width: 44, textAlign: "right" }}>Pay</button>}
+        {canCloseOut
+          ? <button onClick={() => { if (fullyPaidAtBooking) settlePrepaid(); else setStage("done"); }} disabled={payBusy && fullyPaidAtBooking} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer", padding: 4, width: 60, textAlign: "right", opacity: payBusy && fullyPaidAtBooking ? 0.5 : 1 }}>Done</button>
+          : <button onClick={() => { setPayErr(""); setStage("method"); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer", padding: 4, width: 44, textAlign: "right" }}>Pay</button>}
       </div>
 
       {/* client header — avatar · name · client since */}
@@ -23185,10 +23244,10 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.45 }}>Paid in full at booking{(Number(appt.prepaidTip) || 0) > 0 ? ` — ${money(+((Number(appt.prepaidTotal) || 0)).toFixed(2))} incl. ${money(+((Number(appt.prepaidTip) || 0)).toFixed(2))} tip` : ` — ${money(+((Number(appt.prepaidTotal) || bookingCredit) || 0).toFixed(2))}`}. Nothing to charge — tap <b>Done</b>. Add items above to charge extra.</div>
         </div>
       )}
-      {reopen && balance <= 0 && (
+      {canCloseOut && !fullyPaidAtBooking && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, background: "color-mix(in srgb, var(--gold) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginTop: 14 }}>
           <Check size={17} style={{ color: "var(--gold)" }} />
-          <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.45 }}>Already paid — {money(alreadyPaid)} is on record for this ticket. Nothing more to charge — tap <b>Done</b> to close it out. Add items above to charge extra.</div>
+          <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.45 }}>{reopen ? `Already paid — ${money(alreadyPaid)} is on record for this ticket.` : (bookingCredit > 0 ? `Paid earlier — ${money(bookingCredit)} credited.` : "Nothing to charge on this ticket.")} Tap <b>Done</b> to close it out. Add items above to charge extra.</div>
         </div>
       )}
 
