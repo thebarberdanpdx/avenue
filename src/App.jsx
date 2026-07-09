@@ -8659,7 +8659,19 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   const [simpleMode, setSimpleMode] = useState(() => { try { return localStorage.getItem("pulse_full") !== "1"; } catch (e) { return true; } });
   const toggleSimple = () => setSimpleMode((v) => { const nv = !v; try { localStorage.setItem("pulse_full", nv ? "0" : "1"); } catch (e) {} return nv; });
   const wrapIsRecent = (a) => { if (!a.bookedFor) return true; const days = Math.round((Date.now() - new Date(a.bookedFor).getTime()) / 86400000); return days >= 0 && days <= 7; };
-  const wrapUpList = viewedProvider ? appts.filter((a) => a.providerId === viewedProvider.id && a.status === "done" && (a.pendingDurationSave || (!a.hasNote && !a.hasPhotos && !a.noteLogged && clients.some((c) => c.id === a.clientId) && wrapIsRecent(a)))) : [];
+  const wrapUpRaw = viewedProvider ? appts.filter((a) => a.providerId === viewedProvider.id && a.status === "done" && (a.pendingDurationSave || (!a.hasNote && !a.hasPhotos && !a.noteLogged && clients.some((c) => c.id === a.clientId) && wrapIsRecent(a)))) : [];
+  // One card per CLIENT — keep the wrap-up minimal. If a client has more than one just-finished cut,
+  // prefer the one that still needs a learned-time save, else the most recent; the other resurfaces
+  // on its own once this one is cleared, so nothing is dropped.
+  const wrapUpList = Object.values(wrapUpRaw.reduce((acc, a) => {
+    const k = a.clientId || a.id;
+    const prev = acc[k];
+    if (!prev) { acc[k] = a; return acc; }
+    const better = (!!a.pendingDurationSave && !prev.pendingDurationSave)
+      || ((!!a.pendingDurationSave === !!prev.pendingDurationSave) && ((a.serviceEndedAt || a.start || 0) > (prev.serviceEndedAt || prev.start || 0)));
+    if (better) acc[k] = a;
+    return acc;
+  }, {}));
   // --- Inline goal editor: tap the ring (daily) or the week number (weekly) to set goals in place ---
   const [goalEditor, setGoalEditor] = useState(null); // null | "daily" | "weekly"
   const [goalInput, setGoalInput] = useState("");
@@ -9032,8 +9044,8 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       {wrapOpen && viewedProvider && (() => {
         const wrapUp = wrapUpList;
         return (
-          <div onClick={() => setWrapOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(30,26,20,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 2150 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, background: "var(--bg)", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: "10px 16px 22px", maxHeight: "85vh", overflowY: "auto" }}>
+          <div onClick={() => setWrapOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(30,26,20,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "max(48px, calc(env(safe-area-inset-top) + 20px)) 12px 12px", boxSizing: "border-box", zIndex: 2150 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, background: "var(--bg)", borderRadius: 22, padding: "10px 16px 22px", maxHeight: "calc(100vh - 90px)", overflowY: "auto", boxShadow: "0 24px 60px rgba(0,0,0,0.35)" }}>
               <div style={{ width: 38, height: 4, borderRadius: 4, background: "var(--border2)", margin: "3px auto 12px" }} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                 <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, margin: 0, lineHeight: 1, color: "var(--text)" }}>Wrap up</h3>
