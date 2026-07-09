@@ -923,6 +923,7 @@ const idemSig = (p) => {
 // anonymous callers. When there's no session the Authorization header is simply
 // omitted — harmless for any endpoint that doesn't require it.
 async function authedHeaders() {
+  await ensureFreshSession();
   const headers = { "Content-Type": "application/json" };
   try {
     const { data: sess } = await supabase.auth.getSession();
@@ -2148,6 +2149,9 @@ function App() {
   // sign-in — otherwise the demo seed (or []) races the load and tableBusy can skip the real fetch.
   const staffApptsLoadedRef = useRef(false);
   const staffClientsLoadedRef = useRef(false);
+  const lastMirrorCountsRef = useRef({ clients: 0, appointments: 0 });
+  const mirrorFromServerRef = useRef(null);
+  const mirrorInFlightRef = useRef(null);
 
   // Save a whole in-memory list to its shop-scoped table.
   // Strategy: upsert current items first (never destroys data), then delete rows that aren't in the list.
@@ -2160,6 +2164,16 @@ function App() {
     try {
       await ensureFreshSession(); // refresh a stale token before writing (fixes native 42501)
       const list = items || [];
+      // cross-device-sync: NEVER push an empty clients/appointments list when the server mirror
+      // just proved rows exist — that path deleted real bookings on other devices.
+      if ((table === "appointments" || table === "clients") && list.length === 0) {
+        const mc = lastMirrorCountsRef.current[table] || 0;
+        if (mc > 0) {
+          console.error(`[vero] blocked empty save on '${table}' (${mc} on server) — re-mirroring`);
+          try { mirrorFromServerRef.current && mirrorFromServerRef.current(); } catch (e) {}
+          return;
+        }
+      }
       // Null-safe like keepIds/prevKnown below — one corrupt element must not brick every save.
       let rows = list.map((it, i) => ({ id: String((it && it.id) ?? `${table}_${i}`), shop_id: SHOP_ID, data: it })).filter((r) => r.data != null);
       // Send ONLY rows that actually changed since the last known server state. Appointments and
@@ -2340,6 +2354,80 @@ function App() {
     } catch (e) { console.error('[vero] live-sync refetch error:', e); }
   };
 
+  // cross-device-sync — SERVER MIRROR: authoritative copy via api/sync-pull (service-role read
+  // after JWT membership check). Bypasses broken direct Supabase reads on iPad/Capacitor WebViews.
+  const applyServerMirror = (payload) => {
+    const cl = Array.isArray(payload.clients) ? payload.clients : [];
+    const ap = Array.isArray(payload.appointments) ? payload.appointments : [];
+    delete pendingSaveRef.current.clients;
+    delete pendingSaveRef.current.appointments;
+    lastRemoteRef.current.clients = cl;
+    lastRemoteRef.current.appointments = ap;
+    lastMirrorCountsRef.current = { clients: cl.length, appointments: ap.length };
+    setClients(cl);
+    setAppts(ap);
+    staffClientsLoadedRef.current = true;
+    staffApptsLoadedRef.current = true;
+    writeCache("clients", cl);
+    writeCache("appointments", ap);
+    setUsingCache(false);
+    setSaveFailed(false);
+    setSyncHealth({
+      serverClients: cl.length,
+      serverAppts: ap.length,
+      err: null,
+      at: Date.now(),
+      pulling: false,
+      via: payload.via || "direct",
+      email: payload.email || null,
+    });
+  };
+  const mirrorFromServer = async () => {
+    if (!session) return false;
+    if (mirrorInFlightRef.current) return mirrorInFlightRef.current;
+    const run = (async () => {
+      setSyncHealth((h) => ({ ...h, pulling: true }));
+      await ensureFreshSession();
+      try {
+        const headers = await authedHeaders();
+        const r = await fetch(API_BASE + "/api/sync-pull", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ shop: SHOP_ID }),
+          cache: "no-store",
+        });
+        const body = await r.json().catch(() => ({}));
+        if (r.ok && body.ok) {
+          applyServerMirror({ ...body, via: "api" });
+          return true;
+        }
+        console.error("[vero] mirrorFromServer api failed:", body.error || r.status, body.email || "");
+      } catch (e) {
+        console.error("[vero] mirrorFromServer api threw:", e);
+      }
+      const [clRes, apRes] = await Promise.all([
+        fetchStaffTable("clients", SHOP_ID),
+        fetchStaffTable("appointments", SHOP_ID),
+      ]);
+      if (clRes.error || apRes.error) {
+        const err = clRes.error || apRes.error;
+        setSyncHealth((h) => ({ ...h, err: String((err && err.message) || err), at: Date.now(), pulling: false }));
+        hydrateFromCache("clients", clients, setClients);
+        hydrateFromCache("appointments", appts, setAppts);
+        return false;
+      }
+      applyServerMirror({
+        clients: (clRes.data || []).map((row) => row.data),
+        appointments: (apRes.data || []).map((row) => row.data),
+        via: "direct",
+      });
+      return true;
+    })();
+    mirrorInFlightRef.current = run;
+    try { return await run; } finally { mirrorInFlightRef.current = null; }
+  };
+  mirrorFromServerRef.current = mirrorFromServer;
+
   useEffect(() => {
     (async () => {
       let allLoaded = true; // flipped to false on ANY real error — blocks saves so seeds can't overwrite real data
@@ -2466,36 +2554,19 @@ function App() {
   const tableBusy = (table) => { const s = savingRef.current[table]; return !!(s && (s.running || s.queued)) || pendingSaveRef.current[table] !== undefined || !!(lastSaveAt.current[table] && Date.now() - lastSaveAt.current[table] < 2500); };
   const sessionUid = session?.user?.id || null;
 
-  // Private client list: load it ONLY when signed-in staff are present, and never for public booking
-  // visitors. When there's no staff session we set an empty list (clearing the in-code demo seed) so the
-  // public view can never write seed data to the live database. Uses the same array reference for state
-  // and baseline so the save effect below sees no change and stays quiet.
+  // cross-device-sync: signed-in staff mirror clients + appointments from the server in ONE shot.
   useEffect(() => {
-    let alive = true;
     if (!session) {
       staffClientsLoadedRef.current = false;
+      staffApptsLoadedRef.current = false;
       const empty = [];
       lastRemoteRef.current.clients = empty;
+      lastRemoteRef.current.appointments = empty;
       setClients(empty);
       return;
     }
-    (async () => {
-      const { data, error } = await fetchStaffTable('clients', SHOP_ID);
-      if (!alive) return;
-      if (error) {
-        console.error('[vero] load clients failed:', error);
-        setSyncHealth((h) => ({ ...h, err: String((error && error.message) || error), at: Date.now(), pulling: false }));
-        hydrateFromCache('clients', clients, setClients);
-        return;
-      }
-      if (tableBusy('clients') && staffClientsLoadedRef.current) return; // cross-device-sync: never skip the FIRST pull
-      const list = data ? data.map((r) => r.data) : [];
-      staffClientsLoadedRef.current = true;
-      lastRemoteRef.current.clients = list;
-      setClients(list);
-      writeCache('clients', list);
-      setSyncHealth((h) => ({ ...h, serverClients: list.length, err: null, at: Date.now(), pulling: false }));
-    })();
+    let alive = true;
+    (async () => { if (alive) await mirrorFromServer(); })();
     return () => { alive = false; };
   }, [sessionUid]);
 
@@ -2538,39 +2609,19 @@ function App() {
     (async () => { try { await supabase.rpc("claim_my_invites"); } catch (e) {} })();
   }, [sessionUid]);
 
-  // Appointments load, session-keyed. The public gets TIMES ONLY (open/busy slots) via get_availability —
-  // never names or phones; signed-in staff load the full appointment rows. Mirrors the clients effect above.
+  // Appointments for PUBLIC booking: times only via get_availability. Staff rows come from mirrorFromServer.
   useEffect(() => {
     let alive = true;
     (async () => {
-      if (!session) {
-        staffApptsLoadedRef.current = false;
-        try {
-          const { data } = await supabase.rpc('get_availability', { p_shop: SHOP_ID });
-          if (!alive) return;
-          const list = Array.isArray(data) ? data : [];
-          lastRemoteRef.current.appointments = list;
-          setAppts(list);
-        } catch (e) { console.error('[vero] availability load failed:', e); }
-        return;
-      }
-      const { data, error } = await fetchStaffTable('appointments', SHOP_ID);
-      if (!alive) return;
-      if (error) {
-        console.error('[vero] load appointments failed:', error);
-        setSyncHealth((h) => ({ ...h, err: String((error && error.message) || error), at: Date.now(), pulling: false }));
-        hydrateFromCache('appointments', appts, setAppts);
-        return;
-      }
-      if (tableBusy('appointments') && staffApptsLoadedRef.current) return; // cross-device-sync: never skip the FIRST pull
-      const list = data ? data.map((r) => r.data) : [];
-      staffApptsLoadedRef.current = true;
-      lastRemoteRef.current.appointments = list;
-      setAppts(list);
-      writeCache('appointments', list);
-      setUsingCache(false); // fresh server data — leave cache mode
-      setSaveFailed(false);
-      setSyncHealth((h) => ({ ...h, serverAppts: list.length, err: null, at: Date.now(), pulling: false }));
+      if (session) return;
+      staffApptsLoadedRef.current = false;
+      try {
+        const { data } = await supabase.rpc('get_availability', { p_shop: SHOP_ID });
+        if (!alive) return;
+        const list = Array.isArray(data) ? data : [];
+        lastRemoteRef.current.appointments = list;
+        setAppts(list);
+      } catch (e) { console.error('[vero] availability load failed:', e); }
     })();
     return () => { alive = false; };
   }, [sessionUid]);
@@ -2631,19 +2682,15 @@ function App() {
   const pullLiveTables = (tables) => {
     const list = tables || ["appointments", "clients", "waitlist", "services", "providers"];
     lastFgRefetch.current = Date.now();
-    if (list.some((t) => t === "appointments" || t === "clients")) {
-      setSyncHealth((h) => ({ ...h, pulling: true }));
-    }
-    list.forEach((t) => refetchTable(t, { force: t === "appointments" || t === "clients" }));
+    if (session && list.some((t) => t === "appointments" || t === "clients")) mirrorFromServer();
+    list.filter((t) => t !== "appointments" && t !== "clients").forEach((t) => refetchTable(t, { force: true }));
   };
-  // cross-device-sync: once signed in and the shell is ready, immediately pull the live calendar.
-  // iPad WebViews can miss the first pull (stale token, slow network) — retry a few times.
+  // cross-device-sync: hammer the server mirror on sign-in — iPad WebViews often miss the first pull.
   useEffect(() => {
     if (!dataLoaded || !sessionUid) return;
-    pullLiveTables(["appointments", "clients"]);
-    const t2 = setTimeout(() => pullLiveTables(["appointments", "clients"]), 3000);
-    const t3 = setTimeout(() => pullLiveTables(["appointments", "clients"]), 10000);
-    return () => { clearTimeout(t2); clearTimeout(t3); };
+    [0, 2000, 5000, 10000, 20000, 45000].forEach((ms) => {
+      setTimeout(() => mirrorFromServer(), ms);
+    });
   }, [dataLoaded, sessionUid]);
   useEffect(() => {
     if (!sessionUid) return;
@@ -2665,23 +2712,22 @@ function App() {
     window.addEventListener("focus", onFg);
     return () => { document.removeEventListener("visibilitychange", onFg); window.removeEventListener("focus", onFg); };
   }, [sessionUid]);
-  // Heartbeat: while the app is OPEN and visible, quietly re-pull appointments + clients every
-  // 30s. Realtime is the instant path (when the tables are in Supabase's realtime publication);
-  // this is the guaranteed floor — the calendar can never drift more than 30s behind even
-  // if the socket silently died. refetchTable's guards keep it from stomping a mid-save edit.
+  // Heartbeat: native devices mirror every 15s; web every 20s. Server is always the source of truth.
   useEffect(() => {
     if (!sessionUid) return;
+    const ms = IS_NATIVE ? 15000 : 20000;
     const id = setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      pullLiveTables(["appointments", "clients"]);
-    }, 30000);
+      mirrorFromServer();
+    }, ms);
     return () => clearInterval(id);
   }, [sessionUid]);
 
   // Retry: re-push everything currently in memory (used by the failed-save banner's Retry button).
-  const resaveAll = () => {
+  const resaveAll = async () => {
     if (!loadedRef.current) return;
     setSaveFailed(false);
+    await mirrorFromServer();
     syncList('clients', clients);
     syncList('appointments', appts);
     syncList('waitlist', waitlist);
@@ -2709,7 +2755,10 @@ function App() {
     try {
       channel = supabase.channel(`vero-sync-${SHOP_ID}`);
       tables.forEach((table) => {
-        channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `shop_id=eq.${SHOP_ID}` }, () => { refetchTable(table); });
+        channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `shop_id=eq.${SHOP_ID}` }, () => {
+          if (table === "clients" || table === "appointments") mirrorFromServer();
+          else refetchTable(table);
+        });
       });
       channel.subscribe();
     } catch (e) { console.error('[vero] live-sync subscribe failed:', e); }
@@ -2760,7 +2809,7 @@ function App() {
   ));
   const syncGapDetail = syncHealth.err
     ? syncHealth.err
-    : `Cloud: ${syncHealth.serverClients ?? "?"} clients, ${syncHealth.serverAppts ?? "?"} appointments · This device: ${clients.length} clients, ${appts.length} appointments`;
+    : `Cloud: ${syncHealth.serverClients ?? "?"} clients, ${syncHealth.serverAppts ?? "?"} appointments · This device: ${clients.length} clients, ${appts.length} appointments${syncHealth.via ? ` · via ${syncHealth.via}` : ""}`;
 
   return (
     <div id="app-root" className={`theme-${appliedTheme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--canvas, var(--bg))", color: "var(--text)", position: "relative" }}>
@@ -2927,7 +2976,7 @@ function App() {
         <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3001, background: "#1B4D3E", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", fontSize: 13, fontFamily: FONT_BODY, lineHeight: 1.45, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
           <div style={{ marginBottom: 8 }}><strong>Sync problem on this device.</strong> {syncGapDetail}. Signed in as {session?.user?.email || "unknown"} · shop {SHOP_ID}.</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button onClick={() => pullLiveTables(["appointments", "clients"])} style={{ background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600 }}>Sync now</button>
+            <button onClick={() => mirrorFromServer()} style={{ background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600 }}>Sync now</button>
             <button onClick={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} style={{ background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,0.45)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600 }}>Sign out</button>
           </div>
         </div>

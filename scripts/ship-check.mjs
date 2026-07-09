@@ -126,6 +126,8 @@ const GUARDS = [
   { needle: "cross-device-sync", label: "staff cold-start never seeds demo appts / block the first server pull (iPad must see iPhone bookings)" },
   { needle: "fetchStaffTable", label: "staff table reads refresh stale iOS JWT before pull (iPad empty calendar/clients)" },
   { needle: "Sync problem on this device", label: "sync-gap banner when cloud has data but device shows empty" },
+  { needle: "mirrorFromServer", label: "staff calendar mirrors server via api/sync-pull" },
+  { needle: "blocked empty save", label: "never push empty clients/appts when server has rows" },
   { needle: "card-on-file-verified-only", label: "a saved card-on-file (brand + last-4) shows ONLY to a verified/signed-in client — never to an unverified booker who typed a matching phone (card disclosure + enumeration hole)" },
 ];
 try {
