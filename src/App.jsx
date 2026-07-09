@@ -4945,7 +4945,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
   // Returning client with a card already on file → prefill so they don't re-enter it.
   useEffect(() => {
-    if (!matched) return;
+    if (!matched) {
+      // SECURITY (card-on-file must never show to someone not signed in): if there's no VERIFIED
+      // client, drop any lingering on-file card. Otherwise a card saved during an earlier signed-in
+      // session would keep showing (brand + last-4) to an unverified booker who merely typed a
+      // matching phone — a card disclosure + enumeration hole — and its Stripe pmId could be reused.
+      // A card the current booker typed THEMSELVES (onFile falsy) is left alone.
+      setCardInfo((ci) => (ci && ci.onFile ? null : ci));
+      setCardOnFile((v) => (v && cardInfo && cardInfo.onFile ? false : v));
+      return;
+    }
     console.log("[vero] matched client on rebook:", matched.id, "savedCard present?", !!(matched.savedCard && matched.savedCard.pmId), matched.savedCard || "(none returned by lookup)");
     if (matched && matched.savedCard && matched.savedCard.pmId) {
       setCardInfo({ last4: matched.savedCard.last4, brand: matched.savedCard.brand, pmId: matched.savedCard.pmId, stripeCustomerId: matched.savedCard.stripeCustomerId, onFile: true });
@@ -7413,25 +7422,29 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const depositAmt = Math.max(0, Math.min(cartAdjTotal, dep.mode === "fixed" ? Number(dep.amount || 0) : dep.mode === "percent" ? Math.round(cartAdjTotal * (Number(dep.amount || 0) / 100)) : 0));
               const livePay = business.payments?.live === true;
               const last4 = (cardInfo && cardInfo.last4) || "••••";
+              // SECURITY (card-on-file-verified-only): an on-file card is only ever shown to a VERIFIED
+              // (matched) client. A card the current booker just typed (onFile falsy) still shows. Backs
+              // up the state-clear above so an unverified booker who typed a matching phone never sees it.
+              const showCardOnFile = cardOnFile && !(cardInfo && cardInfo.onFile && !matched);
               return (
-                <div style={{ background: "var(--panel)", border: `1px solid ${cardOnFile ? "color-mix(in srgb, var(--text) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16, boxShadow: "var(--shadow-sm)" }}>
-                  <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--text)", fontWeight: 600, marginBottom: 6 }}>{cardOnFile ? "CARD ON FILE" : depositAmt > 0 ? "DEPOSIT TO RESERVE" : "CARD TO RESERVE"}</div>
+                <div style={{ background: "var(--panel)", border: `1px solid ${showCardOnFile ? "color-mix(in srgb, var(--text) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16, boxShadow: "var(--shadow-sm)" }}>
+                  <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--text)", fontWeight: 600, marginBottom: 6 }}>{showCardOnFile ? "CARD ON FILE" : depositAmt > 0 ? "DEPOSIT TO RESERVE" : "CARD TO RESERVE"}</div>
                   <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>
                     {/* A returning client with a card on file is NOT charged a deposit up front (Dan's call):
                         their card holds the spot and they're only charged if they miss. New clients still
                         pay the deposit below. */}
-                    {cardOnFile
+                    {showCardOnFile
                       ? <>Your card's already on file to hold your spot. You won't be charged now &mdash; only if you no-show or cancel late, per the policy above.</>
                       : depositAmt > 0
                       ? <>A <b style={{ color: "var(--text)" }}>${depositAmt}</b> deposit holds your spot and goes toward your total. The rest (${Math.max(0, cartAdjTotal - depositAmt)}) is due at your visit.</>
                       : <>We keep a card on file to hold your spot. You won't be charged unless you no-show or cancel late, per the policy above.</>}
                   </p>
-                  {cardOnFileInvalid && !cardOnFile && (
+                  {cardOnFileInvalid && !showCardOnFile && (
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: "color-mix(in srgb, #C2563F 10%, var(--panel))", border: "1px solid color-mix(in srgb, #C2563F 35%, var(--border))", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
                       <span style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.45 }}>The card we had on file has expired or is no longer valid — please add a card below to hold your spot.</span>
                     </div>
                   )}
-                  {cardOnFile ? (
+                  {showCardOnFile ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px" }}>
                       <Check size={18} style={{ color: "var(--text)" }} />
                       <span style={{ fontSize: 14.5, color: "var(--text)" }}>{(() => { const brand = cardInfo && cardInfo.brand ? cardInfo.brand.charAt(0).toUpperCase() + cardInfo.brand.slice(1) : "Card"; if (cardInfo && cardInfo.paid) return `Deposit paid · ${last4}`; if (cardInfo && cardInfo.onFile) return `${brand} ···· ${last4} · on file`; return `${brand} ···· ${last4} · added`; })()}</span>
