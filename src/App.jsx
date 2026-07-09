@@ -60,6 +60,24 @@ async function ensureFreshSession() {
     }
   } catch (e) { /* never let the guard itself block a write */ }
 }
+// cross-device-sync — staff table reads must refresh stale iOS tokens too. Writes already
+// called ensureFreshSession; reads didn't, so iPad could cold-open with a dead JWT, fail the
+// pull, show an empty calendar/clients, and never retry until a full sign-out.
+async function fetchStaffTable(table, shopId) {
+  const query = () => supabase.from(table).select("data").eq("shop_id", shopId);
+  await ensureFreshSession();
+  let { data, error } = await query();
+  if (error) {
+    const msg = String((error && error.message) || error);
+    const authish = /jwt|expired|401|42501|not authenticated/i.test(msg) || (error && error.code === "PGRST301");
+    if (authish) {
+      try { await supabase.auth.refreshSession(); } catch (e) {}
+      await ensureFreshSession();
+      ({ data, error } = await query());
+    }
+  }
+  return { data, error };
+}
 
 // ============================================================
 // PHOTO LIBRARY — curated "looks" baked in for the prototype.
@@ -1827,6 +1845,9 @@ function App() {
       if (event === "SIGNED_IN") {
         try { if (localStorage.getItem("vero_login_intent") === "staff") { localStorage.removeItem("vero_login_intent"); setView("shop"); } } catch (e) {}
       }
+      if (event === "TOKEN_REFRESHED" && sess) {
+        try { window.dispatchEvent(new CustomEvent("vero-token-refreshed")); } catch (e) {}
+      }
     });
     return () => { mounted = false; clearTimeout(readyTimer); try { sub.subscription.unsubscribe(); } catch (e) {} };
   }, []);
@@ -1844,7 +1865,14 @@ function App() {
         return;
       }
       try { supabase.auth.startAutoRefresh(); } catch (e) {}
-      supabase.auth.getSession().then(({ data }) => { setSession(data && data.session ? data.session : null); }).catch(() => {});
+      (async () => {
+        try { await ensureFreshSession(); } catch (e) {}
+        try {
+          const { data } = await supabase.auth.getSession();
+          setSession(data && data.session ? data.session : null);
+          try { window.dispatchEvent(new CustomEvent("vero-token-refreshed")); } catch (e) {}
+        } catch (e) {}
+      })();
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
@@ -2250,7 +2278,7 @@ function App() {
         setAppts(list);
         return;
       }
-      const { data, error } = await supabase.from(table).select('data').eq('shop_id', SHOP_ID);
+      const { data, error } = await fetchStaffTable(table, SHOP_ID);
       if (error) { console.error(`[vero] live-sync refetch '${table}' failed:`, error); return; }
       let list = data ? data.map((r) => r.data) : [];
       const sv = savingRef.current[table];
@@ -2422,7 +2450,7 @@ function App() {
       return;
     }
     (async () => {
-      const { data, error } = await supabase.from('clients').select('data').eq('shop_id', SHOP_ID);
+      const { data, error } = await fetchStaffTable('clients', SHOP_ID);
       if (!alive) return;
       if (error) { console.error('[vero] load clients failed:', error); hydrateFromCache('clients', clients, setClients); return; }
       if (tableBusy('clients') && staffClientsLoadedRef.current) return; // cross-device-sync: never skip the FIRST pull
@@ -2490,7 +2518,7 @@ function App() {
         } catch (e) { console.error('[vero] availability load failed:', e); }
         return;
       }
-      const { data, error } = await supabase.from('appointments').select('data').eq('shop_id', SHOP_ID);
+      const { data, error } = await fetchStaffTable('appointments', SHOP_ID);
       if (!alive) return;
       if (error) { console.error('[vero] load appointments failed:', error); hydrateFromCache('appointments', appts, setAppts); return; }
       if (tableBusy('appointments') && staffApptsLoadedRef.current) return; // cross-device-sync: never skip the FIRST pull
@@ -2568,6 +2596,12 @@ function App() {
     if (!dataLoaded || !sessionUid) return;
     pullLiveTables(["appointments", "clients"]);
   }, [dataLoaded, sessionUid]);
+  useEffect(() => {
+    if (!sessionUid) return;
+    const onRefreshed = () => pullLiveTables(["appointments", "clients"]);
+    window.addEventListener("vero-token-refreshed", onRefreshed);
+    return () => window.removeEventListener("vero-token-refreshed", onRefreshed);
+  }, [sessionUid]);
   useEffect(() => {
     if (!sessionUid) return;
     const onFg = () => {
