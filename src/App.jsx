@@ -2357,25 +2357,54 @@ function App() {
   // cross-device-sync — SERVER MIRROR: authoritative copy via api/sync-pull (service-role read
   // after JWT membership check). sync-pull allows read for valid login on small shops.
   // Bypasses broken direct Supabase reads on iPad/Capacitor WebViews.
+  const apptsHaveLocalEdits = () => {
+    const sv = savingRef.current.appointments;
+    return !!(sv && (sv.running || sv.queued))
+      || pendingSaveRef.current.appointments !== undefined
+      || (lastSaveAt.current.appointments && Date.now() - lastSaveAt.current.appointments < 12000)
+      || appts !== lastRemoteRef.current.appointments;
+  };
+  const clientsHaveLocalEdits = () => {
+    const sv = savingRef.current.clients;
+    return !!(sv && (sv.running || sv.queued))
+      || pendingSaveRef.current.clients !== undefined
+      || (lastSaveAt.current.clients && Date.now() - lastSaveAt.current.clients < 12000)
+      || clients !== lastRemoteRef.current.clients;
+  };
+  const mergeLocalOverServer = (serverList, localList) => {
+    const byId = new Map((serverList || []).map((a) => [String(a && a.id), a]));
+    for (const la of (localList || [])) {
+      if (!la || la.id == null) continue;
+      const k = String(la.id);
+      const sr = byId.get(k);
+      if (!sr || JSON.stringify(la) !== JSON.stringify(sr)) byId.set(k, la);
+    }
+    return Array.from(byId.values());
+  };
   const applyServerMirror = (payload) => {
-    const cl = Array.isArray(payload.clients) ? payload.clients : [];
-    const ap = Array.isArray(payload.appointments) ? payload.appointments : [];
-    delete pendingSaveRef.current.clients;
-    delete pendingSaveRef.current.appointments;
-    lastRemoteRef.current.clients = cl;
-    lastRemoteRef.current.appointments = ap;
-    lastMirrorCountsRef.current = { clients: cl.length, appointments: ap.length };
-    setClients(cl);
-    setAppts(ap);
+    const serverCl = Array.isArray(payload.clients) ? payload.clients : [];
+    const serverAp = Array.isArray(payload.appointments) ? payload.appointments : [];
+    const apDirty = apptsHaveLocalEdits();
+    const clDirty = clientsHaveLocalEdits();
+    const finalAp = apDirty ? mergeLocalOverServer(serverAp, appts) : serverAp;
+    const finalCl = clDirty ? mergeLocalOverServer(serverCl, clients) : serverCl;
+    if (!apDirty) delete pendingSaveRef.current.appointments;
+    if (!clDirty) delete pendingSaveRef.current.clients;
+    // Baseline stays the raw server copy so the save effect still pushes local edits up.
+    lastRemoteRef.current.clients = serverCl;
+    lastRemoteRef.current.appointments = serverAp;
+    lastMirrorCountsRef.current = { clients: serverCl.length, appointments: serverAp.length };
+    setClients(finalCl);
+    setAppts(finalAp);
     staffClientsLoadedRef.current = true;
     staffApptsLoadedRef.current = true;
-    writeCache("clients", cl);
-    writeCache("appointments", ap);
+    writeCache("clients", finalCl);
+    writeCache("appointments", finalAp);
     setUsingCache(false);
     setSaveFailed(false);
     setSyncHealth({
-      serverClients: cl.length,
-      serverAppts: ap.length,
+      serverClients: serverCl.length,
+      serverAppts: serverAp.length,
       err: null,
       at: Date.now(),
       pulling: false,
@@ -2723,10 +2752,10 @@ function App() {
     window.addEventListener("focus", onFg);
     return () => { document.removeEventListener("visibilitychange", onFg); window.removeEventListener("focus", onFg); };
   }, [sessionUid]);
-  // Heartbeat: native devices mirror every 15s; web every 20s. Server is always the source of truth.
+  // Heartbeat: native 30s / web 20s — server mirror, but mergeLocalOverServer keeps check-ins mid-save.
   useEffect(() => {
     if (!sessionUid) return;
-    const ms = IS_NATIVE ? 15000 : 20000;
+    const ms = IS_NATIVE ? 30000 : 20000;
     const id = setInterval(() => {
       if (document.visibilityState !== "visible") return;
       mirrorFromServer();
