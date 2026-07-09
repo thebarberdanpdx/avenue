@@ -23962,7 +23962,7 @@ function _accParse(s){ if(!s) return null; s=s.trim(); if(s[0]!=="#") return nul
 function _accLum(c){ const f=(x)=>{ x/=255; return x<=0.03928?x/12.92:Math.pow((x+0.055)/1.055,2.4); }; return 0.2126*f(c.r)+0.7152*f(c.g)+0.0722*f(c.b); }
 function accentOnDark(str, min){ let c=_accParse(str); if(!c) return null; const m=min||0.34; let guard=0; while(_accLum(c)<m && guard++<16){ c={r:c.r+(255-c.r)*0.16, g:c.g+(255-c.g)*0.16, b:c.b+(255-c.b)*0.16}; } return `rgb(${Math.round(c.r)}, ${Math.round(c.g)}, ${Math.round(c.b)})`; }
 
-function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, title, nextClient, nextIsWaiting, startedLate, startedLateBy, fmtTime, lateNotified, onLetThemKnow, upNext, nowMin }) {
+function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, title, nextClient, nextIsWaiting, startedLate, startedLateBy, fmtTime, lateNotified, onLetThemKnow, onSendAgain, upNext, nowMin }) {
   // Calm color = the theme's "live now" accent (--live; equals --gold on every theme except Electric's lime), read live so a "Make it yours" override applies too, guarded for the dark card.
   const [CUT, setCUT] = useState("#7CA084");
   useEffect(() => {
@@ -24048,7 +24048,10 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
       {showLatePrompt && (
         <div style={{ marginTop: 12, border: `1.5px solid ${pillBg}`, borderRadius: 14, background: T.panel, padding: "15px 16px" }}>
           {lateNotified ? (
-            <div style={{ fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Check size={15} /> Notified · running {lateNotified} min behind</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}><Check size={15} style={{ flexShrink: 0 }} /> Notified · running {lateNotified} min behind</div>
+              {onSendAgain && <button className="lift" onClick={onSendAgain} style={{ flexShrink: 0, background: "none", border: `1px solid ${pillBg}`, color: T.text, borderRadius: 9, padding: "6px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Send again</button>}
+            </div>
           ) : (
             <>
               <div style={{ fontSize: 14, color: T.text, marginBottom: 12, lineHeight: 1.45 }}>{startedLate ? `This one started about ${startedLateBy} min late. ` : ""}{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running a few minutes behind?</div>
@@ -24556,6 +24559,18 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     if (laterClients.length > 1 && ci - 1 >= 0) setLateCascade({ ci, idx: 1 });
     else setLateOpen(false);
   };
+  // "Send again" — re-fire the exact same running-late text to the next client, at the band already
+  // recorded. No cascade, no re-picking; just resend the message that was (or should have been) sent.
+  const resendRunningLate = () => {
+    if (!nextClient) return;
+    const band = nextClient.lateNotified;
+    const rec = (clients || []).find((c) => c.id === nextClient.clientId) || null;
+    const first = (nextClient.name || "there").split(" ")[0];
+    fireRunningLate({ shopId, business, providers, appt: nextClient, client: rec, range: band }).then((res) => {
+      if (res && res.ok) showToast(`Re-sent to ${first} — running ${band} min behind.`);
+      else showToast(`Couldn't reach ${first} — ${runningLateFailReason(res)}. Nothing was sent.`);
+    });
+  };
   const cascadeYes = () => {
     if (!lateCascade) return;
     const ranges = (business?.runningLate?.ranges) || ["5–10", "10–15"];
@@ -24729,6 +24744,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   fmtTime={fmtTime}
                   lateNotified={nextClient && nextClient.lateNotified}
                   onLetThemKnow={() => setLateOpen(true)}
+                  onSendAgain={resendRunningLate}
                 />
               )}
 
