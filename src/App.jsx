@@ -2355,7 +2355,8 @@ function App() {
   };
 
   // cross-device-sync — SERVER MIRROR: authoritative copy via api/sync-pull (service-role read
-  // after JWT membership check). Bypasses broken direct Supabase reads on iPad/Capacitor WebViews.
+  // after JWT membership check). sync-pull allows read for valid login on small shops.
+  // Bypasses broken direct Supabase reads on iPad/Capacitor WebViews.
   const applyServerMirror = (payload) => {
     const cl = Array.isArray(payload.clients) ? payload.clients : [];
     const ap = Array.isArray(payload.appointments) ? payload.appointments : [];
