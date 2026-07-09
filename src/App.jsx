@@ -3885,6 +3885,20 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: c.id, p_session: c.sessionToken })
               .then(({ data }) => { if (alive) setMyAppts(Array.isArray(data) ? data : []); })
               .catch(() => {});
+            // Refresh the cached login's per-client pricing/duration/family from the server. Without this
+            // a custom time set staff-side AFTER this client last logged in never reached their booking
+            // (the restored snapshot was stale) — the "biz card not wired to client-facing" bug. Only the
+            // pricing/family fields are merged; everything else stays as-is. No-op if the RPC isn't live.
+            supabase.rpc("get_client_profile", { p_shop: shopId, p_client_id: c.id, p_session: c.sessionToken })
+              .then(({ data, error }) => {
+                if (!alive || error || !data) return;
+                setMatched((m) => (m && m.id === c.id) ? { ...m,
+                  customDurations: (data.customDurations && typeof data.customDurations === "object") ? data.customDurations : m.customDurations,
+                  customPrices: (data.customPrices && typeof data.customPrices === "object") ? data.customPrices : m.customPrices,
+                  family: Array.isArray(data.family) ? data.family : m.family,
+                } : m);
+              })
+              .catch(() => {});
           } else if (Array.isArray(c._localAppts)) {
             setMyAppts(c._localAppts); // brand-new booker: show the local snapshot instantly…
             refreshLocalAppts(c);      // …then re-pull each appt via its manage token so staff moves/cancels show
@@ -26075,12 +26089,20 @@ const sheetPrimary = { flex: 1, textAlign: "center", padding: 14, borderRadius: 
 function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPrice, onSave, onClear }) {
   const [t, setT] = useState(curDur != null ? String(curDur) : "");
   const [p, setP] = useState(curPrice != null ? String(curPrice) : "");
+  const [saved, setSaved] = useState(false); // flashes "Saved ✓" after a real commit
   useEffect(() => { setT(curDur != null ? String(curDur) : ""); setP(curPrice != null ? String(curPrice) : ""); }, [curDur, curPrice]);
+  useEffect(() => { if (!saved) return; const id = setTimeout(() => setSaved(false), 2600); return () => clearTimeout(id); }, [saved]);
   const hasOverride = curDur != null || curPrice != null;
   const effDur = curDur != null ? curDur : baseDur;
   const effPrice = curPrice != null ? curPrice : basePrice;
-  const commitT = () => { const v = t.trim() === "" ? null : Math.max(0, parseInt(t, 10) || 0); onSave({ dur: v }); };
-  const commitP = () => { const v = p.trim() === "" ? null : Math.max(0, Math.round((parseFloat(p) || 0) * 100) / 100); onSave({ price: v }); };
+  const normDur = () => (t.trim() === "" ? null : Math.max(0, parseInt(t, 10) || 0));
+  const normPrice = () => (p.trim() === "" ? null : Math.max(0, Math.round((parseFloat(p) || 0) * 100) / 100));
+  const dirty = normDur() !== curDur || normPrice() !== curPrice;
+  // Blur still auto-saves (so nothing is lost if they navigate away), and an explicit Save button
+  // gives the deliberate "set it in stone" action + a Saved ✓ confirmation Dan asked for.
+  const commitT = () => { const v = normDur(); if (v !== curDur) { onSave({ dur: v }); setSaved(true); } };
+  const commitP = () => { const v = normPrice(); if (v !== curPrice) { onSave({ price: v }); setSaved(true); } };
+  const saveAll = () => { const dv = normDur(), pv = normPrice(); if (dv !== curDur || pv !== curPrice) onSave({ dur: dv, price: pv }); setSaved(true); };
   const fl = { fontSize: 13, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, marginBottom: 6 };
   const ipt = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--bg)" };
   const inp = { width: "100%", border: "none", outline: "none", background: "transparent", padding: "11px 12px", fontFamily: FONT_BODY, fontSize: 15, color: "var(--text)" };
@@ -26093,14 +26115,18 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
       <div style={{ display: "flex", gap: 10, marginTop: 13 }}>
         <div style={{ flex: 1 }}>
           <div style={fl}>Time for {firstName}</div>
-          <div style={ipt}><input value={t} onChange={(e) => setT(e.target.value.replace(/[^0-9]/g, ""))} onBlur={commitT} placeholder={String(baseDur)} inputMode="numeric" style={inp} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13.5 }}>min</span></div>
+          <div style={ipt}><input value={t} onChange={(e) => { setT(e.target.value.replace(/[^0-9]/g, "")); setSaved(false); }} onBlur={commitT} placeholder={String(baseDur)} inputMode="numeric" style={inp} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13.5 }}>min</span></div>
         </div>
         <div style={{ flex: 1 }}>
           <div style={fl}>Price for {firstName}</div>
-          <div style={ipt}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input value={p} onChange={(e) => setP(e.target.value.replace(/[^0-9.]/g, ""))} onBlur={commitP} placeholder={String(basePrice)} inputMode="decimal" style={inp} /></div>
+          <div style={ipt}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input value={p} onChange={(e) => { setP(e.target.value.replace(/[^0-9.]/g, "")); setSaved(false); }} onBlur={commitP} placeholder={String(basePrice)} inputMode="decimal" style={inp} /></div>
         </div>
       </div>
-      {hasOverride ? (
+      {dirty ? (
+        <button className="lift" onClick={saveAll} style={{ marginTop: 12, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "10px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Save {firstName}'s time</button>
+      ) : saved ? (
+        <div style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6, color: "#3FA968", fontSize: 13.5, fontWeight: 600 }}><Check size={14} strokeWidth={3} /> Saved{hasOverride ? ` · books at ${fmtDur(effDur)} · $${effPrice}` : ""}</div>
+      ) : hasOverride ? (
         <div style={{ marginTop: 11 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text)", fontWeight: 500 }}>
             <span style={{ background: "var(--text)", color: "var(--bg)", borderRadius: 20, padding: "3px 9px", fontSize: 12, letterSpacing: 0.5 }}>CUSTOM</span>
