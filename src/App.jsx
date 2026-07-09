@@ -2553,29 +2553,6 @@ function App() {
     return () => { try { if (channel) supabase.removeChannel(channel); } catch (e) { /* ignore */ } };
   }, [dataLoaded, SHOP_ID, session]);
 
-  // ---- FOREGROUND RE-SYNC — keeps a second device (iPad, front desk) matching the phone ----
-  // The realtime websocket above dies silently when iOS/Capacitor backgrounds the webview: no close
-  // event fires, so the channel just stops delivering and the device quietly drifts behind whatever
-  // was changed elsewhere — the "my iPad doesn't match my phone" bug. There is no error because
-  // nothing failed; the live feed simply went deaf. On EVERY return to the foreground we re-pull the
-  // live tables through refetchTable, which ALREADY ignores our own in-flight / just-saved edits
-  // (savingRef + the 2.5s lastSaveAt window) — so this can never resurrect a row or stomp a local
-  // change mid-save. Net effect: opening the app always shows current server state, no manual reload.
-  useEffect(() => {
-    if (!dataLoaded) return;
-    let last = 0;
-    const resync = () => {
-      if (typeof document !== "undefined" && document.hidden) return;
-      const now = Date.now();
-      if (now - last < 1500) return; // collapse the visibilitychange + focus double-fire into one pass
-      last = now;
-      const tables = session ? ['appointments', 'clients', 'waitlist', 'services', 'providers'] : ['appointments', 'services', 'providers'];
-      tables.forEach((t) => { try { refetchTable(t); } catch (e) { /* refetchTable already logs */ } });
-    };
-    try { document.addEventListener('visibilitychange', resync); window.addEventListener('focus', resync); } catch (e) {}
-    return () => { try { document.removeEventListener('visibilitychange', resync); window.removeEventListener('focus', resync); } catch (e) {} };
-  }, [dataLoaded, session]);
-
   // Client-facing surfaces ALWAYS render in the Studio look, whatever the shop/staff theme is —
   // customers should see one consistent, on-brand storefront. Only the staff dashboard ("shop")
   // uses the per-user theme. Client components style purely off CSS vars, so swapping the applied
