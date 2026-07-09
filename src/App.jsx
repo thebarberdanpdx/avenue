@@ -24228,7 +24228,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const [pendingDur, setPendingDur] = useState(null); // staged duration, applied on Save
   const [pendingPrice, setPendingPrice] = useState(null); // staged per-client price, applied on Save
   const [wuPriceText, setWuPriceText] = useState(null); // null = show stored; string = mid-edit
-  useEffect(() => { setWuNote(wuTarget?.notes || ""); setWuDirty(false); setWuSaved(false); setPendingDur(null); setPendingPrice(null); setWuPriceText(null); }, [wuTarget?.id]);
+  const [durSaved, setDurSaved] = useState(false); // wrap-up: show "Saved ✓" on the learned-time control
+  useEffect(() => { setWuNote(wuTarget?.notes || ""); setWuDirty(false); setWuSaved(false); setPendingDur(null); setPendingPrice(null); setWuPriceText(null); setDurSaved(false); }, [wuTarget?.id]);
   const wuFileRef = useRef(null);
   // Keep the LATEST note in a ref so the unmount fallback persists the current value, not a
   // stale mount-time closure. The old `[]`-deps cleanup captured the pre-edit note and wrote it
@@ -24278,8 +24279,27 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     patchTarget((p) => ({ ...p, gallery: (p.gallery || []).filter((g) => g.id !== gid) }));
   };
   const storedDur = (wuTarget && service && wuTarget.customDurations && wuTarget.customDurations[service.id] != null) ? wuTarget.customDurations[service.id] : (service?.duration || dur);
-  const wuDur = pendingDur != null ? pendingDur : storedDur; // show staged value if any
-  const setWuDur = (val) => { setPendingDur(val); setWuDirty(true); setWuSaved(false); };
+  const storedDurIsCustom = !!(wuTarget && service && wuTarget.customDurations && wuTarget.customDurations[service.id] != null);
+  // Actual time this cut ran, from the in-chair timer (start→end), rounded UP to the next 5. It's the
+  // wrap-up's pre-fill so the learned time reflects what really happened; falls back to the stored
+  // custom (or the service default) when the visit wasn't timed.
+  const wuMeasured = (appt.serviceStartedAt && appt.serviceEndedAt && appt.serviceEndedAt > appt.serviceStartedAt) ? Math.max(5, Math.ceil(((appt.serviceEndedAt - appt.serviceStartedAt) / 60000) / 5) * 5) : null;
+  const wuDur = pendingDur != null ? pendingDur : (wuMeasured != null ? wuMeasured : storedDur); // staged → measured-today → stored
+  const setWuDur = (val) => { setPendingDur(Math.max(5, val)); setWuDirty(true); setWuSaved(false); setDurSaved(false); };
+  // Save the learned time straight to this person's profile (member-aware via patchTarget).
+  const saveWuDuration = () => {
+    if (!service) return;
+    const val = Math.max(5, Number(wuDur) || storedDur);
+    patchTarget((p) => ({ ...p, customDurations: { ...(p.customDurations || {}), [service.id]: val } }));
+    setPendingDur(val); setWuDirty(false); setDurSaved(true);
+    if (showToast) showToast(`Saved — ${service.name} books at ${val} min for ${((wuTarget && wuTarget.name) || "them").split(" ")[0]}.`);
+  };
+  const revertWuDuration = () => {
+    if (!service) return;
+    patchTarget((p) => { const cd = { ...(p.customDurations || {}) }; delete cd[service.id]; return { ...p, customDurations: cd }; });
+    setPendingDur(null); setWuDirty(false); setDurSaved(false);
+    if (showToast) showToast(`Reverted — ${service.name} uses the default ${service.duration || dur} min.`);
+  };
   // Per-client price, mirroring the duration override. Stored falls back to the effective service price.
   const storedPrice = (wuTarget && service && wuTarget.customPrices && wuTarget.customPrices[service.id] != null) ? wuTarget.customPrices[service.id] : (service ? getPrice(service, appt.providerId) : 0);
   const wuPriceVal = wuPriceText != null ? wuPriceText : (storedPrice != null ? String(storedPrice) : "");
@@ -25017,6 +25037,24 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   ); })()}
                   <textarea value={wuNote} onChange={(e) => { setWuNote(e.target.value); setWuSaved(false); }} onBlur={commitWuNote} placeholder="Note for next time — #2 guard, scissor on top, tighter on the sides…" rows={3} style={{ width: "100%", boxSizing: "border-box", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "14px 15px", color: T.text, fontSize: 16, resize: "vertical", lineHeight: 1.5, outline: "none", minHeight: 92, marginTop: 14 }} />
                   {wuSaved && <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#3FA968", fontSize: 14.5, fontWeight: 600, marginTop: 9 }}><Check size={15} strokeWidth={3} /> Saved</div>}
+                </div>
+              )}
+
+              {/* TIME FOR NEXT TIME — set this person's learned duration for the service just finished,
+                  pre-filled with the actual measured time. Saves straight to their profile (the same
+                  per-client override the Pricing/Duration tab writes). Wrap-up only (status done). */}
+              {client && service && appt.status === "done" && (
+                <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
+                  <div style={{ fontSize: 17.5, fontWeight: 600, color: T.text, lineHeight: 1.1 }}>Time for next time</div>
+                  <div style={{ fontSize: 14.5, color: T.sub, margin: "4px 0 14px", lineHeight: 1.45 }}>{wuMeasured != null ? `Ran about ${wuMeasured} min today. ` : ""}Set what {((wuTarget && wuTarget.name) || "they").split(" ")[0]} books {service.name} at.</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <button onClick={() => setWuDur(wuDur - 5)} aria-label="Less time" style={{ width: 44, height: 44, borderRadius: 12, border: `1px solid ${T.line}`, background: T.chip, color: T.text, fontSize: 22, lineHeight: 1, cursor: "pointer", flexShrink: 0 }}>−</button>
+                    <div style={{ minWidth: 92, textAlign: "center", fontSize: 20, fontWeight: 600, color: T.text }}>{wuDur} min</div>
+                    <button onClick={() => setWuDur(wuDur + 5)} aria-label="More time" style={{ width: 44, height: 44, borderRadius: 12, border: `1px solid ${T.line}`, background: T.chip, color: T.text, fontSize: 22, lineHeight: 1, cursor: "pointer", flexShrink: 0 }}>+</button>
+                    <button onClick={saveWuDuration} disabled={wuDur === storedDur} style={{ marginLeft: "auto", padding: "12px 20px", borderRadius: 12, border: "none", background: wuDur === storedDur ? T.line : T.accent, color: wuDur === storedDur ? T.faint : "#fff", fontSize: 15, fontWeight: 600, cursor: wuDur === storedDur ? "default" : "pointer", flexShrink: 0 }}>Save</button>
+                  </div>
+                  {durSaved && pendingDur != null && wuDur === storedDur && <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#3FA968", fontSize: 14.5, fontWeight: 600, marginTop: 10 }}><Check size={15} strokeWidth={3} /> Saved · books {service.name} at {storedDur} min</div>}
+                  {storedDurIsCustom && !durSaved && <button onClick={revertWuDuration} style={{ background: "none", border: "none", padding: 0, marginTop: 10, fontSize: 13.5, color: T.sub, textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>Revert to default ({service.duration || dur} min)</button>}
                 </div>
               )}
 
