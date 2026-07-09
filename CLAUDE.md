@@ -114,3 +114,6 @@ SMS consent / privacy / terms wording is under 10DLC carrier vetting. The phrase
 2. `grep -c "reminders from Sanctuary Barber Co" src/App.jsx` → exactly **4**.
 3. Sanity-check brackets / no obvious imbalance in edited regions.
 4. Commit, push, `npx vercel --prod --force`. Native rebuild (`npm run build && npx cap sync` → Xcode ▶) only when testing inside the iOS app.
+
+## Dan's reply style (standing, 2026-07-09)
+Always answer Dan like he's 5 years old and keep it as brief as possible. Simple words, short. (Still meet his senior-engineer bar: name the risk, say what's not checked — just in plain, tiny words.)
