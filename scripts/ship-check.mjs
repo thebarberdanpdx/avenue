@@ -132,6 +132,7 @@ const GUARDS = [
   { needle: "sync-pull allows read for valid login on small shops", label: "micro-shop sync-pull auth for Dan+Heather without provider emails on file" },
   { needle: "mergeLocalOverServer", label: "server mirror keeps in-flight check-ins/edits until save lands" },
   { needle: "flushApptsNow", label: "check-in/book/checkout save to server immediately" },
+  { needle: "syncGuardRef", label: "auto-refresh waits for unsaved work; server pulls always merge local" },
   { needle: "card-on-file-verified-only", label: "a saved card-on-file (brand + last-4) shows ONLY to a verified/signed-in client — never to an unverified booker who typed a matching phone (card disclosure + enumeration hole)" },
 ];
 try {

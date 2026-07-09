@@ -1760,6 +1760,13 @@ function App() {
   // Set true while a client is on the booking CONFIRMATION screen so the version auto-updater below
   // never hard-reloads mid-confirmation (that reload was wiping the "You're in" page → login).
   const holdReloadRef = useRef(false);
+  // Deferred app update: never hard-reload while edits are mid-save (see syncGuardRef below).
+  const pendingVersionReloadRef = useRef(null);
+  const syncGuardRef = useRef({
+    hasUnsavedWork: () => false,
+    flushAll: () => {},
+    waitForSavesIdle: async () => true,
+  });
   const [shopUnlocked, setShopUnlocked] = useState(true);
   const [shopPwPrompt, setShopPwPrompt] = useState(false);
   const [pwEntry, setPwEntry] = useState("");
@@ -1769,40 +1776,52 @@ function App() {
   const [authReady, setAuthReady] = useState(false);
 
   // Auto-update: a cached (stale) app asks the server what's live and refreshes itself if it's
-  // behind. Kills the "features disappear until you reinstall" problem for good. Reloads at most
-  // once per server version (sessionStorage guard) so a stuck cache can never loop.
+  // behind. NEVER reload while local edits are pending — that was wiping check-ins, settings, and
+  // bookings mid-save (the "app refreshes and everything resets" bug on iPhone).
   useEffect(() => {
     const LOCAL = (typeof __BUILD_VERSION__ !== "undefined") ? __BUILD_VERSION__ : "dev";
     if (LOCAL === "dev") return; // skip in local dev
     let cancelled = false;
+    const doReload = (version) => {
+      const KEY = "vero_reloaded_for";
+      if (sessionStorage.getItem(KEY) === version) return;
+      sessionStorage.setItem(KEY, version);
+      const u = new URL(window.location.href);
+      u.searchParams.set("v", String(version).slice(0, 8));
+      if (IS_NATIVE) u.searchParams.set("_", String(Date.now()));
+      window.location.replace(u.toString());
+    };
     const check = async () => {
-      if (holdReloadRef.current) return; // client is mid-confirmation — don't reload out from under them
+      if (holdReloadRef.current) return;
       try {
-        const r = await fetch(API_BASE + "/api/version", { cache: "no-store" });
-        if (!r.ok) return;
-        const { version } = await r.json();
-        if (cancelled || !version || version === LOCAL) return;
-        const KEY = "vero_reloaded_for";
-        if (sessionStorage.getItem(KEY) === version) return; // already tried for this version — don't loop
-        sessionStorage.setItem(KEY, version);
-        // cross-device-sync: drop stale on-device copies when a new build ships — otherwise iPad can
-        // keep showing an old cached calendar and skip the fresh server pull.
-        try {
-          const sid = _shopIdFromUrl();
-          ["appointments", "clients", "waitlist", "services", "providers"].forEach((t) => {
-            localStorage.removeItem(`vero_cache_${sid}_${t}`);
-          });
-        } catch (e) {}
-        const u = new URL(window.location.href);
-        u.searchParams.set("v", String(version).slice(0, 8)); // change the URL to bust the webview cache
-        if (IS_NATIVE) u.searchParams.set("_", String(Date.now())); // Capacitor WKWebView: query-only bust is not always enough
-        window.location.replace(u.toString());
+        const targetVersion = pendingVersionReloadRef.current;
+        let version = targetVersion;
+        if (!version) {
+          const r = await fetch(API_BASE + "/api/version", { cache: "no-store" });
+          if (!r.ok) return;
+          const body = await r.json();
+          version = body.version;
+        }
+        if (cancelled || !version || version === LOCAL) { pendingVersionReloadRef.current = null; return; }
+        const guard = syncGuardRef.current;
+        if (guard.hasUnsavedWork()) {
+          pendingVersionReloadRef.current = version;
+          return;
+        }
+        guard.flushAll();
+        const idle = await guard.waitForSavesIdle(10000);
+        if (cancelled || !idle || guard.hasUnsavedWork()) {
+          pendingVersionReloadRef.current = version;
+          return;
+        }
+        pendingVersionReloadRef.current = null;
+        doReload(version);
       } catch (e) {}
     };
     check();
     const onVis = () => { if (document.visibilityState === "visible") check(); };
     document.addEventListener("visibilitychange", onVis);
-    const id = setInterval(check, 5 * 60 * 1000);
+    const id = setInterval(check, 60 * 1000);
     return () => { cancelled = true; document.removeEventListener("visibilitychange", onVis); clearInterval(id); };
   }, []);
 
@@ -2294,6 +2313,24 @@ function App() {
     return true;
   };
   const tableSetters = { clients: setClients, appointments: setAppts, waitlist: setWaitlist, services: setServices, providers: setProviders };
+  const localTableState = (table) => {
+    if (table === "appointments") return appts;
+    if (table === "clients") return clients;
+    if (table === "waitlist") return waitlist;
+    if (table === "services") return services;
+    if (table === "providers") return providers;
+    return [];
+  };
+  const mergeLocalOverServer = (serverList, localList) => {
+    const byId = new Map((serverList || []).map((a) => [String(a && a.id), a]));
+    for (const la of (localList || [])) {
+      if (!la || la.id == null) continue;
+      const k = String(la.id);
+      const sr = byId.get(k);
+      if (!sr || JSON.stringify(la) !== JSON.stringify(sr)) byId.set(k, la);
+    }
+    return Array.from(byId.values());
+  };
   const refetchTable = async (table, opts = {}) => {
     const force = !!(opts && opts.force);
     try {
@@ -2324,19 +2361,14 @@ function App() {
       } else if (sv && sv.running) {
         if (table === "appointments" || table === "clients") setSyncHealth((h) => ({ ...h, pulling: false }));
         return; // never stomp a write that's actively in flight
-      } else if (table === 'appointments' || table === 'clients') {
-        // cross-device-sync: server wins over a stale pending local snapshot
-        delete pendingSaveRef.current[table];
       }
+      // cross-device-sync: ALWAYS merge server rows with local — foreground pulls and realtime used
+      // to replace the whole table and revert edits that hadn't finished saving (the iPhone reset bug).
+      const local = localTableState(table);
+      list = mergeLocalOverServer(list, local);
       if (table === 'services') list.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
-      if (table === 'providers') {
-        // Don't clobber an in-flight local edit (title/role/reorder) with a realtime echo,
-        // and always re-sort so saved order survives. Mirrors the [session] reload guard.
-        const s = savingRef.current.providers;
-        if (providersDirtyRef.current || (s && (s.running || s.queued))) return;
-        list = sortProviders(list);
-      }
-      lastRemoteRef.current[table] = list;
+      if (table === 'providers') list = sortProviders(list);
+      lastRemoteRef.current[table] = data ? data.map((r) => r.data) : [];
       const set = tableSetters[table]; if (set) set(list);
       if (table === 'appointments' || table === 'clients') {
         writeCache(table, list); setUsingCache(false);
@@ -2357,39 +2389,14 @@ function App() {
   // cross-device-sync — SERVER MIRROR: authoritative copy via api/sync-pull (service-role read
   // after JWT membership check). sync-pull allows read for valid login on small shops.
   // Bypasses broken direct Supabase reads on iPad/Capacitor WebViews.
-  const apptsHaveLocalEdits = () => {
-    const sv = savingRef.current.appointments;
-    return !!(sv && (sv.running || sv.queued))
-      || pendingSaveRef.current.appointments !== undefined
-      || (lastSaveAt.current.appointments && Date.now() - lastSaveAt.current.appointments < 12000)
-      || appts !== lastRemoteRef.current.appointments;
-  };
-  const clientsHaveLocalEdits = () => {
-    const sv = savingRef.current.clients;
-    return !!(sv && (sv.running || sv.queued))
-      || pendingSaveRef.current.clients !== undefined
-      || (lastSaveAt.current.clients && Date.now() - lastSaveAt.current.clients < 12000)
-      || clients !== lastRemoteRef.current.clients;
-  };
-  const mergeLocalOverServer = (serverList, localList) => {
-    const byId = new Map((serverList || []).map((a) => [String(a && a.id), a]));
-    for (const la of (localList || [])) {
-      if (!la || la.id == null) continue;
-      const k = String(la.id);
-      const sr = byId.get(k);
-      if (!sr || JSON.stringify(la) !== JSON.stringify(sr)) byId.set(k, la);
-    }
-    return Array.from(byId.values());
-  };
   const applyServerMirror = (payload) => {
     const serverCl = Array.isArray(payload.clients) ? payload.clients : [];
     const serverAp = Array.isArray(payload.appointments) ? payload.appointments : [];
-    const apDirty = apptsHaveLocalEdits();
-    const clDirty = clientsHaveLocalEdits();
-    const finalAp = apDirty ? mergeLocalOverServer(serverAp, appts) : serverAp;
-    const finalCl = clDirty ? mergeLocalOverServer(serverCl, clients) : serverCl;
-    if (!apDirty) delete pendingSaveRef.current.appointments;
-    if (!clDirty) delete pendingSaveRef.current.clients;
+    // cross-device-sync: ALWAYS merge — never blind-replace with server rows. The old "only merge when
+    // dirty" path let the 30s heartbeat / foreground pull revert check-ins and edits that had already
+    // landed locally but looked "clean" because lastRemoteRef matched appts (the iPhone reset bug).
+    const finalAp = mergeLocalOverServer(serverAp, appts);
+    const finalCl = mergeLocalOverServer(serverCl, clients);
     // Baseline stays the raw server copy so the save effect still pushes local edits up.
     lastRemoteRef.current.clients = serverCl;
     lastRemoteRef.current.appointments = serverAp;
@@ -2414,6 +2421,10 @@ function App() {
   };
   const mirrorFromServer = async () => {
     if (!session) return false;
+    // Never interleave a server mirror with an active write — wait for the next heartbeat.
+    const apSv = savingRef.current.appointments;
+    const clSv = savingRef.current.clients;
+    if ((apSv && apSv.running) || (clSv && clSv.running)) return false;
     if (mirrorInFlightRef.current) return mirrorInFlightRef.current;
     const run = (async () => {
       setSyncHealth((h) => ({ ...h, pulling: true }));
@@ -2705,6 +2716,32 @@ function App() {
     lastSaveAt.current.appointments = Date.now();
     firePending('appointments');
   };
+  // cross-device-sync: detect ANY in-flight local work so auto-refresh and server pulls never stomp it.
+  const SYNC_GUARD_MS = 45000;
+  const tableHasUnsavedWork = (table) => {
+    const sv = savingRef.current[table];
+    if (sv && (sv.running || sv.queued)) return true;
+    if (pendingSaveRef.current[table] !== undefined) return true;
+    if (table === "providers" && providersDirtyRef.current) return true;
+    if (lastSaveAt.current[table] && Date.now() - lastSaveAt.current[table] < SYNC_GUARD_MS) return true;
+    const local = localTableState(table);
+    const base = lastRemoteRef.current[table] || [];
+    if (Array.isArray(local) && JSON.stringify(mergeLocalOverServer(base, local)) !== JSON.stringify(base)) return true;
+    return false;
+  };
+  const hasUnsavedWork = () => {
+    if (shopsPendingRef.current) return true;
+    return ["appointments", "clients", "waitlist", "services", "providers"].some(tableHasUnsavedWork);
+  };
+  const waitForSavesIdle = (timeoutMs = 8000) => new Promise((resolve) => {
+    const start = Date.now();
+    const tick = () => {
+      if (!hasUnsavedWork()) return resolve(true);
+      if (Date.now() - start > timeoutMs) return resolve(false);
+      setTimeout(tick, 200);
+    };
+    tick();
+  });
   useEffect(() => { if (!loadedRef.current || !session || !staffClientsLoadedRef.current) return; if (clients === lastRemoteRef.current.clients) return; lastSaveAt.current.clients = Date.now(); pendingSaveRef.current.clients = clients; const t = setTimeout(() => firePending('clients'), 800); return () => clearTimeout(t); }, [clients]);
   useEffect(() => { if (!loadedRef.current || !session || !staffApptsLoadedRef.current) return; if (appts === lastRemoteRef.current.appointments) return; lastSaveAt.current.appointments = Date.now(); pendingSaveRef.current.appointments = appts; const t = setTimeout(() => firePending('appointments'), 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; lastSaveAt.current.waitlist = Date.now(); pendingSaveRef.current.waitlist = waitlist; const t = setTimeout(() => firePending('waitlist'), 800); return () => clearTimeout(t); }, [waitlist]);
@@ -2716,6 +2753,7 @@ function App() {
   // can never double-write or send stale data.
   useEffect(() => {
     const flushAll = () => { Object.keys(pendingSaveRef.current).forEach(firePending); fireShopsSave(); };
+    syncGuardRef.current = { hasUnsavedWork, flushAll, waitForSavesIdle };
     const onVis = () => { if (document.visibilityState === "hidden") flushAll(); };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("pagehide", flushAll);
@@ -2731,6 +2769,9 @@ function App() {
   const pullLiveTables = (tables) => {
     const list = tables || ["appointments", "clients", "waitlist", "services", "providers"];
     lastFgRefetch.current = Date.now();
+    // Flush debounced edits BEFORE pulling — otherwise the pull replaces state and the save never fires.
+    Object.keys(pendingSaveRef.current).forEach(firePending);
+    fireShopsSave();
     if (session && list.some((t) => t === "appointments" || t === "clients")) mirrorFromServer();
     list.filter((t) => t !== "appointments" && t !== "clients").forEach((t) => refetchTable(t, { force: true }));
   };
@@ -2743,7 +2784,11 @@ function App() {
   }, [dataLoaded, sessionUid]);
   useEffect(() => {
     if (!sessionUid) return;
-    const onRefreshed = () => pullLiveTables(["appointments", "clients"]);
+    const onRefreshed = () => {
+      // Native foreground already pulls; token refresh fires on every wake — debounce to avoid double-reset.
+      if (Date.now() - lastFgRefetch.current < 6000) return;
+      pullLiveTables(["appointments", "clients"]);
+    };
     window.addEventListener("vero-token-refreshed", onRefreshed);
     return () => window.removeEventListener("vero-token-refreshed", onRefreshed);
   }, [sessionUid]);
