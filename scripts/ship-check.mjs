@@ -128,6 +128,7 @@ const GUARDS = [
   { needle: "Sync problem on this device", label: "sync-gap banner when cloud has data but device shows empty" },
   { needle: "mirrorFromServer", label: "staff calendar mirrors server via api/sync-pull" },
   { needle: "blocked empty save", label: "never push empty clients/appts when server has rows" },
+  { needle: "the whole shop shares one calendar", label: "all staff see every chair by default (Heather sees Dan bookings)" },
   { needle: "card-on-file-verified-only", label: "a saved card-on-file (brand + last-4) shows ONLY to a verified/signed-in client — never to an unverified booker who typed a matching phone (card disclosure + enumeration hole)" },
 ];
 try {
