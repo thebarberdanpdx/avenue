@@ -4,6 +4,39 @@ import * as Sentry from '@sentry/react'
 import './index.css'
 import App from './App.jsx'
 
+// GUARD: native-viewport-lock — capacitor:// bundles can mis-read device-width and scale the
+// whole UI (enlarged text, blown-up calendar rows). Pin viewport + text-size-adjust on native.
+function lockNativeShellLayout() {
+  if (typeof window === 'undefined') return
+  const proto = window.location.protocol
+  const isNative = proto === 'capacitor:' || proto === 'ionic:' || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
+  if (!isNative) return
+  const html = document.documentElement
+  const body = document.body
+  const noInflate = '100%'
+  html.style.webkitTextSizeAdjust = noInflate
+  html.style.textSizeAdjust = noInflate
+  if (body) {
+    body.style.webkitTextSizeAdjust = noInflate
+    body.style.textSizeAdjust = noInflate
+  }
+  const applyViewport = () => {
+    const w = Math.round(window.innerWidth || window.screen?.width || 390)
+    if (!w) return
+    let meta = document.querySelector('meta[name="viewport"]')
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.setAttribute('name', 'viewport')
+      document.head.appendChild(meta)
+    }
+    meta.setAttribute('content', `width=${w}, viewport-fit=cover, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no`)
+  }
+  applyViewport()
+  window.addEventListener('orientationchange', applyViewport)
+  window.addEventListener('resize', applyViewport)
+}
+lockNativeShellLayout()
+
 // Error monitoring — emails the owner when something actually breaks.
 // Privacy-conscious by design: errors only (NO Session Replay / screen
 // recording, NO performance tracing), and sendDefaultPii is off so we don't
@@ -42,7 +75,14 @@ const Fallback = (
   </div>
 )
 
-createRoot(document.getElementById('root')).render(
+const rootEl = document.getElementById('root')
+// index.html must not pin flex/center on #root — React mounts into it and those inline
+// styles persist, which made the native shell look zoomed/enlarged on iOS.
+if (rootEl) {
+  rootEl.removeAttribute('style')
+  rootEl.textContent = ''
+}
+createRoot(rootEl).render(
   <StrictMode>
     <Sentry.ErrorBoundary fallback={Fallback}>
       <App />

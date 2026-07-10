@@ -22,6 +22,9 @@ import {
 // OFFLINE-NATIVE-BUNDLE: the iOS shell ships dist/ from the device (no server.url). Remote gotvero.com
 // loading breaks offline — airplane mode can't fetch JS. CAPACITOR_BUILD=1 (npm run build:cap) sets vite
 // base './' so CSS/JS asset paths resolve inside the bundled shell. API calls still use API_BASE below.
+// GUARD: root-shell-layout — main.jsx runs rootEl.removeAttribute("style") so index.html never leaves
+// flex/center on #root after mount (iOS native looked zoomed/enlarged when that persisted).
+// GUARD: native-viewport-lock — main.jsx lockNativeShellLayout() pins viewport width on capacitor://.
 const IS_NATIVE = typeof window !== "undefined" && (
   window.location.protocol === "capacitor:" ||
   window.location.protocol === "ionic:" ||
@@ -21860,9 +21863,23 @@ function ColumnOrderEditor({ providers, setProviders }) {
 }
 function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId, deepLinkApptId, onDeepLinkHandled, rebookSeed, onRebookHandled, flushApptsNow }) {
   const sizeId = business?.calendarRowSize || "L";
-  // Visible calendar window — configurable in Calendar Settings; falls back to 7 AM–10 PM.
-  const DAY_START = ((business?.calendar?.dayStartHr ?? 7)) * 60;
-  const DAY_END = ((business?.calendar?.dayEndHr ?? 22)) * 60;
+  // Visible calendar window — hrs OR min-from-midnight (bad cache must not blow up gridHeight).
+  const calWindowMin = (raw, fallbackHr) => {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return fallbackHr * 60;
+    if (n >= 60 && n <= 24 * 60) return Math.round(n);
+    return Math.min(23, Math.max(0, Math.round(n))) * 60;
+  };
+  const calApptMin = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return NaN;
+    if (n >= 0 && n < 24 * 60) return n;
+    if (n > 24 * 60 && n <= 24 * 3600) return Math.round(n / 60);
+    return NaN;
+  };
+  let DAY_START = calWindowMin(business?.calendar?.dayStartHr, 7);
+  let DAY_END = calWindowMin(business?.calendar?.dayEndHr, 22);
+  if (DAY_END <= DAY_START) { DAY_START = 7 * 60; DAY_END = 22 * 60; }
   const [showWaitlistPanel, setShowWaitlistPanel] = useState(false);
   // Openings the staff can offer to waitlist / "notify me if earlier" clients. Recorded when an
   // appointment is cancelled or removed. NOTHING is ever sent automatically — the staff chooses who
@@ -22160,9 +22177,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     if (freed) setTimeout(() => handleFreedSlot(freed), 350);
   };
 
-  const pxPerHour = (ROW_SIZES.find((s) => s.id === sizeId) || ROW_SIZES[2]).pxPerHour;
+  const pxPerHour = Math.min(240, (ROW_SIZES.find((s) => s.id === sizeId) || ROW_SIZES[2]).pxPerHour);
   const PPM = pxPerHour / 60; // pixels per minute
-  const totalMin = DAY_END - DAY_START;
+  const totalMin = Math.max(60, DAY_END - DAY_START);
   const gridHeight = totalMin * PPM;
 
   const snap5 = (min) => Math.round(min / 5) * 5;
@@ -22966,10 +22983,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                   tint regardless of theme/service color). Flat near-square tiles, flush to the column,
                   label → NAME → time hierarchy, quiet markers bottom-right. Dan-approved 2026-07-03. */}
               {col.map((a) => {
+                const aStart = calApptMin(a.start);
+                const aEnd = calApptMin(a.end);
+                if (!Number.isFinite(aStart) || !Number.isFinite(aEnd) || aEnd <= aStart) return null;
                 const isDragging = drag && drag.id === a.id && drag.armed;
-                const liveStart = isDragging ? a.start + drag.deltaMin : a.start;
+                const liveStart = isDragging ? aStart + drag.deltaMin : aStart;
                 const top = (liveStart - DAY_START) * PPM;
-                const height = (a.end - a.start) * PPM - 4; // 4px breathing gap between stacked tiles
+                const height = Math.max(8, (aEnd - aStart) * PPM - 4); // 4px breathing gap between stacked tiles
                 const isBlock = a.status === "block";
                 const isDone = a.status === "done";
                 const live = a.status === "in-service";
@@ -23008,7 +23028,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                   return !appts.some((o) => o.id !== a.id && o.clientId === a.clientId && o.status !== "cancelled" && o.status !== "no-show" && o.status !== "block" && o.bookedFor && new Date(o.bookedFor) < new Date(a.bookedFor));
                 })());
                 const rebooked = /rebook/i.test(a.title || "");
-                const range = `${fmtTime(liveStart)} – ${fmtTime(liveStart + (a.end - a.start))}`;
+                const range = `${fmtTime(liveStart)} – ${fmtTime(liveStart + (aEnd - aStart))}`;
                 // Eyebrow shows the service alone; the cut style + add-ons get their own clean line below,
                 // so the tile never crams a truncated "HAIRCUT (SKIN FADE, FACIAL…)" into one row.
                 const svcTop = a.serviceName || (a.title || "").replace(/\s*[(·].*$/, "");

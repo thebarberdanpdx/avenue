@@ -150,6 +150,9 @@ const GUARDS = [
   { needle: "OFFLINE-NATIVE-BUNDLE", label: "native app bundles dist locally for offline (not remote gotvero.com webview)" },
   { needle: "writeShopSettingsCache", label: "offline shop settings (hours/calendar) cached for native offline view" },
   { needle: "providersStillSeed", label: "offline boot replaces demo seed providers with cached staff rows" },
+  { needle: "root-shell-layout", label: "boot clears vestigial #root inline flex/center from index.html" },
+  { needle: "native-viewport-lock", label: "native viewport lock — capacitor bundle must not scale UI enlarged" },
+  { needle: "calApptMin", label: "calendar normalizes appt start/end units (prevents giant offline tiles)" },
   { needle: "CAPACITOR_BUILD", label: "Capacitor build uses relative asset base (./) for bundled iOS offline" },
 ];
 try {
@@ -209,6 +212,13 @@ try {
   const rootCss = readFileSync(join(ROOT, "src/index.css"), "utf8");
   if (/text-align\s*:\s*center/.test(rootCss) && /#root/.test(rootCss)) {
     capFails.push("src/index.css #root must not use text-align:center — breaks native calendar layout");
+  }
+  if (!/-webkit-text-size-adjust\s*:\s*100%/.test(rootCss)) {
+    capFails.push("src/index.css must set -webkit-text-size-adjust: 100% (stops iOS inflating text)");
+  }
+  const indexHtml = readFileSync(join(ROOT, "index.html"), "utf8");
+  if (/<div id="root"[^>]*style=/.test(indexHtml)) {
+    capFails.push('index.html #root must not use inline styles — flex/center on #root breaks native layout');
   }
   record(capFails.length === 0, "Native offline bundle (Capacitor)",
     capFails.length ? capFails.join(" · ") : "iOS app bundles dist locally + relative asset paths for cap sync");

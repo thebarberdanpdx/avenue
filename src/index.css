@@ -1,25 +1,42 @@
-/* App shell — full viewport on web + Capacitor. Keep this minimal; theming lives in App.jsx. */
-:root {
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
+/* App shell — full viewport on web + Capacitor. Theming lives in App.jsx. */
 html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  font-size: 16px;
+  width: 100%;
+  overflow-x: hidden;
   overscroll-behavior: none;
 }
 
 body {
   margin: 0;
   min-height: 100dvh;
+  width: 100%;
+  overflow-x: hidden;
+  font-size: 16px;
+  line-height: 1.45;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* Block layout only — never leave flex/center inline on #root (breaks native scale). */
 #root {
+  display: block;
   width: 100%;
+  max-width: 100%;
   min-height: 100dvh;
   margin: 0;
   padding: 0;
   text-align: initial;
+  box-sizing: border-box;
+}
+
+#app-root {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: 100dvh;
   box-sizing: border-box;
 }
