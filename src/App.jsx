@@ -41,29 +41,116 @@ async function haptic(kind) {
   } catch (e) { /* best-effort — haptics never block a tap */ }
 }
 
-// ---- OFFLINE STAGE 0 (native SQLite probe) ---------------------------------
-// PLAN ONLY until Dan flips OFFLINE_NATIVE on a test device. Default OFF — zero production
-// behavior change. Proves @capacitor-community/sqlite opens outside WKWebView WASM (PowerSync
-// crashed there). Do NOT wire calendar reads/writes here until later stages.
+// ---- OFFLINE NATIVE STORE (Stage 1 — reading) -------------------------------
+// GUARD: offline-store-boundary — all native offline read/write seeds go through this block and
+// persistLocalMirror / hydrateFromOfflineFailover inside App(). Default OFF — zero production change.
+// PowerSync WASM crashed WKWebView; this uses @capacitor-community/sqlite (native plugin).
 const OFFLINE_NATIVE = false;
-let _offlineSqliteProbed = false;
-async function offlineNativeSqliteProbe() {
-  if (!OFFLINE_NATIVE || !IS_NATIVE || _offlineSqliteProbed) return;
-  _offlineSqliteProbed = true;
+const OFFLINE_DB = "vero_offline";
+let _offlineDb = null;
+let _offlineSqlite = null;
+let _offlineStoreOpen = false;
+
+function offlineStoreActive() {
+  return !!(OFFLINE_NATIVE && IS_NATIVE);
+}
+
+async function offlineStoreOpenConn() {
+  if (!offlineStoreActive()) return false;
+  if (_offlineStoreOpen && _offlineDb) return true;
   try {
     const { CapacitorSQLite, SQLiteConnection } = await import("@capacitor-community/sqlite");
-    const sqlite = new SQLiteConnection(CapacitorSQLite);
-    const db = await sqlite.createConnection("vero_offline_probe", false, "no-encryption", 1, false);
-    await db.open();
-    await db.execute("CREATE TABLE IF NOT EXISTS probe (id INTEGER PRIMARY KEY);");
-    const r = await db.query("SELECT 1 AS ok;");
-    await db.close();
-    await sqlite.closeConnection("vero_offline_probe", false);
-    console.info("[offline-stage0] native SQLite probe OK", r);
+    _offlineSqlite = new SQLiteConnection(CapacitorSQLite);
+    _offlineDb = await _offlineSqlite.createConnection(OFFLINE_DB, false, "no-encryption", 1, false);
+    await _offlineDb.open();
+    await _offlineDb.execute(`
+      CREATE TABLE IF NOT EXISTS sync_rows (
+        shop_id TEXT NOT NULL,
+        table_name TEXT NOT NULL,
+        row_id TEXT NOT NULL,
+        json_data TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (shop_id, table_name, row_id)
+      );
+      CREATE TABLE IF NOT EXISTS sync_meta (
+        shop_id TEXT NOT NULL,
+        meta_key TEXT NOT NULL,
+        meta_value TEXT NOT NULL,
+        PRIMARY KEY (shop_id, meta_key)
+      );
+      CREATE TABLE IF NOT EXISTS outbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shop_id TEXT NOT NULL,
+        table_name TEXT NOT NULL,
+        row_id TEXT,
+        op TEXT NOT NULL,
+        patch_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        sent_at TEXT
+      );
+    `);
+    _offlineStoreOpen = true;
+    return true;
   } catch (e) {
-    console.warn("[offline-stage0] native SQLite probe failed", e);
-    _offlineSqliteProbed = false;
+    console.warn("[offline] native SQLite open failed", e);
+    _offlineStoreOpen = false;
+    _offlineDb = null;
+    return false;
   }
+}
+
+async function offlineStoreWriteTable(shopId, table, list) {
+  if (!offlineStoreActive() || !Array.isArray(list)) return;
+  if (!(await offlineStoreOpenConn()) || !_offlineDb) return;
+  const shop = String(shopId || "");
+  const tbl = String(table || "");
+  const now = new Date().toISOString();
+  try {
+    await _offlineDb.run("DELETE FROM sync_rows WHERE shop_id = ? AND table_name = ?", [shop, tbl]);
+    for (const row of list) {
+      if (!row || row.id == null) continue;
+      await _offlineDb.run(
+        "INSERT OR REPLACE INTO sync_rows (shop_id, table_name, row_id, json_data, updated_at) VALUES (?,?,?,?,?)",
+        [shop, tbl, String(row.id), JSON.stringify(row), now]
+      );
+    }
+    await _offlineDb.run(
+      "INSERT OR REPLACE INTO sync_meta (shop_id, meta_key, meta_value) VALUES (?,?,?)",
+      [shop, `seed:${tbl}`, now]
+    );
+  } catch (e) {
+    console.warn("[offline] seed failed", tbl, e);
+  }
+}
+
+async function offlineStoreReadTable(shopId, table) {
+  if (!offlineStoreActive()) return null;
+  if (!(await offlineStoreOpenConn()) || !_offlineDb) return null;
+  try {
+    const r = await _offlineDb.query(
+      "SELECT json_data FROM sync_rows WHERE shop_id = ? AND table_name = ? ORDER BY row_id",
+      [String(shopId || ""), String(table || "")]
+    );
+    const vals = (r && r.values) ? r.values : [];
+    return vals.map((v) => {
+      try { return JSON.parse(v[0]); } catch (e) { return null; }
+    }).filter(Boolean);
+  } catch (e) {
+    console.warn("[offline] read failed", table, e);
+    return null;
+  }
+}
+
+async function offlineStoreBootPaint(shopId, paint) {
+  if (!offlineStoreActive()) return false;
+  if (!(await offlineStoreOpenConn())) return false;
+  const tables = ["appointments", "clients", "services", "providers"];
+  let any = false;
+  for (const tbl of tables) {
+    const rows = await offlineStoreReadTable(shopId, tbl);
+    if (rows && rows.length && paint(tbl, rows)) any = true;
+  }
+  return any;
 }
 
 // ---- ensureFreshSession ----------------------------------------------------
@@ -2077,7 +2164,6 @@ function App() {
     window.addEventListener("storage", sync);
     return () => { window.removeEventListener("vero-user-changed", sync); window.removeEventListener("storage", sync); };
   }, []);
-  useEffect(() => { offlineNativeSqliteProbe(); }, []);
   const userThemePref = signedInUser && business?.userThemes && business.userThemes[signedInUser];
   const theme = (userThemePref && THEME_IDS.includes(userThemePref)) ? userThemePref
               : (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : DEFAULT_THEME;
@@ -2401,19 +2487,37 @@ function App() {
     if (table === 'clients') return (list || []).map((c) => { if (!c) return c; const { gallery, photo, ...rest } = c; return rest; });
     return list || [];
   };
-  const writeCache = (table, list) => { try { if (Array.isArray(list)) localStorage.setItem(CACHE_PREFIX + table, JSON.stringify(slimForCache(table, list))); } catch (e) { /* quota — ignore */ } };
+  const writeCache = (table, list) => {
+    const slim = Array.isArray(list) ? slimForCache(table, list) : null;
+    try { if (slim) localStorage.setItem(CACHE_PREFIX + table, JSON.stringify(slim)); } catch (e) { /* quota */ }
+    if (slim && offlineStoreActive()) offlineStoreWriteTable(SHOP_ID, table, slim).catch(() => {});
+  };
   const readCache = (table) => { try { const raw = localStorage.getItem(CACHE_PREFIX + table); const v = raw ? JSON.parse(raw) : null; return Array.isArray(v) ? v : null; } catch (e) { return null; } };
-  // Hydrate one table read-only from cache after a failed load. Blocks all saves (degraded state) and
-  // sets lastRemoteRef to the same reference so the save effect sees "no change" and never writes.
   const hydrateFromCache = (table, current, setter) => {
-    if ((current || []).length) return false;          // already have live data — don't overwrite
+    if ((current || []).length) return false;
     const c = readCache(table);
     if (!c || !c.length) return false;
     lastRemoteRef.current[table] = c;
     setter(c);
-    loadedRef.current = false;                          // degraded: block every save until a clean reload
+    loadedRef.current = false;
     setUsingCache(true);
     return true;
+  };
+  const hydrateFromOfflineFailover = async (table, current, setter) => {
+    if ((current || []).length) return hydrateFromCache(table, current, setter);
+    if (offlineStoreActive()) {
+      try {
+        const rows = await offlineStoreReadTable(SHOP_ID, table);
+        if (rows && rows.length) {
+          lastRemoteRef.current[table] = rows;
+          setter(rows);
+          loadedRef.current = false;
+          setUsingCache(true);
+          return true;
+        }
+      } catch (e) { console.warn("[offline] hydrate", table, e); }
+    }
+    return hydrateFromCache(table, current, setter);
   };
   const tableSetters = { clients: setClients, appointments: setAppts, waitlist: setWaitlist, services: setServices, providers: setProviders };
   const localTableState = (table) => {
@@ -2648,8 +2752,8 @@ function App() {
         const err = clRes.error || apRes.error;
         const msg = apiErr ? `${apiErr}; direct: ${String((err && err.message) || err)}` : String((err && err.message) || err);
         setSyncHealth((h) => ({ ...h, err: msg, at: Date.now(), pulling: false, via: apiErr ? "api-failed" : "direct-failed" }));
-        hydrateFromCache("clients", clientsRef.current, setClients);
-        hydrateFromCache("appointments", apptsRef.current, setAppts);
+        await hydrateFromOfflineFailover("clients", clientsRef.current, setClients);
+        await hydrateFromOfflineFailover("appointments", apptsRef.current, setAppts);
         return false;
       }
       applyServerMirror({
@@ -2763,8 +2867,16 @@ function App() {
       // Mirror the columns/services the calendar needs to render into the offline cache on success.
       // Only fall back to the cache when a load actually ERRORED (!allLoaded) — never over a
       // genuinely-empty shop, which would show stale rows.
-      if (pr && pr.length) writeCache('providers', pr); else if (!allLoaded) { const c = readCache('providers'); if (c && c.length && !providersFullRef.current) { lastRemoteRef.current.providers = c; setProviders(c); } }
-      if (sv && sv.length) writeCache('services', sv); else if (!allLoaded) { const c = readCache('services'); if (c && c.length) { lastRemoteRef.current.services = c; setServices(c); setServicesTrusted(true); } } // [outage-honest-menu] last-synced real menu from the offline cache
+      if (pr && pr.length) writeCache('providers', pr); else if (!allLoaded) {
+        let c = readCache('providers');
+        if ((!c || !c.length) && offlineStoreActive()) { try { c = await offlineStoreReadTable(SHOP_ID, 'providers'); } catch (e) {} }
+        if (c && c.length && !providersFullRef.current) { lastRemoteRef.current.providers = c; setProviders(c); }
+      }
+      if (sv && sv.length) writeCache('services', sv); else if (!allLoaded) {
+        let c = readCache('services');
+        if ((!c || !c.length) && offlineStoreActive()) { try { c = await offlineStoreReadTable(SHOP_ID, 'services'); } catch (e) {} }
+        if (c && c.length) { lastRemoteRef.current.services = c; setServices(c); setServicesTrusted(true); }
+      } // [outage-honest-menu] last-synced real menu from offline store or localStorage cache
 
       } catch (e) {
         // A load threw (hard network failure / abort). Treat as an incomplete load: never unblock saves.
@@ -2802,7 +2914,37 @@ function App() {
       return;
     }
     let alive = true;
-    (async () => { if (alive) await mirrorFromServer(); })();
+    (async () => {
+      if (offlineStoreActive() && alive) {
+        await offlineStoreBootPaint(SHOP_ID, (tbl, rows) => {
+          if (tbl === "appointments" && !(apptsRef.current || []).length) {
+            lastRemoteRef.current.appointments = rows;
+            setAppts(rows);
+            staffApptsLoadedRef.current = true;
+            return true;
+          }
+          if (tbl === "clients" && !(clientsRef.current || []).length) {
+            lastRemoteRef.current.clients = rows;
+            setClients(rows);
+            staffClientsLoadedRef.current = true;
+            return true;
+          }
+          if (tbl === "services") {
+            lastRemoteRef.current.services = rows;
+            setServices(rows);
+            setServicesTrusted(true);
+            return true;
+          }
+          if (tbl === "providers" && !providersFullRef.current) {
+            lastRemoteRef.current.providers = rows;
+            setProviders(rows);
+            return true;
+          }
+          return false;
+        });
+      }
+      if (alive) await mirrorFromServer();
+    })();
     return () => { alive = false; };
   }, [sessionUid]);
 
@@ -3285,7 +3427,7 @@ function App() {
           "saving paused" banner because here the barber CAN still see their schedule. */}
       {usingCache && session && (
         <div role="status" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#8A6D3B", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
-          <span>Showing your last synced schedule — can't reach the server right now. Your data is safe; changes are paused until it reconnects.</span>
+          <span>Showing your last synced schedule — can't reach the server right now. Your data is safe; changes are paused until it reconnects.{offlineStoreActive() ? " (on-device copy)" : ""}</span>
           <button onClick={() => { try { window.location.reload(); } catch (e) {} }} style={{ flexShrink: 0, background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600, letterSpacing: 0.5 }}>Retry</button>
         </div>
       )}
