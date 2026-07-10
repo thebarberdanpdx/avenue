@@ -2482,21 +2482,19 @@ function App() {
           cache: "no-store",
         });
         const body = await r.json().catch(() => ({}));
-        if (r.ok && body.ok) {
-          applyServerMirror({ ...body, via: "api" });
+        if (r.ok && (body.ok || Array.isArray(body.clients) || Array.isArray(body.appointments))) {
+          applyServerMirror({ ...body, ok: true, via: "api" });
           return true;
         }
-        apiErr = body.error || `sync-pull HTTP ${r.status}`;
-        console.error("[vero] mirrorFromServer api failed:", apiErr, body.email || "");
+        apiErr = body.error || (r.ok ? "sync-pull returned no data" : `sync-pull HTTP ${r.status}`);
+        console.error("[vero] mirrorFromServer api failed:", apiErr, body.email || "", body);
       } catch (e) {
         apiErr = (e && e.message) || String(e);
         console.error("[vero] mirrorFromServer api threw:", e);
       }
-      // Never treat a failed server mirror as success with empty direct rows — that
-      // was the iPad "Cloud: 0 · via direct" false empty state.
+      // API path failed — still try direct Supabase reads before giving up (iPad/Capacitor path).
       if (apiErr) {
-        setSyncHealth((h) => ({ ...h, err: apiErr, at: Date.now(), pulling: false, via: "api-failed" }));
-        return false;
+        console.warn("[vero] mirrorFromServer api failed, trying direct:", apiErr);
       }
       const [clRes, apRes] = await Promise.all([
         fetchStaffTable("clients", SHOP_ID),
@@ -2504,7 +2502,8 @@ function App() {
       ]);
       if (clRes.error || apRes.error) {
         const err = clRes.error || apRes.error;
-        setSyncHealth((h) => ({ ...h, err: String((err && err.message) || err), at: Date.now(), pulling: false }));
+        const msg = apiErr ? `${apiErr}; direct: ${String((err && err.message) || err)}` : String((err && err.message) || err);
+        setSyncHealth((h) => ({ ...h, err: msg, at: Date.now(), pulling: false, via: apiErr ? "api-failed" : "direct-failed" }));
         hydrateFromCache("clients", clients, setClients);
         hydrateFromCache("appointments", appts, setAppts);
         return false;
@@ -11966,18 +11965,32 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       setSignedInAs(realProviders[0]?.id || null);
     }
   }, [providers, signedInAs]);
-  // Identify the person from their LOGIN email. When the account changes, drop the remembered
-  // chair identity so Heather's pick can't stick on Dan's phone after a handoff.
+  // Identify who is "at the chair" from the LOGIN email. Provider cards often carry the shared
+  // shop inbox (sanctuarybarberco@…) while owners sign in with personal Gmail — so a failed match
+  // must NOT leave Heather's remembered chair on Dan's phone.
   useEffect(() => {
     if (!authEmail) return;
     const norm = (e) => (e || "").trim().toLowerCase();
     const cur = norm(authEmail);
+    const loginHint = cur.split("@")[0] || "";
     try {
       const prev = localStorage.getItem("vero_last_auth_email");
       if (prev && prev !== cur) localStorage.removeItem("vero_signed_in_as");
       localStorage.setItem("vero_last_auth_email", cur);
     } catch (e) {}
-    const match = realProviders.find((p) => norm(p.email) && norm(p.email) === cur);
+    const emailMatches = realProviders.filter((p) => norm(p.email) && norm(p.email) === cur);
+    let match = null;
+    if (emailMatches.length === 1) match = emailMatches[0];
+    else if (emailMatches.length > 1) {
+      match = emailMatches.find((p) => p.pulseRole === "owner") || emailMatches[0];
+    } else {
+      // Personal login (e.g. michaelsdan415@…) — hint from the address before @, else seat the owner.
+      match = realProviders.find((p) => {
+        const n = (p.name || "").trim().toLowerCase().split(/\s+/)[0];
+        const id = String(p.id || "").toLowerCase();
+        return (n && loginHint.includes(n)) || (id && loginHint.includes(id));
+      }) || realProviders.find((p) => p.pulseRole === "owner") || null;
+    }
     if (match && match.id !== signedInAs) setSignedInAs(match.id);
   }, [authEmail, providers]);
   const me = providers.find((p) => p.id === signedInAs);
