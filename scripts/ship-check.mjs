@@ -134,6 +134,7 @@ const GUARDS = [
   { needle: "flushApptsNow", label: "check-in/book/checkout save to server immediately" },
   { needle: "syncGuardRef", label: "auto-refresh waits for unsaved work; server pulls always merge local" },
   { needle: "mergeApptRow", label: "completed checkout beats stale in-service on cross-device sync" },
+  { needle: "!IS_NATIVE", label: "PowerSync skipped on Capacitor iOS (WASM crash guard)" },
   { needle: "card-on-file-verified-only", label: "a saved card-on-file (brand + last-4) shows ONLY to a verified/signed-in client — never to an unverified booker who typed a matching phone (card disclosure + enumeration hole)" },
 ];
 try {

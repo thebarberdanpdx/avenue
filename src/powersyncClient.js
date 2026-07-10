@@ -1,29 +1,41 @@
 // PowerSync local-first sync — Stage 0/1 groundwork.
-// Connects signed-in staff to the PowerSync instance; watches shop tables into React state.
-// Writes still go through syncList → Supabase until Stage 2 wires uploadData.
-import { PowerSyncDatabase, Schema, Table, column } from '@powersync/web';
+// Lazy-loaded: @powersync/web (WASM + workers) must NEVER load on Capacitor iOS —
+// it crashed the native shell on 2026-07-10. Web/desktop only until verified on device.
 import { supabase } from './supabaseClient';
 
 const POWERSYNC_URL = import.meta.env.VITE_POWERSYNC_URL || '';
 
-const shopTable = () => new Table({
-  shop_id: column.text,
-  data: column.text,
-});
+const IS_NATIVE = typeof window !== 'undefined' && (
+  window.location.protocol === 'capacitor:' ||
+  window.location.protocol === 'ionic:' ||
+  !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform())
+);
 
-const AppSchema = new Schema({
-  clients: shopTable(),
-  appointments: shopTable(),
-  services: shopTable(),
-  providers: shopTable(),
-  waitlist: shopTable(),
-});
-
-const FATAL_UPLOAD_CODES = [/^22/, /^23/, /^42501$/];
-
+let psMod = null;
+let AppSchema = null;
 let db = null;
 let connector = null;
 let connectedShopId = null;
+
+const FATAL_UPLOAD_CODES = [/^22/, /^23/, /^42501$/];
+
+async function loadPowerSyncModule() {
+  if (psMod) return psMod;
+  psMod = await import('@powersync/web');
+  const { Schema, Table, column } = psMod;
+  const shopTable = () => new Table({
+    shop_id: column.text,
+    data: column.text,
+  });
+  AppSchema = new Schema({
+    clients: shopTable(),
+    appointments: shopTable(),
+    services: shopTable(),
+    providers: shopTable(),
+    waitlist: shopTable(),
+  });
+  return psMod;
+}
 
 class VeroConnector {
   async fetchCredentials() {
@@ -40,7 +52,6 @@ class VeroConnector {
     return { endpoint: POWERSYNC_URL, token: sess.access_token };
   }
 
-  // Stage 2 will upload queued local writes. Read-only Stage 1 leaves the queue empty.
   async uploadData(database) {
     const transaction = await database.getNextCrudTransaction();
     if (!transaction) return;
@@ -81,16 +92,18 @@ class VeroConnector {
 }
 
 export function powerSyncEnabled() {
-  return !!POWERSYNC_URL;
+  // Native shell uses the existing mirrorFromServer path until PowerSync is proven on WKWebView.
+  return !!POWERSYNC_URL && !IS_NATIVE;
 }
 
-export function getPowerSyncDb() {
+export async function getPowerSyncDb() {
   if (!powerSyncEnabled()) return null;
   if (!db) {
+    const { PowerSyncDatabase } = await loadPowerSyncModule();
     db = new PowerSyncDatabase({
       schema: AppSchema,
       database: { dbFilename: 'vero_powersync.db' },
-      flags: { enableMultiTabs: typeof SharedWorker !== 'undefined' },
+      flags: { enableMultiTabs: false },
     });
   }
   return db;
@@ -98,7 +111,7 @@ export function getPowerSyncDb() {
 
 export async function connectPowerSync(shopId) {
   if (!powerSyncEnabled() || !shopId) return { ok: false, reason: 'disabled' };
-  const psDb = getPowerSyncDb();
+  const psDb = await getPowerSyncDb();
   if (!psDb) return { ok: false, reason: 'no-db' };
   if (connectedShopId === shopId && psDb.connected) return { ok: true, connected: true };
   connector = new VeroConnector();
@@ -128,9 +141,8 @@ export function parseShopRows(rows) {
   }).filter(Boolean);
 }
 
-/** Live query — calls onUpdate whenever the local table changes. Returns cleanup fn. */
-export function watchShopTable(shopId, table, onUpdate) {
-  const psDb = getPowerSyncDb();
+export async function watchShopTable(shopId, table, onUpdate) {
+  const psDb = await getPowerSyncDb();
   if (!psDb || !shopId) return () => {};
   let alive = true;
   psDb.watch(
@@ -147,9 +159,8 @@ export function watchShopTable(shopId, table, onUpdate) {
   return () => { alive = false; };
 }
 
-/** One-shot read from local SQLite (instant boot even if sync is still catching up). */
 export async function readShopTable(shopId, table) {
-  const psDb = getPowerSyncDb();
+  const psDb = await getPowerSyncDb();
   if (!psDb || !shopId) return [];
   const rows = await psDb.getAll(
     `SELECT id, shop_id, data FROM ${table} WHERE shop_id = ?`,

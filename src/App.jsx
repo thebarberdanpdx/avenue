@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from './supabaseClient'
-import { connectPowerSync, disconnectPowerSync, powerSyncEnabled, readShopTable, watchShopTable } from './powersyncClient'
 import { tapToPayCharge, cardReaderCharge } from './tapToPay'
 import * as Sentry from '@sentry/react'
 import {
@@ -2512,64 +2511,74 @@ function App() {
   };
   mirrorFromServerRef.current = mirrorFromServer;
 
-  // PowerSync Stage 1 — signed-in staff keep a local SQLite copy; watches push live cross-device updates.
-  // Existing mirrorFromServer stays as fallback until the outage drill proves PowerSync end-to-end.
+  // PowerSync Stage 1 — web only (native skips: WASM/workers crash WKWebView). Lazy-imported.
   useEffect(() => {
-    if (!session || !powerSyncEnabled()) return undefined;
+    if (!session) return undefined;
     let alive = true;
     const cleanups = [];
-    const applyPsClients = (serverList) => {
-      if (tableBusy('clients')) return;
-      setClients((local) => {
-        const finalCl = mergeLocalOverServer(serverList, local, 'clients');
-        lastRemoteRef.current.clients = serverList;
-        lastMirrorCountsRef.current = { ...lastMirrorCountsRef.current, clients: serverList.length };
-        staffClientsLoadedRef.current = true;
-        writeCache('clients', finalCl);
-        setUsingCache(false);
-        setSyncHealth((h) => ({ ...h, serverClients: serverList.length, err: null, at: Date.now(), via: 'powersync', pulling: false }));
-        return finalCl;
-      });
-    };
-    const applyPsAppts = (serverList) => {
-      if (tableBusy('appointments')) return;
-      setAppts((local) => {
-        const finalAp = mergeLocalOverServer(serverList, local, 'appointments');
-        lastRemoteRef.current.appointments = serverList;
-        lastMirrorCountsRef.current = { ...lastMirrorCountsRef.current, appointments: serverList.length };
-        staffApptsLoadedRef.current = true;
-        writeCache('appointments', finalAp);
-        setUsingCache(false);
-        setSaveFailed(false);
-        setSyncHealth((h) => ({ ...h, serverAppts: serverList.length, err: null, at: Date.now(), via: 'powersync', pulling: false }));
-        return finalAp;
-      });
-    };
-    const applyPsServices = (serverList) => {
-      if (tableBusy('services')) return;
-      const sorted = [...serverList].sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
-      if (!sorted.length) return;
-      lastRemoteRef.current.services = sorted;
-      setServices(sorted);
-      setServicesTrusted(true);
-      writeCache('services', sorted);
-    };
-    const applyPsProviders = (serverList) => {
-      const provBusy = () => { const s = savingRef.current.providers; return providersDirtyRef.current || (s && (s.running || s.queued)); };
-      providersFullRef.current = true;
-      if (provBusy()) return;
-      const sorted = sortProviders(serverList);
-      if (!sorted.length) return;
-      lastRemoteRef.current.providers = sorted;
-      setProviders(sorted);
-      writeCache('providers', sorted);
-    };
-    const applyPsWaitlist = (serverList) => {
-      if (tableBusy('waitlist')) return;
-      lastRemoteRef.current.waitlist = serverList;
-      setWaitlist(serverList);
-    };
+    let disconnectFn = null;
     (async () => {
+      let ps;
+      try {
+        ps = await import('./powersyncClient');
+        if (!alive || !ps.powerSyncEnabled()) return;
+      } catch (e) {
+        console.error('[vero] PowerSync module load failed:', e);
+        return;
+      }
+      const { connectPowerSync, disconnectPowerSync, readShopTable, watchShopTable } = ps;
+      disconnectFn = disconnectPowerSync;
+      const applyPsClients = (serverList) => {
+        if (tableBusy('clients')) return;
+        setClients((local) => {
+          const finalCl = mergeLocalOverServer(serverList, local, 'clients');
+          lastRemoteRef.current.clients = serverList;
+          lastMirrorCountsRef.current = { ...lastMirrorCountsRef.current, clients: serverList.length };
+          staffClientsLoadedRef.current = true;
+          writeCache('clients', finalCl);
+          setUsingCache(false);
+          setSyncHealth((h) => ({ ...h, serverClients: serverList.length, err: null, at: Date.now(), via: 'powersync', pulling: false }));
+          return finalCl;
+        });
+      };
+      const applyPsAppts = (serverList) => {
+        if (tableBusy('appointments')) return;
+        setAppts((local) => {
+          const finalAp = mergeLocalOverServer(serverList, local, 'appointments');
+          lastRemoteRef.current.appointments = serverList;
+          lastMirrorCountsRef.current = { ...lastMirrorCountsRef.current, appointments: serverList.length };
+          staffApptsLoadedRef.current = true;
+          writeCache('appointments', finalAp);
+          setUsingCache(false);
+          setSaveFailed(false);
+          setSyncHealth((h) => ({ ...h, serverAppts: serverList.length, err: null, at: Date.now(), via: 'powersync', pulling: false }));
+          return finalAp;
+        });
+      };
+      const applyPsServices = (serverList) => {
+        if (tableBusy('services')) return;
+        const sorted = [...serverList].sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
+        if (!sorted.length) return;
+        lastRemoteRef.current.services = sorted;
+        setServices(sorted);
+        setServicesTrusted(true);
+        writeCache('services', sorted);
+      };
+      const applyPsProviders = (serverList) => {
+        const provBusy = () => { const s = savingRef.current.providers; return providersDirtyRef.current || (s && (s.running || s.queued)); };
+        providersFullRef.current = true;
+        if (provBusy()) return;
+        const sorted = sortProviders(serverList);
+        if (!sorted.length) return;
+        lastRemoteRef.current.providers = sorted;
+        setProviders(sorted);
+        writeCache('providers', sorted);
+      };
+      const applyPsWaitlist = (serverList) => {
+        if (tableBusy('waitlist')) return;
+        lastRemoteRef.current.waitlist = serverList;
+        setWaitlist(serverList);
+      };
       try {
         const res = await connectPowerSync(SHOP_ID);
         if (!alive || !res.ok) return;
@@ -2585,7 +2594,7 @@ function App() {
           if (alive && list.length) apply(list);
         }
         for (const [table, apply] of boot) {
-          cleanups.push(watchShopTable(SHOP_ID, table, (list) => { if (alive) apply(list); }));
+          cleanups.push(await watchShopTable(SHOP_ID, table, (list) => { if (alive) apply(list); }));
         }
       } catch (e) {
         console.error('[vero] PowerSync setup failed:', e);
@@ -2595,7 +2604,7 @@ function App() {
     return () => {
       alive = false;
       cleanups.forEach((stop) => { try { stop(); } catch (e) {} });
-      disconnectPowerSync();
+      if (disconnectFn) disconnectFn();
     };
   }, [sessionUid]);
 
