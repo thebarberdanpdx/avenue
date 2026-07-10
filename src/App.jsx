@@ -331,7 +331,9 @@ const DEFAULT_BUSINESS = {
   // ---- Payments master mode (Checkout & money → Payments) ----
   // live:false = Test mode — cards entered, full flow, but NOTHING is charged.
   // live:true  = real Stripe charges at every charge point (deposit, checkout, no-show).
-  payments: { live: true },
+  // Default is Test: a new shop must deliberately flip to Live before any real card is
+  // charged. (Shops that already saved live:true keep it — this only sets the default.)
+  payments: { live: false },
   // ---- Rebooking offer at end of checkout (customizable) ----
   rebook: {
     enabled: true,               // show the rebook screen at checkout at all
@@ -1023,7 +1025,12 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
       // browser/device actually supports a wallet (Safari+Apple, Chrome+Google) on our
       // verified domain — everywhere else canMakePayment() is null and the card field
       // is the fallback, so this never breaks anyone who can't use it.
-      try {
+      // TEST MODE: no wallet button at all. A wallet charge is real money the instant it's
+      // confirmed — there's no safe "simulate" for Apple Pay — so we simply don't offer it
+      // when payments are in test mode. The card field below stays, and its submit is
+      // simulated. This keeps "test mode — no real charge yet" honest.
+      if (!live) { if (!dead) setWalletChecking(false); }
+      else try {
         const pr = stripe.paymentRequest({
           country: "US", currency: "usd",
           total: isPay
@@ -1084,6 +1091,17 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
       const pm = await e.stripe.createPaymentMethod({ type: "card", card: e.card });
       if (pm.error) { setErr(pm.error.message || "Please check your card details."); setBusy(false); return; }
       const c4 = pm.paymentMethod.card || {};
+      // TEST MODE: the card was validated (tokenized — this alone moves NO money) but we
+      // stop here. No sale_intent, no setup, no customer, no charge. We simulate the
+      // success the flow needs so booking can proceed, with test:true on the result so
+      // nothing downstream mistakes this for a real payment.
+      if (!live) {
+        setResult(isPay
+          ? { paid: true, intentId: null, last4: c4.last4 || "••••", brand: c4.brand, test: true }
+          : { saved: true, pmId: null, stripeCustomerId: null, last4: c4.last4 || "••••", brand: c4.brand, test: true });
+        setBusy(false); setPhase("done");
+        return;
+      }
       if (isPay) {
         const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit" });
         if (!intent.clientSecret) { setErr(intent.error || "Couldn't start the charge."); setBusy(false); return; }
@@ -1114,9 +1132,11 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
           {phase === "done" ? (
             <div style={{ textAlign: "center", padding: "20px 4px 10px" }}>
               <div style={{ width: 60, height: 60, borderRadius: "50%", background: "color-mix(in srgb, var(--text) 14%, transparent)", color: A, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Check size={30} /></div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, marginBottom: 8 }}>{isPay ? "Deposit paid" : "Card saved"}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, marginBottom: 8 }}>{result && result.test ? (isPay ? "Deposit (test)" : "Card saved (test)") : (isPay ? "Deposit paid" : "Card saved")}</div>
               <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>
-                {isPay
+                {result && result.test
+                  ? <>Test mode — no real charge was made and no card was saved. Tap below to finish this test booking.</>
+                  : isPay
                   ? <>${amount} was charged and goes toward your total. Tap below to save and finish your booking.</>
                   : <>Your card is securely on file — you won't be charged unless you no-show or cancel late. Tap below to save and finish your booking.</>}
               </div>
@@ -17166,30 +17186,48 @@ function AppearancePicker({ theme, setTheme }) {
 // Payments master mode — Test (simulate, no real charges) vs Live (real Stripe).
 // One switch governs every charge point: deposits, checkout, no-show fees.
 function PaymentsEditor({ p, onChange }) {
-  // Vero runs live payments only. Ensure the flag is set so every charge point is active.
-  useEffect(() => { if (p?.live !== true) onChange({ live: true }); }, []);
-  const A = "var(--gold)";
+  // The master money switch. live:true → real Stripe charges at every charge point
+  // (deposits, checkout, no-show fees). live:false (Test) → the whole flow works but
+  // NOTHING is charged: staff-side checkout disables every pay method, and the client
+  // booking card sheet validates the card but moves no money. Default is Test — a shop
+  // has to deliberately flip to Live before any real card is ever charged.
+  const live = p?.live === true;
   const cps = ["Deposits", "Checkout", "No-show fee"];
   return (
     <>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 18px" }}>
-        Payments are <b style={{ color: "var(--text)" }}>live</b>. Real cards are charged across deposits, checkout, and no-show fees, and payouts go to your connected Stripe account.
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 16px" }}>
+        The master switch for real money. In <b style={{ color: "var(--text)" }}>Test</b> the whole flow works but nothing is ever charged — use it freely while you set up. In <b style={{ color: "var(--text)" }}>Live</b> real cards get charged everywhere: deposits, checkout, and no-show fees.
       </p>
 
-      <div style={{ background: "var(--panel)", border: "1px solid color-mix(in srgb, var(--gold) 55%, var(--border))", borderRadius: 20, padding: 22, boxShadow: "0 18px 44px -24px var(--wash)" }}>
+      {/* Live / Test switch — the one control that decides whether money is real. */}
+      <div role="group" aria-label="Payments mode" style={{ display: "flex", gap: 6, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 5, marginBottom: 18 }}>
+        {[{ k: false, t: "Test" }, { k: true, t: "Live" }].map((o) => {
+          const on = live === o.k;
+          return (
+            <button key={o.t} aria-pressed={on} onClick={() => { if (live !== o.k) onChange({ live: o.k }); }}
+              style={{ flex: 1, border: "none", borderRadius: 10, padding: "12px 4px", fontSize: 14.5, fontWeight: 700, cursor: "pointer",
+                background: on ? (o.k ? "var(--gold)" : "var(--text)") : "transparent",
+                color: on ? (o.k ? "var(--on-gold)" : "var(--bg)") : "var(--sub)" }}>{o.t}</button>
+          );
+        })}
+      </div>
+
+      <div style={{ background: "var(--panel)", border: `1px solid ${live ? "color-mix(in srgb, var(--gold) 55%, var(--border))" : "var(--border)"}`, borderRadius: 20, padding: 22, boxShadow: "0 18px 44px -24px var(--wash)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 6 }}>
-          <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--gold)", boxShadow: "0 0 12px var(--wash)" }} />
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1 }}>Live mode</div>
+          <span style={{ width: 9, height: 9, borderRadius: "50%", background: live ? "var(--gold)" : "var(--faint)", boxShadow: live ? "0 0 12px var(--wash)" : "none" }} />
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{live ? "Live mode" : "Test mode"}</div>
         </div>
         <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>
-          Real cards are being charged for real money across your shop.
+          {live
+            ? "Real cards are being charged for real money across your shop."
+            : "Cards can be entered and the full flow works, but no real card is ever charged. Flip to Live when you're ready to take real money."}
         </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
           {cps.map((lbl) => (
-            <div key={lbl} style={{ flex: 1, textAlign: "center", border: "1px solid color-mix(in srgb, var(--gold) 40%, var(--border))", background: "var(--wash)", borderRadius: 12, padding: "11px 4px" }}>
+            <div key={lbl} style={{ flex: 1, textAlign: "center", border: `1px solid ${live ? "color-mix(in srgb, var(--gold) 40%, var(--border))" : "var(--border)"}`, background: live ? "var(--wash)" : "var(--panel2)", borderRadius: 12, padding: "11px 4px" }}>
               <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500 }}>{lbl}</div>
-              <div style={{ fontSize: 11.5, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 3, fontWeight: 700, color: "var(--gold)" }}>Live</div>
+              <div style={{ fontSize: 11.5, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 3, fontWeight: 700, color: live ? "var(--gold)" : "var(--faint)" }}>{live ? "Live" : "Test"}</div>
             </div>
           ))}
         </div>
@@ -23752,6 +23790,13 @@ function CardOnFileSheet({ open, onClose, client, onSaved, showToast, live }) {
     try {
       const pm = await stripe.createPaymentMethod({ type: "card", card });
       if (pm.error) throw new Error(pm.error.message);
+      // TEST MODE: validate the card (tokenize — no money, no stored customer) but don't
+      // create a real Stripe customer/setup. Nothing is saved at the processor.
+      if (!live) {
+        onSaved({ stripeCustomerId: null, paymentMethodId: null, brand: pm.paymentMethod.card.brand, last4: pm.paymentMethod.card.last4, test: true });
+        showToast("Card saved on file (test — not stored at Stripe).");
+        onClose(); setBusy(false); return;
+      }
       const setup = await stripeApi({ action: "setup", customerId: client?.card?.stripeCustomerId || null, name: client?.name, email: client?.email, phone: client?.phone });
       const conf = await stripe.confirmCardSetup(setup.clientSecret, { payment_method: pm.paymentMethod.id });
       if (conf.error) throw new Error(conf.error.message);
@@ -24075,6 +24120,11 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
     try {
       const pm = await stripe.createPaymentMethod({ type: "card", card });
       if (pm.error) throw new Error(pm.error.message);
+      // TEST MODE: card validated, but no sale_intent and no charge — no money moves.
+      if (!live) {
+        onPaid({ paymentIntentId: null, brand: pm.paymentMethod.card.brand, last4: pm.paymentMethod.card.last4, test: true });
+        setBusy(false); return;
+      }
       const intent = await stripeApi({ action: "sale_intent", amount, description: description || "Vero — sale" });
       if (!intent.clientSecret) throw new Error(intent.error || "Couldn't start the charge.");
       const conf = await stripe.confirmCardPayment(intent.clientSecret, { payment_method: pm.paymentMethod.id });
@@ -24506,6 +24556,14 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
     if (isNaN(n) || n <= 0) { setErr("Enter a valid amount."); return; }
     if (!card || !card.paymentMethodId || !card.stripeCustomerId) { setErr("No card on file for this client."); return; }
     setBusy(true); setErr("");
+    // TEST MODE: never hit Stripe. Simulate the charge so the flow works, but no money
+    // moves — even if the client has a REAL card on file from a prior Live session.
+    if (!live) {
+      const amt = Math.round(n * 100) / 100; setDone(amt);
+      if (onCharged) onCharged({ id: "pay_" + Date.now().toString(36), ts: Date.now(), amount: amt, type: "no-show", status: "paid", paymentIntentId: null, brand: card.brand || null, last4: card.last4 || null, note: "No-show fee (test)", refunded: 0, test: true });
+      showToast(`Test — no real charge (${client.name}).`);
+      setBusy(false); return;
+    }
     try {
       const res = await stripeApi({ action: "charge", customerId: card.stripeCustomerId, paymentMethodId: card.paymentMethodId, amount: n, description: `No-show fee — ${client.name}` });
       if (res.status === "succeeded") { const amt = Math.round(n * 100) / 100; setDone(amt); if (onCharged) onCharged({ id: "pay_" + Date.now().toString(36), ts: Date.now(), amount: amt, type: "no-show", status: "paid", paymentIntentId: res.id || null, brand: card.brand || null, last4: card.last4 || null, note: "No-show fee", refunded: 0 }); showToast(`Charged $${amt} to ${client.name}.`); }
