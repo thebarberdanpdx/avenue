@@ -1005,6 +1005,9 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
   const cardBox = useRef(null);
   const prBox = useRef(null);
   const els = useRef(null);
+  // Per-open idempotency seed (this sheet mounts fresh each time it opens). A retry of
+  // the same deposit reuses the key so a lost response can't charge the card twice.
+  const idemNonce = useRef(newIdemKey());
 
   useEffect(() => {
     setReady(false);
@@ -1045,7 +1048,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
         pr.on("paymentmethod", async (ev) => {
           try {
             if (isPay) {
-              const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit" });
+              const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit", idempotencyKey: idemKeyFor(`sale_intent:${idemNonce.current}:${Math.round(Number(amount) * 100)}`) });
               if (!intent.clientSecret) { ev.complete("fail"); setErr(intent.error || "Couldn't start the charge."); return; }
               const conf = await stripe.confirmCardPayment(intent.clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false });
               if (conf.error) { ev.complete("fail"); setErr(conf.error.message || "Payment failed."); return; }
@@ -1103,7 +1106,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
         return;
       }
       if (isPay) {
-        const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit" });
+        const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit", idempotencyKey: idemKeyFor(`sale_intent:${idemNonce.current}:${Math.round(Number(amount) * 100)}`) });
         if (!intent.clientSecret) { setErr(intent.error || "Couldn't start the charge."); setBusy(false); return; }
         const conf = await e.stripe.confirmCardPayment(intent.clientSecret, { payment_method: pm.paymentMethod.id });
         if (conf.error) { setErr(conf.error.message || "Your card was declined. Try a different card."); setBusy(false); return; }
@@ -23095,6 +23098,10 @@ function CardChargeInline({ amount, appt, onCancel, onPaid, money }) {
   const cardBox = useRef(null);
   const stripeRef = useRef(null);
   const elRef = useRef(null);
+  // Per-attempt idempotency seed: fresh for each time this sheet mounts (a new sale),
+  // stable while it stays open (a retry after a lost response reuses the same key so
+  // Stripe returns the same PaymentIntent instead of charging twice).
+  const idemNonce = useRef(newIdemKey());
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -23118,7 +23125,7 @@ function CardChargeInline({ amount, appt, onCancel, onPaid, money }) {
     try {
       const pm = await stripe.createPaymentMethod({ type: "card", card });
       if (pm.error) throw new Error(pm.error.message);
-      const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: `Checkout — ${appt?.name || "client"}` });
+      const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: `Checkout — ${appt?.name || "client"}`, idempotencyKey: idemKeyFor(`sale_intent:${idemNonce.current}:${Math.round(Number(amount) * 100)}`) });
       if (!intent.clientSecret) throw new Error(intent.error || "Couldn't start the charge.");
       const conf = await stripe.confirmCardPayment(intent.clientSecret, { payment_method: pm.paymentMethod.id });
       if (conf.error) throw new Error(conf.error.message);
@@ -24095,11 +24102,16 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
   const cardBox = useRef(null);
   const stripeRef = useRef(null);
   const elRef = useRef(null);
+  // Per-sale idempotency seed. This sheet is reused (not remounted) between sales, so
+  // reseed it every time it opens — a retry within one open sale reuses the key (no
+  // double charge); a brand-new sale gets a fresh one.
+  const idemNonce = useRef(newIdemKey());
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   useEffect(() => {
     if (!open) return;
+    idemNonce.current = newIdemKey();
     let dead = false;
     setReady(false); setErr(""); setBusy(false);
     getStripe().then((stripe) => {
@@ -24125,7 +24137,7 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
         onPaid({ paymentIntentId: null, brand: pm.paymentMethod.card.brand, last4: pm.paymentMethod.card.last4, test: true });
         setBusy(false); return;
       }
-      const intent = await stripeApi({ action: "sale_intent", amount, description: description || "Vero — sale" });
+      const intent = await stripeApi({ action: "sale_intent", amount, description: description || "Vero — sale", idempotencyKey: idemKeyFor(`sale_intent:${idemNonce.current}:${Math.round(Number(amount) * 100)}`) });
       if (!intent.clientSecret) throw new Error(intent.error || "Couldn't start the charge.");
       const conf = await stripe.confirmCardPayment(intent.clientSecret, { payment_method: pm.paymentMethod.id });
       if (conf.error) throw new Error(conf.error.message);

@@ -246,16 +246,20 @@ async function handler(req, res) {
     // Charges a card that's entered right now — no saved customer needed.
     // Returns a clientSecret the app confirms with the card field.
     if (action === "sale_intent") {
-      const { amount, description } = body;
+      const { amount, description, idempotencyKey } = body;
       if (!validAmount(amount)) {
         return res.status(400).json({ error: "Invalid amount." });
       }
+      // idempotencyKey (optional): a retry of the SAME checkout attempt returns the SAME
+      // PaymentIntent instead of a fresh one — so if the card already charged but the
+      // response was lost, confirming again hits the already-succeeded intent (no second
+      // charge) rather than a brand-new one. Same guarantee charge/refund already have.
       const pi = await stripe.paymentIntents.create({
         amount: Math.round(Number(amount) * 100),
         currency: "usd",
         payment_method_types: ["card"],
         description: description || "Vero — sale",
-      });
+      }, idempotencyKey ? { idempotencyKey } : undefined);
       return res.status(200).json({ clientSecret: pi.client_secret, id: pi.id });
     }
 
