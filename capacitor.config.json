@@ -2,6 +2,10 @@
   "appId": "com.gotvero.app",
   "appName": "Vero",
   "webDir": "dist",
+  "server": {
+    "url": "https://gotvero.com",
+    "cleartext": false
+  },
   "ios": {
     "contentInset": "automatic"
   }

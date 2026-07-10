@@ -24,7 +24,9 @@ import {
 // base './' so CSS/JS asset paths resolve inside the bundled shell. API calls still use API_BASE below.
 // GUARD: root-shell-layout — main.jsx runs rootEl.removeAttribute("style") so index.html never leaves
 // flex/center on #root after mount (iOS native looked zoomed/enlarged when that persisted).
-// GUARD: native-viewport-lock — main.jsx lockNativeShellLayout() pins viewport width on capacitor://.
+// GUARD: native-viewport-boot — index.html sets viewport from screen.width before paint (see
+// native-viewport-boot in index.html). lockNativeShellLayout was removed — it used innerWidth
+// after a bad layout pass and locked the zoomed viewport.
 const IS_NATIVE = typeof window !== "undefined" && (
   window.location.protocol === "capacitor:" ||
   window.location.protocol === "ionic:" ||
@@ -51,7 +53,7 @@ async function haptic(kind) {
 // GUARD: offline-store-boundary — all native offline read/write seeds go through this block and
 // persistLocalMirror / hydrateFromOfflineFailover inside App(). Default OFF — zero production change.
 // PowerSync WASM crashed WKWebView; this uses @capacitor-community/sqlite (native plugin).
-const OFFLINE_NATIVE = true;
+const OFFLINE_NATIVE = false;
 const OFFLINE_DB = "vero_offline";
 let _offlineDb = null;
 let _offlineSqlite = null;
@@ -22845,7 +22847,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const isSelected = d.toDateString() === selectedDate.toDateString();
           const isToday = offset === 0;
           return (
-            <button key={offset} data-today={isToday ? "1" : undefined} data-sel={isSelected ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: d.getDay() === 0 ? "start" : "none", textAlign: "center", padding: "10px 4px 12px", borderRadius: 14, background: isSelected ? "var(--gold)" : (isToday ? "var(--wash)" : "transparent"), color: isSelected ? "var(--on-gold)" : (isToday ? "var(--gold)" : "var(--sub)"), border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
+            <button key={offset} data-today={isToday ? "1" : undefined} data-sel={isSelected ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 52px", width: 52, scrollSnapAlign: d.getDay() === 0 ? "start" : "none", textAlign: "center", padding: "10px 4px 12px", borderRadius: 14, background: isSelected ? "var(--gold)" : (isToday ? "var(--wash)" : "transparent"), color: isSelected ? "var(--on-gold)" : (isToday ? "var(--gold)" : "var(--sub)"), border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.85 : (isToday ? 0.8 : 0.55) }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17.5, fontWeight: isSelected || isToday ? 600 : 500, lineHeight: 1 }}>{d.getDate()}</div>
               {!isSelected && isToday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "var(--gold)" }} />}
