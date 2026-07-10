@@ -2258,6 +2258,28 @@ function App() {
           }
         } catch (e) { /* safety read failed — fall through with the un-merged rows */ }
       }
+      const keepIds = new Set(list.map((it, i) => String((it && it.id) ?? `${table}_${i}`)));
+      const prevKnown = new Set((lastRemoteRef.current[table] || []).map((it) => String(it && it.id)));
+      const toDelete = [...prevKnown].filter((id) => !keepIds.has(id));
+      // cross-device-sync: iPad/iPhone direct Supabase writes fail RLS (42501) even when reads
+      // work via api/sync-pull — route appointments + clients through the same service-role path.
+      if (table === "appointments" || table === "clients") {
+        const headers = await authedHeaders();
+        const r = await fetch(API_BASE + "/api/sync-pull", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            shop: SHOP_ID,
+            mode: "save",
+            table,
+            upserts: rows.map((row) => ({ id: row.id, data: row.data })),
+            deleteIds: toDelete,
+          }),
+          cache: "no-store",
+        });
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok || !body.ok) throw new Error(body.error || `sync-save HTTP ${r.status}`);
+      } else {
       // 1. Upsert what changed — adds new rows, updates existing ones, destroys nothing. Chunked so a
       //    photo-heavy batch (base64 galleries / appointment photos) never builds one oversized request.
       //    A failed chunk is captured, NOT thrown yet: the delete step below must still run — otherwise
@@ -2270,30 +2292,27 @@ function App() {
       // 2. Delete ONLY rows this device knew about and has since removed. A server row we
       //    don't have but never knew about is a NEW row from another device (e.g. Heather just
       //    booked someone) — deleting it would be the two-device clobber, so we leave it.
-      // keepIds must come from the FULL list (rows is only the changed subset) — otherwise every
-      // unchanged row would look "removed" and get deleted.
-      const keepIds = new Set(list.map((it, i) => String((it && it.id) ?? `${table}_${i}`)));
-      const prevKnown = new Set((lastRemoteRef.current[table] || []).map((it) => String(it && it.id)));
       const { data: existing, error: selErr } = await supabase.from(table).select('id').eq('shop_id', SHOP_ID);
       if (selErr) throw selErr;
-      const toDelete = (existing || []).filter((r) => !keepIds.has(r.id) && prevKnown.has(r.id)).map((r) => r.id);
-      if (toDelete.length) {
+      const toDeleteDirect = (existing || []).filter((r) => !keepIds.has(r.id) && prevKnown.has(r.id)).map((r) => r.id);
+      if (toDeleteDirect.length) {
         // VERIFIED delete: ask for the deleted rows back. A missing RLS DELETE policy makes
         // .delete() "succeed" while removing 0 rows — the row then resurrects on the next
         // refetch (the un-deletable test appointment bug). Surface that as a real failure.
-        const { data: deleted, error: delErr } = await supabase.from(table).delete().eq('shop_id', SHOP_ID).in('id', toDelete).select('id');
+        const { data: deleted, error: delErr } = await supabase.from(table).delete().eq('shop_id', SHOP_ID).in('id', toDeleteDirect).select('id');
         if (delErr) throw delErr;
-        if ((deleted || []).length < toDelete.length) {
+        if ((deleted || []).length < toDeleteDirect.length) {
           // Shortfall: only a real failure if the missing rows STILL EXIST. Another device (or a
           // manual purge) deleting them concurrently is success, not an error — without this
           // re-check a save could keep throwing over rows that are already gone.
           const got = new Set((deleted || []).map((r) => String(r.id)));
-          const missing = toDelete.filter((id) => !got.has(String(id)));
+          const missing = toDeleteDirect.filter((id) => !got.has(String(id)));
           const { data: still } = await supabase.from(table).select('id').eq('shop_id', SHOP_ID).in('id', missing);
           if ((still || []).length) throw new Error(`delete blocked on '${table}': ${(still || []).length} row(s) refused — likely a missing RLS DELETE policy`);
         }
       }
       if (upsertErr) throw upsertErr; // deletions are done — now surface the failed upsert chunk for retry
+      }
       // Success: this list is now exactly what's on the server, so it becomes our known baseline.
       lastRemoteRef.current[table] = list;
       lastSaveAt.current[table] = Date.now();
