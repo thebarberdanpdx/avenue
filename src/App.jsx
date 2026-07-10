@@ -12483,7 +12483,10 @@ function CategorySheet({ open, onClose, categories, setCategories, services, set
     });
   };
 
-  const focusSel = (el) => { if (el) { try { el.focus(); el.select(); } catch (x) {} } };
+  // useCallback keeps this ref stable so it fires ONCE on mount, not every render —
+  // an unstable ref re-ran el.select() on each keystroke, re-selecting the field so
+  // the next character overwrote the last (category name/rename typing bug).
+  const focusSel = React.useCallback((el) => { if (el) { try { el.focus(); el.select(); } catch (x) {} } }, []);
   const card = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "0 1px 3px var(--shadow)" };
   const nameStyle = { fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 19, letterSpacing: "-0.2px", lineHeight: 1.15, color: "var(--text)" };
 
