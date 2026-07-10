@@ -149,7 +149,8 @@ const GUARDS = [
   { needle: "GUARD: offline-store-boundary", label: "offline native store boundary (sqlite seeds + failover hydrate)" },
   { needle: "OFFLINE-NATIVE-BUNDLE", label: "native app bundles dist locally for offline (not remote gotvero.com webview)" },
   { needle: "writeShopSettingsCache", label: "offline shop settings (hours/calendar) cached for native offline view" },
-  { needle: "hydrateFromOfflineFailover", label: "offline failover reads sqlite before localStorage cache" },
+  { needle: "providersStillSeed", label: "offline boot replaces demo seed providers with cached staff rows" },
+  { needle: "CAPACITOR_BUILD", label: "Capacitor build uses relative asset base (./) for bundled iOS offline" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
@@ -201,8 +202,16 @@ try {
   if (!/"webDir"\s*:\s*"dist"/.test(cap)) {
     capFails.push("capacitor.config.json must set webDir to dist");
   }
+  const viteCfg = readFileSync(join(ROOT, "vite.config.js"), "utf8");
+  if (!viteCfg.includes("CAPACITOR_BUILD") || !viteCfg.includes("base: CAPACITOR_BUILD")) {
+    capFails.push("vite.config.js must set base: './' when CAPACITOR_BUILD=1 (npm run build:cap)");
+  }
+  const rootCss = readFileSync(join(ROOT, "src/index.css"), "utf8");
+  if (/text-align\s*:\s*center/.test(rootCss) && /#root/.test(rootCss)) {
+    capFails.push("src/index.css #root must not use text-align:center — breaks native calendar layout");
+  }
   record(capFails.length === 0, "Native offline bundle (Capacitor)",
-    capFails.length ? capFails.join(" · ") : "iOS app bundles dist locally (no remote server.url)");
+    capFails.length ? capFails.join(" · ") : "iOS app bundles dist locally + relative asset paths for cap sync");
 } catch (e) {
   record(false, "Native offline bundle (Capacitor)", "check error: " + e.message);
 }

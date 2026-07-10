@@ -20,7 +20,8 @@ import {
 // sent to the live site instead.
 // ============================================================
 // OFFLINE-NATIVE-BUNDLE: the iOS shell ships dist/ from the device (no server.url). Remote gotvero.com
-// loading breaks offline — airplane mode can't fetch JS. API calls still use API_BASE below.
+// loading breaks offline — airplane mode can't fetch JS. CAPACITOR_BUILD=1 (npm run build:cap) sets vite
+// base './' so CSS/JS asset paths resolve inside the bundled shell. API calls still use API_BASE below.
 const IS_NATIVE = typeof window !== "undefined" && (
   window.location.protocol === "capacitor:" ||
   window.location.protocol === "ionic:" ||
@@ -709,6 +710,17 @@ const defaultPermissions = (userType) => {
   return m;
 };
 const countPermsOn = (perms) => ALL_PERMISSION_KEYS.reduce((n, k) => n + ((perms && perms[k]) ? 1 : 0), 0);
+
+const SEED_PROVIDER_IDS = new Set(["anyone", "dan", "heather"]);
+const providersStillSeed = (list) => {
+  const real = (list || []).filter((p) => p && p.id !== "anyone");
+  if (!real.length) return true;
+  return real.length <= 2 && real.every((p) => SEED_PROVIDER_IDS.has(p.id));
+};
+const servicesStillSeed = (list) => {
+  const ids = new Set((list || []).map((s) => s && s.id).filter(Boolean));
+  return ids.has("cut") && ids.has("cutbeard");
+};
 
 const DEFAULT_PROVIDERS = [
   { id: "anyone", name: "Anyone", role: "First available", color: "var(--sub)", hours: DEFAULT_HOURS },
@@ -2145,8 +2157,10 @@ function App() {
   // (scheduled mirrors captured stale closures and erased time blocks ~2s after creation).
   const apptsRef = useRef(appts);
   const clientsRef = useRef(clients);
+  const providersRef = useRef(providers);
   apptsRef.current = appts;
   clientsRef.current = clients;
+  providersRef.current = providers;
   const [waitlist, setWaitlist] = useState(() => (_hasStoredAuth() ? [] : [
     { id: "w1", name: "Andre Foster", phone: "503-555-0277", provider: "Dan", day: "This week", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 3 * 3600e3).toLocaleString() },
     { id: "w2", name: "Sam Rivera", phone: "503-555-0291", provider: "Dan", day: "Any day", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 1 * 3600e3).toLocaleString() },
@@ -2571,6 +2585,42 @@ function App() {
     }
     return hydrateFromCache(table, current, setter);
   };
+  // Native offline: paint cached shop config + staff before first frame so the calendar never
+  // flashes demo seed providers/hours (dan/heather + DEFAULT_BUSINESS) on airplane mode.
+  useLayoutEffect(() => {
+    if (!offlineStoreActive()) return;
+    let alive = true;
+    (async () => {
+      await hydrateShopSettingsCache();
+      if (!alive) return;
+      const paintTable = (tbl, rows, apply) => {
+        if (!rows || !rows.length) return;
+        if (tbl === "providers") {
+          if (providersFullRef.current) return;
+          if (!providersStillSeed(providersRef.current) && (providersRef.current || []).filter((p) => p.id !== "anyone").length) return;
+        }
+        if (tbl === "services" && !servicesStillSeed(services) && (services || []).length) return;
+        apply(rows);
+      };
+      for (const tbl of ["providers", "services", "appointments", "clients"]) {
+        let rows = readCache(tbl);
+        if ((!rows || !rows.length) && offlineStoreActive()) {
+          try { rows = await offlineStoreReadTable(SHOP_ID, tbl); } catch (e) {}
+        }
+        if (!rows || !rows.length) continue;
+        paintTable(tbl, rows, (list) => {
+          lastRemoteRef.current[tbl] = list;
+          if (tbl === "providers") setProviders(list);
+          else if (tbl === "services") { setServices(list); setServicesTrusted(true); }
+          else if (tbl === "appointments") { setAppts(list); staffApptsLoadedRef.current = true; }
+          else if (tbl === "clients") { setClients(list); staffClientsLoadedRef.current = true; }
+          setUsingCache(true);
+          loadedRef.current = false;
+        });
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
   const tableSetters = { clients: setClients, appointments: setAppts, waitlist: setWaitlist, services: setServices, providers: setProviders };
   const localTableState = (table) => {
     if (table === "appointments") return apptsRef.current;
@@ -2924,12 +2974,12 @@ function App() {
       if (pr && pr.length) writeCache('providers', pr); else if (!allLoaded) {
         let c = readCache('providers');
         if ((!c || !c.length) && offlineStoreActive()) { try { c = await offlineStoreReadTable(SHOP_ID, 'providers'); } catch (e) {} }
-        if (c && c.length && !providersFullRef.current) { lastRemoteRef.current.providers = c; setProviders(c); }
+        if (c && c.length && !providersFullRef.current && (providersStillSeed(providersRef.current) || !(providersRef.current || []).filter((p) => p.id !== "anyone").length)) { lastRemoteRef.current.providers = c; setProviders(c); }
       }
       if (sv && sv.length) writeCache('services', sv); else if (!allLoaded) {
         let c = readCache('services');
         if ((!c || !c.length) && offlineStoreActive()) { try { c = await offlineStoreReadTable(SHOP_ID, 'services'); } catch (e) {} }
-        if (c && c.length) { lastRemoteRef.current.services = c; setServices(c); setServicesTrusted(true); }
+        if (c && c.length && (servicesStillSeed(services) || !(services || []).length)) { lastRemoteRef.current.services = c; setServices(c); setServicesTrusted(true); }
       } // [outage-honest-menu] last-synced real menu from offline store or localStorage cache
       if (!allLoaded) await hydrateShopSettingsCache();
 
@@ -2985,13 +3035,13 @@ function App() {
             staffClientsLoadedRef.current = true;
             return true;
           }
-          if (tbl === "services") {
+          if (tbl === "services" && (servicesStillSeed(services) || !(services || []).length)) {
             lastRemoteRef.current.services = rows;
             setServices(rows);
             setServicesTrusted(true);
             return true;
           }
-          if (tbl === "providers" && !providersFullRef.current) {
+          if (tbl === "providers" && !providersFullRef.current && (providersStillSeed(providersRef.current) || !(providersRef.current || []).filter((p) => p.id !== "anyone").length)) {
             lastRemoteRef.current.providers = rows;
             setProviders(rows);
             return true;

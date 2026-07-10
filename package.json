@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:cap": "CAPACITOR_BUILD=1 vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "ship-check": "node scripts/ship-check.mjs"
