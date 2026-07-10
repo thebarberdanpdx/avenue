@@ -2000,6 +2000,12 @@ function App() {
   // from cache showed stale calendars on iPad and could skip the real pull.
   const [clients, setClients] = useState(() => (_hasStoredAuth() ? [] : CLIENTS));
   const [appts, setAppts] = useState(() => (_hasStoredAuth() ? [] : TODAY_APPTS));
+  // cross-device-sync: refs so async mirror/refetch always merges against the latest local rows
+  // (scheduled mirrors captured stale closures and erased time blocks ~2s after creation).
+  const apptsRef = useRef(appts);
+  const clientsRef = useRef(clients);
+  apptsRef.current = appts;
+  clientsRef.current = clients;
   const [waitlist, setWaitlist] = useState(() => (_hasStoredAuth() ? [] : [
     { id: "w1", name: "Andre Foster", phone: "503-555-0277", provider: "Dan", day: "This week", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 3 * 3600e3).toLocaleString() },
     { id: "w2", name: "Sam Rivera", phone: "503-555-0291", provider: "Dan", day: "Any day", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 1 * 3600e3).toLocaleString() },
@@ -2340,8 +2346,8 @@ function App() {
   };
   const tableSetters = { clients: setClients, appointments: setAppts, waitlist: setWaitlist, services: setServices, providers: setProviders };
   const localTableState = (table) => {
-    if (table === "appointments") return appts;
-    if (table === "clients") return clients;
+    if (table === "appointments") return apptsRef.current;
+    if (table === "clients") return clientsRef.current;
     if (table === "waitlist") return waitlist;
     if (table === "services") return services;
     if (table === "providers") return providers;
@@ -2453,8 +2459,8 @@ function App() {
     // cross-device-sync: ALWAYS merge — never blind-replace with server rows. The old "only merge when
     // dirty" path let the 30s heartbeat / foreground pull revert check-ins and edits that had already
     // landed locally but looked "clean" because lastRemoteRef matched appts (the iPhone reset bug).
-    const finalAp = mergeLocalOverServer(serverAp, appts, "appointments");
-    const finalCl = mergeLocalOverServer(serverCl, clients, "clients");
+    const finalAp = mergeLocalOverServer(serverAp, apptsRef.current, "appointments");
+    const finalCl = mergeLocalOverServer(serverCl, clientsRef.current, "clients");
     // Baseline stays the raw server copy so the save effect still pushes local edits up.
     lastRemoteRef.current.clients = serverCl;
     lastRemoteRef.current.appointments = serverAp;
@@ -2520,8 +2526,8 @@ function App() {
         const err = clRes.error || apRes.error;
         const msg = apiErr ? `${apiErr}; direct: ${String((err && err.message) || err)}` : String((err && err.message) || err);
         setSyncHealth((h) => ({ ...h, err: msg, at: Date.now(), pulling: false, via: apiErr ? "api-failed" : "direct-failed" }));
-        hydrateFromCache("clients", clients, setClients);
-        hydrateFromCache("appointments", appts, setAppts);
+        hydrateFromCache("clients", clientsRef.current, setClients);
+        hydrateFromCache("appointments", apptsRef.current, setAppts);
         return false;
       }
       applyServerMirror({
@@ -2836,7 +2842,7 @@ function App() {
   useEffect(() => {
     if (!dataLoaded || !sessionUid) return;
     [0, 2000, 5000, 10000, 20000, 45000].forEach((ms) => {
-      setTimeout(() => mirrorFromServer(), ms);
+      setTimeout(() => { mirrorFromServerRef.current && mirrorFromServerRef.current(); }, ms);
     });
   }, [dataLoaded, sessionUid]);
   useEffect(() => {
@@ -2869,7 +2875,7 @@ function App() {
     const ms = IS_NATIVE ? 30000 : 20000;
     const id = setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      mirrorFromServer();
+      mirrorFromServerRef.current && mirrorFromServerRef.current();
     }, ms);
     return () => clearInterval(id);
   }, [sessionUid]);
@@ -21759,7 +21765,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
   const deleteAppt = (id) => {
     const freed = appts.find((a) => a.id === id);
-    setAppts((cur) => cur.filter((a) => a.id !== id));
+    setAppts((cur) => { const next = cur.filter((a) => a.id !== id); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
     setOpen(null);
     showToast("Appointment removed.");
     if (freed) setTimeout(() => handleFreedSlot(freed), 350);
@@ -22035,7 +22041,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     const weeks = repeat ? 12 : 1;
     const blocks = [];
     for (let i = 0; i < weeks; i++) { const d = new Date(base); d.setDate(d.getDate() + i * 7); blocks.push(mk(d, i)); }
-    setAppts((cur) => [...cur, ...blocks]);
+    // cross-device-sync: time blocks must flush immediately — the 2s sign-in mirror was erasing them.
+    setAppts((cur) => { const next = [...cur, ...blocks]; if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
     setBlockSlot(null);
     showToast(repeat ? `${label || "Time block"} set to repeat weekly.` : `Blocked off at ${fmtTime(start)}.`);
   };
