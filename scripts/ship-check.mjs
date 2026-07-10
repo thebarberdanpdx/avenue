@@ -18,7 +18,7 @@
 // Exits 0 only if all pass, non-zero otherwise — so it's safe to chain:
 //   npm run ship-check && npx vercel --prod --force
 import { execSync } from "node:child_process";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -210,6 +210,17 @@ try {
   }
   if (!/"webDir"\s*:\s*"dist"/.test(cap)) {
     capFails.push("capacitor.config.json must set webDir to dist");
+  }
+  const iosCapPath = join(ROOT, "ios/App/App/capacitor.config.json");
+  if (existsSync(iosCapPath)) {
+    const iosCap = readFileSync(iosCapPath, "utf8");
+    if (offlineNativeOn) {
+      if (/"url"\s*:\s*"https:\/\/gotvero\.com"/.test(iosCap)) {
+        capFails.push("ios/App/App/capacitor.config.json must not have server.url when OFFLINE_NATIVE is on — run: npx cap sync ios && commit");
+      }
+    } else if (!/"url"\s*:\s*"https:\/\/gotvero\.com"/.test(iosCap)) {
+      capFails.push("ios/App/App/capacitor.config.json missing server.url — run: npm run cap:prepare && commit");
+    }
   }
   const viteCfg = readFileSync(join(ROOT, "vite.config.js"), "utf8");
   if (!viteCfg.includes("CAPACITOR_BUILD") || !viteCfg.includes("base: CAPACITOR_BUILD")) {
