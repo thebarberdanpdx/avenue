@@ -19,13 +19,6 @@ import {
 // Inside the iOS/Android app there is no local server, so those calls must be
 // sent to the live site instead.
 // ============================================================
-// OFFLINE-NATIVE-BUNDLE: the iOS shell ships dist/ from the device (no server.url). Remote gotvero.com
-// loading breaks offline — airplane mode can't fetch JS. CAPACITOR_BUILD=1 (npm run build:cap) sets vite
-// base './' so CSS/JS asset paths resolve inside the bundled shell. API calls still use API_BASE below.
-// GUARD: root-shell-layout — main.jsx runs rootEl.removeAttribute("style") so index.html never leaves
-// flex/center on #root after mount (iOS native looked zoomed/enlarged when that persisted).
-// GUARD: native-viewport-boot — index.html isNativeShell() sets viewport from screen.width before paint.
-// main.jsx ensureNativeViewport() repeats on boot. Never use innerWidth — it locked ~980px and zoomed UI.
 const IS_NATIVE = typeof window !== "undefined" && (
   window.location.protocol === "capacitor:" ||
   window.location.protocol === "ionic:" ||
@@ -46,145 +39,6 @@ async function haptic(kind) {
     }
     _hapticImpact(kind);
   } catch (e) { /* best-effort — haptics never block a tap */ }
-}
-
-// ---- OFFLINE NATIVE STORE (Stage 1 — reading) -------------------------------
-// GUARD: offline-store-boundary — all native offline read/write seeds go through this block and
-// persistLocalMirror / hydrateFromOfflineFailover inside App(). Default OFF — zero production change.
-// PowerSync WASM crashed WKWebView; this uses @capacitor-community/sqlite (native plugin).
-const OFFLINE_NATIVE = false;
-const OFFLINE_DB = "vero_offline";
-let _offlineDb = null;
-let _offlineSqlite = null;
-let _offlineStoreOpen = false;
-
-function offlineStoreActive() {
-  return !!(OFFLINE_NATIVE && IS_NATIVE);
-}
-
-async function offlineStoreOpenConn() {
-  if (!offlineStoreActive()) return false;
-  if (_offlineStoreOpen && _offlineDb) return true;
-  try {
-    const { CapacitorSQLite, SQLiteConnection } = await import("@capacitor-community/sqlite");
-    _offlineSqlite = new SQLiteConnection(CapacitorSQLite);
-    _offlineDb = await _offlineSqlite.createConnection(OFFLINE_DB, false, "no-encryption", 1, false);
-    await _offlineDb.open();
-    await _offlineDb.execute(`
-      CREATE TABLE IF NOT EXISTS sync_rows (
-        shop_id TEXT NOT NULL,
-        table_name TEXT NOT NULL,
-        row_id TEXT NOT NULL,
-        json_data TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        PRIMARY KEY (shop_id, table_name, row_id)
-      );
-      CREATE TABLE IF NOT EXISTS sync_meta (
-        shop_id TEXT NOT NULL,
-        meta_key TEXT NOT NULL,
-        meta_value TEXT NOT NULL,
-        PRIMARY KEY (shop_id, meta_key)
-      );
-      CREATE TABLE IF NOT EXISTS outbox (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        shop_id TEXT NOT NULL,
-        table_name TEXT NOT NULL,
-        row_id TEXT,
-        op TEXT NOT NULL,
-        patch_json TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        sent_at TEXT
-      );
-    `);
-    _offlineStoreOpen = true;
-    return true;
-  } catch (e) {
-    console.warn("[offline] native SQLite open failed", e);
-    _offlineStoreOpen = false;
-    _offlineDb = null;
-    return false;
-  }
-}
-
-async function offlineStoreWriteTable(shopId, table, list) {
-  if (!offlineStoreActive() || !Array.isArray(list)) return;
-  if (!(await offlineStoreOpenConn()) || !_offlineDb) return;
-  const shop = String(shopId || "");
-  const tbl = String(table || "");
-  const now = new Date().toISOString();
-  try {
-    await _offlineDb.run("DELETE FROM sync_rows WHERE shop_id = ? AND table_name = ?", [shop, tbl]);
-    for (const row of list) {
-      if (!row || row.id == null) continue;
-      await _offlineDb.run(
-        "INSERT OR REPLACE INTO sync_rows (shop_id, table_name, row_id, json_data, updated_at) VALUES (?,?,?,?,?)",
-        [shop, tbl, String(row.id), JSON.stringify(row), now]
-      );
-    }
-    await _offlineDb.run(
-      "INSERT OR REPLACE INTO sync_meta (shop_id, meta_key, meta_value) VALUES (?,?,?)",
-      [shop, `seed:${tbl}`, now]
-    );
-  } catch (e) {
-    console.warn("[offline] seed failed", tbl, e);
-  }
-}
-
-async function offlineStoreReadTable(shopId, table) {
-  if (!offlineStoreActive()) return null;
-  if (!(await offlineStoreOpenConn()) || !_offlineDb) return null;
-  try {
-    const r = await _offlineDb.query(
-      "SELECT json_data FROM sync_rows WHERE shop_id = ? AND table_name = ? ORDER BY row_id",
-      [String(shopId || ""), String(table || "")]
-    );
-    const vals = (r && r.values) ? r.values : [];
-    return vals.map((v) => {
-      try { return JSON.parse(v[0]); } catch (e) { return null; }
-    }).filter(Boolean);
-  } catch (e) {
-    console.warn("[offline] read failed", table, e);
-    return null;
-  }
-}
-
-async function offlineStoreWriteMeta(shopId, key, value) {
-  if (!offlineStoreActive()) return;
-  if (!(await offlineStoreOpenConn()) || !_offlineDb) return;
-  try {
-    await _offlineDb.run(
-      "INSERT OR REPLACE INTO sync_meta (shop_id, meta_key, meta_value) VALUES (?,?,?)",
-      [String(shopId || ""), String(key || ""), JSON.stringify(value)]
-    );
-  } catch (e) { console.warn("[offline] meta write failed", key, e); }
-}
-
-async function offlineStoreReadMeta(shopId, key) {
-  if (!offlineStoreActive()) return null;
-  if (!(await offlineStoreOpenConn()) || !_offlineDb) return null;
-  try {
-    const r = await _offlineDb.query(
-      "SELECT meta_value FROM sync_meta WHERE shop_id = ? AND meta_key = ? LIMIT 1",
-      [String(shopId || ""), String(key || "")]
-    );
-    const raw = r && r.values && r.values[0] && r.values[0][0];
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    console.warn("[offline] meta read failed", key, e);
-    return null;
-  }
-}
-
-async function offlineStoreBootPaint(shopId, paint) {
-  if (!offlineStoreActive()) return false;
-  if (!(await offlineStoreOpenConn())) return false;
-  const tables = ["appointments", "clients", "services", "providers"];
-  let any = false;
-  for (const tbl of tables) {
-    const rows = await offlineStoreReadTable(shopId, tbl);
-    if (rows && rows.length && paint(tbl, rows)) any = true;
-  }
-  return any;
 }
 
 // ---- ensureFreshSession ----------------------------------------------------
@@ -714,17 +568,6 @@ const defaultPermissions = (userType) => {
   return m;
 };
 const countPermsOn = (perms) => ALL_PERMISSION_KEYS.reduce((n, k) => n + ((perms && perms[k]) ? 1 : 0), 0);
-
-const SEED_PROVIDER_IDS = new Set(["anyone", "dan", "heather"]);
-const providersStillSeed = (list) => {
-  const real = (list || []).filter((p) => p && p.id !== "anyone");
-  if (!real.length) return true;
-  return real.length <= 2 && real.every((p) => SEED_PROVIDER_IDS.has(p.id));
-};
-const servicesStillSeed = (list) => {
-  const ids = new Set((list || []).map((s) => s && s.id).filter(Boolean));
-  return ids.has("cut") && ids.has("cutbeard");
-};
 
 const DEFAULT_PROVIDERS = [
   { id: "anyone", name: "Anyone", role: "First available", color: "var(--sub)", hours: DEFAULT_HOURS },
@@ -2038,7 +1881,7 @@ function App() {
     });
     // Absolute backstop: if getSession neither resolves nor rejects (a true network hang), enable
     // login after a few seconds no matter what, rather than leaving the app frozen on a dead gate.
-    const readyTimer = setTimeout(markReady, (IS_NATIVE && typeof navigator !== "undefined" && !navigator.onLine) ? 400 : 5000);
+    const readyTimer = setTimeout(markReady, 5000);
     const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
       setSession(sess || null);
       markReady(); // any auth event means the client is alive — unblock the app
@@ -2161,10 +2004,8 @@ function App() {
   // (scheduled mirrors captured stale closures and erased time blocks ~2s after creation).
   const apptsRef = useRef(appts);
   const clientsRef = useRef(clients);
-  const providersRef = useRef(providers);
   apptsRef.current = appts;
   clientsRef.current = clients;
-  providersRef.current = providers;
   const [waitlist, setWaitlist] = useState(() => (_hasStoredAuth() ? [] : [
     { id: "w1", name: "Andre Foster", phone: "503-555-0277", provider: "Dan", day: "This week", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 3 * 3600e3).toLocaleString() },
     { id: "w2", name: "Sam Rivera", phone: "503-555-0291", provider: "Dan", day: "Any day", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 1 * 3600e3).toLocaleString() },
@@ -2534,97 +2375,20 @@ function App() {
     if (table === 'clients') return (list || []).map((c) => { if (!c) return c; const { gallery, photo, ...rest } = c; return rest; });
     return list || [];
   };
-  const writeCache = (table, list) => {
-    const slim = Array.isArray(list) ? slimForCache(table, list) : null;
-    try { if (slim) localStorage.setItem(CACHE_PREFIX + table, JSON.stringify(slim)); } catch (e) { /* quota */ }
-    if (slim && offlineStoreActive()) offlineStoreWriteTable(SHOP_ID, table, slim).catch(() => {});
-  };
-  const writeShopSettingsCache = (biz, cats, cuts) => {
-    const payload = { business: biz, categories: cats || [], cutLibrary: cuts || [] };
-    try { localStorage.setItem(CACHE_PREFIX + "shop_settings", JSON.stringify(payload)); } catch (e) { /* quota */ }
-    if (offlineStoreActive()) offlineStoreWriteMeta(SHOP_ID, "shop_settings", payload).catch(() => {});
-  };
-  const readShopSettingsCache = () => {
-    try {
-      const raw = localStorage.getItem(CACHE_PREFIX + "shop_settings");
-      const v = raw ? JSON.parse(raw) : null;
-      return v && v.business ? v : null;
-    } catch (e) { return null; }
-  };
-  const hydrateShopSettingsCache = async () => {
-    let payload = readShopSettingsCache();
-    if ((!payload || !payload.business) && offlineStoreActive()) {
-      try { payload = await offlineStoreReadMeta(SHOP_ID, "shop_settings"); } catch (e) {}
-    }
-    if (!payload || !payload.business) return false;
-    setBusiness(payload.business);
-    if (Array.isArray(payload.categories) && payload.categories.length) setCategories(payload.categories);
-    if (Array.isArray(payload.cutLibrary)) setCutLibrary(payload.cutLibrary);
-    return true;
-  };
+  const writeCache = (table, list) => { try { if (Array.isArray(list)) localStorage.setItem(CACHE_PREFIX + table, JSON.stringify(slimForCache(table, list))); } catch (e) { /* quota — ignore */ } };
   const readCache = (table) => { try { const raw = localStorage.getItem(CACHE_PREFIX + table); const v = raw ? JSON.parse(raw) : null; return Array.isArray(v) ? v : null; } catch (e) { return null; } };
+  // Hydrate one table read-only from cache after a failed load. Blocks all saves (degraded state) and
+  // sets lastRemoteRef to the same reference so the save effect sees "no change" and never writes.
   const hydrateFromCache = (table, current, setter) => {
-    if ((current || []).length) return false;
+    if ((current || []).length) return false;          // already have live data — don't overwrite
     const c = readCache(table);
     if (!c || !c.length) return false;
     lastRemoteRef.current[table] = c;
     setter(c);
-    loadedRef.current = false;
+    loadedRef.current = false;                          // degraded: block every save until a clean reload
     setUsingCache(true);
     return true;
   };
-  const hydrateFromOfflineFailover = async (table, current, setter) => {
-    if ((current || []).length) return hydrateFromCache(table, current, setter);
-    if (offlineStoreActive()) {
-      try {
-        const rows = await offlineStoreReadTable(SHOP_ID, table);
-        if (rows && rows.length) {
-          lastRemoteRef.current[table] = rows;
-          setter(rows);
-          loadedRef.current = false;
-          setUsingCache(true);
-          return true;
-        }
-      } catch (e) { console.warn("[offline] hydrate", table, e); }
-    }
-    return hydrateFromCache(table, current, setter);
-  };
-  // Native offline: paint cached shop config + staff before first frame so the calendar never
-  // flashes demo seed providers/hours (dan/heather + DEFAULT_BUSINESS) on airplane mode.
-  useLayoutEffect(() => {
-    if (!offlineStoreActive()) return;
-    let alive = true;
-    (async () => {
-      await hydrateShopSettingsCache();
-      if (!alive) return;
-      const paintTable = (tbl, rows, apply) => {
-        if (!rows || !rows.length) return;
-        if (tbl === "providers") {
-          if (providersFullRef.current) return;
-          if (!providersStillSeed(providersRef.current) && (providersRef.current || []).filter((p) => p.id !== "anyone").length) return;
-        }
-        if (tbl === "services" && !servicesStillSeed(services) && (services || []).length) return;
-        apply(rows);
-      };
-      for (const tbl of ["providers", "services", "appointments", "clients"]) {
-        let rows = readCache(tbl);
-        if ((!rows || !rows.length) && offlineStoreActive()) {
-          try { rows = await offlineStoreReadTable(SHOP_ID, tbl); } catch (e) {}
-        }
-        if (!rows || !rows.length) continue;
-        paintTable(tbl, rows, (list) => {
-          lastRemoteRef.current[tbl] = list;
-          if (tbl === "providers") setProviders(list);
-          else if (tbl === "services") { setServices(list); setServicesTrusted(true); }
-          else if (tbl === "appointments") { setAppts(list); staffApptsLoadedRef.current = true; }
-          else if (tbl === "clients") { setClients(list); staffClientsLoadedRef.current = true; }
-          setUsingCache(true);
-          loadedRef.current = false;
-        });
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
   const tableSetters = { clients: setClients, appointments: setAppts, waitlist: setWaitlist, services: setServices, providers: setProviders };
   const localTableState = (table) => {
     if (table === "appointments") return apptsRef.current;
@@ -2800,7 +2564,6 @@ function App() {
     staffApptsLoadedRef.current = true;
     writeCache("clients", serverCl);
     writeCache("appointments", serverAp);
-    writeShopSettingsCache(business, categories, cutLibrary);
     setUsingCache(false);
     setSaveFailed(false);
     setSyncHealth({
@@ -2859,8 +2622,8 @@ function App() {
         const err = clRes.error || apRes.error;
         const msg = apiErr ? `${apiErr}; direct: ${String((err && err.message) || err)}` : String((err && err.message) || err);
         setSyncHealth((h) => ({ ...h, err: msg, at: Date.now(), pulling: false, via: apiErr ? "api-failed" : "direct-failed" }));
-        await hydrateFromOfflineFailover("clients", clientsRef.current, setClients);
-        await hydrateFromOfflineFailover("appointments", apptsRef.current, setAppts);
+        hydrateFromCache("clients", clientsRef.current, setClients);
+        hydrateFromCache("appointments", apptsRef.current, setAppts);
         return false;
       }
       applyServerMirror({
@@ -2902,7 +2665,6 @@ function App() {
         }
         if (Array.isArray(_categories) && _categories.length) setCategories(_categories);
         if (Array.isArray(_cutLibrary)) savedCutLibrary = _cutLibrary;
-        writeShopSettingsCache(biz, _categories, _cutLibrary);
       }
 
       // Load a list table → array of stored item objects. Returns null ONLY on a real DB error (so we can skip and refuse saves).
@@ -2975,17 +2737,8 @@ function App() {
       // Mirror the columns/services the calendar needs to render into the offline cache on success.
       // Only fall back to the cache when a load actually ERRORED (!allLoaded) — never over a
       // genuinely-empty shop, which would show stale rows.
-      if (pr && pr.length) writeCache('providers', pr); else if (!allLoaded) {
-        let c = readCache('providers');
-        if ((!c || !c.length) && offlineStoreActive()) { try { c = await offlineStoreReadTable(SHOP_ID, 'providers'); } catch (e) {} }
-        if (c && c.length && !providersFullRef.current && (providersStillSeed(providersRef.current) || !(providersRef.current || []).filter((p) => p.id !== "anyone").length)) { lastRemoteRef.current.providers = c; setProviders(c); }
-      }
-      if (sv && sv.length) writeCache('services', sv); else if (!allLoaded) {
-        let c = readCache('services');
-        if ((!c || !c.length) && offlineStoreActive()) { try { c = await offlineStoreReadTable(SHOP_ID, 'services'); } catch (e) {} }
-        if (c && c.length && (servicesStillSeed(services) || !(services || []).length)) { lastRemoteRef.current.services = c; setServices(c); setServicesTrusted(true); }
-      } // [outage-honest-menu] last-synced real menu from offline store or localStorage cache
-      if (!allLoaded) await hydrateShopSettingsCache();
+      if (pr && pr.length) writeCache('providers', pr); else if (!allLoaded) { const c = readCache('providers'); if (c && c.length && !providersFullRef.current) { lastRemoteRef.current.providers = c; setProviders(c); } }
+      if (sv && sv.length) writeCache('services', sv); else if (!allLoaded) { const c = readCache('services'); if (c && c.length) { lastRemoteRef.current.services = c; setServices(c); setServicesTrusted(true); } } // [outage-honest-menu] last-synced real menu from the offline cache
 
       } catch (e) {
         // A load threw (hard network failure / abort). Treat as an incomplete load: never unblock saves.
@@ -3023,43 +2776,7 @@ function App() {
       return;
     }
     let alive = true;
-    (async () => {
-      if (offlineStoreActive() && alive) {
-        await hydrateShopSettingsCache();
-        await offlineStoreBootPaint(SHOP_ID, (tbl, rows) => {
-          if (tbl === "appointments" && !(apptsRef.current || []).length) {
-            lastRemoteRef.current.appointments = rows;
-            setAppts(rows);
-            staffApptsLoadedRef.current = true;
-            return true;
-          }
-          if (tbl === "clients" && !(clientsRef.current || []).length) {
-            lastRemoteRef.current.clients = rows;
-            setClients(rows);
-            staffClientsLoadedRef.current = true;
-            return true;
-          }
-          if (tbl === "services" && (servicesStillSeed(services) || !(services || []).length)) {
-            lastRemoteRef.current.services = rows;
-            setServices(rows);
-            setServicesTrusted(true);
-            return true;
-          }
-          if (tbl === "providers" && !providersFullRef.current && (providersStillSeed(providersRef.current) || !(providersRef.current || []).filter((p) => p.id !== "anyone").length)) {
-            lastRemoteRef.current.providers = rows;
-            setProviders(rows);
-            return true;
-          }
-          return false;
-        });
-      }
-      const mirrorOk = alive ? await mirrorFromServer() : false;
-      if (alive && !mirrorOk && session && ((apptsRef.current || []).length || (clientsRef.current || []).length)) {
-        setUsingCache(true);
-        loadedRef.current = false;
-        setLoadIncomplete(false);
-      }
-    })();
+    (async () => { if (alive) await mirrorFromServer(); })();
     return () => { alive = false; };
   }, [sessionUid]);
 
@@ -3084,11 +2801,7 @@ function App() {
         // We now hold (or are mid-edit on) the FULL provider rows for this session — protect them
         // from the sanitized public feed even if an in-flight edit makes us skip applying below.
         providersFullRef.current = true;
-        if (!provBusy()) {
-          const list = sortProviders(pr.data.map((r) => r.data));
-          lastRemoteRef.current.providers = list;
-          if (list.length) { setProviders(list); writeCache("providers", list); }
-        }
+        if (!provBusy()) { const list = sortProviders(pr.data.map((r) => r.data)); lastRemoteRef.current.providers = list; if (list.length) setProviders(list); }
       }
       const wl = await supabase.from('waitlist').select('data').eq('shop_id', SHOP_ID);
       if (alive && !wl.error && Array.isArray(wl.data) && !tableBusy('waitlist')) { const list = wl.data.map((r) => r.data); lastRemoteRef.current.waitlist = list; setWaitlist(list); }
@@ -3546,7 +3259,7 @@ function App() {
           "saving paused" banner because here the barber CAN still see their schedule. */}
       {usingCache && session && (
         <div role="status" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#8A6D3B", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
-          <span>Showing your last synced schedule — can't reach the server right now. Your data is safe; changes are paused until it reconnects.{offlineStoreActive() ? " (on-device copy)" : ""}</span>
+          <span>Showing your last synced schedule — can't reach the server right now. Your data is safe; changes are paused until it reconnects.</span>
           <button onClick={() => { try { window.location.reload(); } catch (e) {} }} style={{ flexShrink: 0, background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600, letterSpacing: 0.5 }}>Retry</button>
         </div>
       )}
@@ -21864,23 +21577,9 @@ function ColumnOrderEditor({ providers, setProviders }) {
 }
 function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId, deepLinkApptId, onDeepLinkHandled, rebookSeed, onRebookHandled, flushApptsNow }) {
   const sizeId = business?.calendarRowSize || "L";
-  // Visible calendar window — hrs OR min-from-midnight (bad cache must not blow up gridHeight).
-  const calWindowMin = (raw, fallbackHr) => {
-    const n = Number(raw);
-    if (!Number.isFinite(n)) return fallbackHr * 60;
-    if (n >= 60 && n <= 24 * 60) return Math.round(n);
-    return Math.min(23, Math.max(0, Math.round(n))) * 60;
-  };
-  const calApptMin = (v) => {
-    const n = Number(v);
-    if (!Number.isFinite(n)) return NaN;
-    if (n >= 0 && n < 24 * 60) return n;
-    if (n > 24 * 60 && n <= 24 * 3600) return Math.round(n / 60);
-    return NaN;
-  };
-  let DAY_START = calWindowMin(business?.calendar?.dayStartHr, 7);
-  let DAY_END = calWindowMin(business?.calendar?.dayEndHr, 22);
-  if (DAY_END <= DAY_START) { DAY_START = 7 * 60; DAY_END = 22 * 60; }
+  // Visible calendar window — configurable in Calendar Settings; falls back to 7 AM–10 PM.
+  const DAY_START = ((business?.calendar?.dayStartHr ?? 7)) * 60;
+  const DAY_END = ((business?.calendar?.dayEndHr ?? 22)) * 60;
   const [showWaitlistPanel, setShowWaitlistPanel] = useState(false);
   // Openings the staff can offer to waitlist / "notify me if earlier" clients. Recorded when an
   // appointment is cancelled or removed. NOTHING is ever sent automatically — the staff chooses who
@@ -22178,9 +21877,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     if (freed) setTimeout(() => handleFreedSlot(freed), 350);
   };
 
-  const pxPerHour = Math.min(240, (ROW_SIZES.find((s) => s.id === sizeId) || ROW_SIZES[2]).pxPerHour);
+  const pxPerHour = (ROW_SIZES.find((s) => s.id === sizeId) || ROW_SIZES[2]).pxPerHour;
   const PPM = pxPerHour / 60; // pixels per minute
-  const totalMin = Math.max(60, DAY_END - DAY_START);
+  const totalMin = DAY_END - DAY_START;
   const gridHeight = totalMin * PPM;
 
   const snap5 = (min) => Math.round(min / 5) * 5;
@@ -22846,7 +22545,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const isSelected = d.toDateString() === selectedDate.toDateString();
           const isToday = offset === 0;
           return (
-            <button key={offset} data-today={isToday ? "1" : undefined} data-sel={isSelected ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 52px", width: 52, scrollSnapAlign: d.getDay() === 0 ? "start" : "none", textAlign: "center", padding: "10px 4px 12px", borderRadius: 14, background: isSelected ? "var(--gold)" : (isToday ? "var(--wash)" : "transparent"), color: isSelected ? "var(--on-gold)" : (isToday ? "var(--gold)" : "var(--sub)"), border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
+            <button key={offset} data-today={isToday ? "1" : undefined} data-sel={isSelected ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: d.getDay() === 0 ? "start" : "none", textAlign: "center", padding: "10px 4px 12px", borderRadius: 14, background: isSelected ? "var(--gold)" : (isToday ? "var(--wash)" : "transparent"), color: isSelected ? "var(--on-gold)" : (isToday ? "var(--gold)" : "var(--sub)"), border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.85 : (isToday ? 0.8 : 0.55) }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17.5, fontWeight: isSelected || isToday ? 600 : 500, lineHeight: 1 }}>{d.getDate()}</div>
               {!isSelected && isToday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "var(--gold)" }} />}
@@ -22984,13 +22683,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                   tint regardless of theme/service color). Flat near-square tiles, flush to the column,
                   label → NAME → time hierarchy, quiet markers bottom-right. Dan-approved 2026-07-03. */}
               {col.map((a) => {
-                const aStart = calApptMin(a.start);
-                const aEnd = calApptMin(a.end);
-                if (!Number.isFinite(aStart) || !Number.isFinite(aEnd) || aEnd <= aStart) return null;
                 const isDragging = drag && drag.id === a.id && drag.armed;
-                const liveStart = isDragging ? aStart + drag.deltaMin : aStart;
+                const liveStart = isDragging ? a.start + drag.deltaMin : a.start;
                 const top = (liveStart - DAY_START) * PPM;
-                const height = Math.max(8, (aEnd - aStart) * PPM - 4); // 4px breathing gap between stacked tiles
+                const height = (a.end - a.start) * PPM - 4; // 4px breathing gap between stacked tiles
                 const isBlock = a.status === "block";
                 const isDone = a.status === "done";
                 const live = a.status === "in-service";
@@ -23029,7 +22725,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                   return !appts.some((o) => o.id !== a.id && o.clientId === a.clientId && o.status !== "cancelled" && o.status !== "no-show" && o.status !== "block" && o.bookedFor && new Date(o.bookedFor) < new Date(a.bookedFor));
                 })());
                 const rebooked = /rebook/i.test(a.title || "");
-                const range = `${fmtTime(liveStart)} – ${fmtTime(liveStart + (aEnd - aStart))}`;
+                const range = `${fmtTime(liveStart)} – ${fmtTime(liveStart + (a.end - a.start))}`;
                 // Eyebrow shows the service alone; the cut style + add-ons get their own clean line below,
                 // so the tile never crams a truncated "HAIRCUT (SKIN FADE, FACIAL…)" into one row.
                 const svcTop = a.serviceName || (a.title || "").replace(/\s*[(·].*$/, "");

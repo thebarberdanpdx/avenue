@@ -18,7 +18,7 @@
 // Exits 0 only if all pass, non-zero otherwise — so it's safe to chain:
 //   npm run ship-check && npx vercel --prod --force
 import { execSync } from "node:child_process";
-import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -145,15 +145,6 @@ const GUARDS = [
   { needle: "scheduleRtMirror", label: "realtime calendar pulls debounced when idle" },
   { needle: 'tableHasUnsavedWork("appointments") || tableHasUnsavedWork("clients")', label: "mirror skips while calendar edits are pending" },
   { needle: "deleteAppt flushes immediately", label: "deleteAppt calls flushApptsNow (cross-device delete)" },
-  { needle: "const OFFLINE_NATIVE", label: "offline native flag present (toggle OFFLINE_NATIVE to pause Stage 1)" },
-  { needle: "GUARD: offline-store-boundary", label: "offline native store boundary (sqlite seeds + failover hydrate)" },
-  { needle: "OFFLINE-NATIVE-BUNDLE", label: "native app bundles dist locally for offline (not remote gotvero.com webview)" },
-  { needle: "writeShopSettingsCache", label: "offline shop settings (hours/calendar) cached for native offline view" },
-  { needle: "providersStillSeed", label: "offline boot replaces demo seed providers with cached staff rows" },
-  { needle: "root-shell-layout", label: "boot clears vestigial #root inline flex/center from index.html" },
-  { needle: "native-viewport-boot", label: "native viewport boot — screen.width before paint; no innerWidth lock" },
-  { needle: "calApptMin", label: "calendar normalizes appt start/end units (prevents giant offline tiles)" },
-  { needle: "CAPACITOR_BUILD", label: "Capacitor build uses relative asset base (./) for bundled iOS offline" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
@@ -192,66 +183,6 @@ try {
     calFails.length ? calFails.join(" · ") : "server-authoritative read/write/delete path intact");
 } catch (e) {
   record(false, "Calendar sync contract (structural)", "check error: " + e.message);
-}
-
-// 7) Native shell — when OFFLINE_NATIVE is on, bundle dist locally (no server.url).
-// When OFFLINE_NATIVE is paused, server.url loads the live site so the shop isn't stuck on a bad bundle.
-try {
-  const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
-  const offlineNativeOn = /const OFFLINE_NATIVE = true/.test(app);
-  const cap = readFileSync(join(ROOT, "capacitor.config.json"), "utf8");
-  const capFails = [];
-  if (offlineNativeOn) {
-    if (/"url"\s*:\s*"https:\/\/gotvero\.com"/.test(cap)) {
-      capFails.push("remove server.url from capacitor.config.json — native app must bundle dist for offline");
-    }
-  } else if (!/"url"\s*:\s*"https:\/\/gotvero\.com"/.test(cap)) {
-    capFails.push("capacitor.config.json must set server.url to https://gotvero.com while OFFLINE_NATIVE is paused");
-  }
-  if (!/"webDir"\s*:\s*"dist"/.test(cap)) {
-    capFails.push("capacitor.config.json must set webDir to dist");
-  }
-  const iosCapPath = join(ROOT, "ios/App/App/capacitor.config.json");
-  if (existsSync(iosCapPath)) {
-    const iosCap = readFileSync(iosCapPath, "utf8");
-    if (offlineNativeOn) {
-      if (/"url"\s*:\s*"https:\/\/gotvero\.com"/.test(iosCap)) {
-        capFails.push("ios/App/App/capacitor.config.json must not have server.url when OFFLINE_NATIVE is on — run: npx cap sync ios && commit");
-      }
-    } else if (!/"url"\s*:\s*"https:\/\/gotvero\.com"/.test(iosCap)) {
-      capFails.push("ios/App/App/capacitor.config.json missing server.url — run: npm run cap:prepare && commit");
-    }
-  }
-  const viteCfg = readFileSync(join(ROOT, "vite.config.js"), "utf8");
-  if (!viteCfg.includes("CAPACITOR_BUILD") || !viteCfg.includes("base: CAPACITOR_BUILD")) {
-    capFails.push("vite.config.js must set base: './' when CAPACITOR_BUILD=1 (npm run build:cap)");
-  }
-  const rootCss = readFileSync(join(ROOT, "src/index.css"), "utf8");
-  if (/text-align\s*:\s*center/.test(rootCss) && /#root/.test(rootCss)) {
-    capFails.push("src/index.css #root must not use text-align:center — breaks native calendar layout");
-  }
-  if (!/-webkit-text-size-adjust\s*:\s*100%/.test(rootCss)) {
-    capFails.push("src/index.css must set -webkit-text-size-adjust: 100% (stops iOS inflating text)");
-  }
-  const indexHtml = readFileSync(join(ROOT, "index.html"), "utf8");
-  if (!indexHtml.includes("native-viewport-boot") || !indexHtml.includes("isNativeShell")) {
-    capFails.push("index.html must include native-viewport-boot + isNativeShell (WKWebView viewport from screen.width)");
-  }
-  if (readFileSync(join(ROOT, "src/main.jsx"), "utf8").includes("lockNativeShellLayout")) {
-    capFails.push("remove lockNativeShellLayout from main.jsx — innerWidth locks ~980px and enlarges the whole UI");
-  }
-  if (!readFileSync(join(ROOT, "src/main.jsx"), "utf8").includes("ensureNativeViewport")) {
-    capFails.push("main.jsx must call ensureNativeViewport() — screen.width belt-and-suspenders on native shell");
-  }
-  if (/<div id="root"[^>]*style=/.test(indexHtml)) {
-    capFails.push('index.html #root must not use inline styles — flex/center on #root breaks native layout');
-  }
-  record(capFails.length === 0, "Native shell (Capacitor)",
-    capFails.length ? capFails.join(" · ") : offlineNativeOn
-      ? "iOS app bundles dist locally + relative asset paths for cap sync"
-      : "OFFLINE_NATIVE paused — native loads gotvero.com until bundle viewport is verified on device");
-} catch (e) {
-  record(false, "Native shell (Capacitor)", "check error: " + e.message);
 }
 
 // Report.

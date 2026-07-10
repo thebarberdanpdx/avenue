@@ -2,35 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- GUARD: native-viewport-boot — WKWebView (capacitor:// OR server.url https) must set viewport
-         from screen.width BEFORE paint. device-width / innerWidth often resolve ~980px → whole UI zoomed. -->
-    <script>
-      (function () {
-        function isNativeShell() {
-          var p = window.location.protocol;
-          if (p === 'capacitor:' || p === 'ionic:') return true;
-          try {
-            if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return true;
-          } catch (e) {}
-          var ua = navigator.userAgent || '';
-          // Capacitor WKWebView on iOS — AppleWebKit without the Safari/ token Mobile Safari has
-          if (/iPhone|iPod|iPad/i.test(ua) && /AppleWebKit/i.test(ua) && !/Safari\//i.test(ua)) return true;
-          // Android System WebView
-          if (/Android/i.test(ua) && /; wv\)/.test(ua)) return true;
-          return false;
-        }
-        var m = document.createElement('meta');
-        m.name = 'viewport';
-        if (isNativeShell()) {
-          var sw = Math.min(screen.width || 390, screen.height || 844);
-          m.content = 'width=' + sw + ', initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
-        } else {
-          m.content = 'viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no';
-        }
-        document.head.appendChild(m);
-      })();
-    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <title>Vero</title>
   </head>

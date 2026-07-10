@@ -3,14 +3,9 @@
 	"appName": "Vero",
 	"webDir": "dist",
 	"server": {
-		"url": "https://gotvero.com",
-		"cleartext": false
-	},
-	"ios": {
-		"contentInset": "automatic"
+		"url": "https://gotvero.com"
 	},
 	"packageClassList": [
-		"CapacitorSQLitePlugin",
 		"StripeTerminalPlugin",
 		"HapticsPlugin",
 		"PushNotificationsPlugin"

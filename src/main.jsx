@@ -4,30 +4,6 @@ import * as Sentry from '@sentry/react'
 import './index.css'
 import App from './App.jsx'
 
-// GUARD: native-viewport-boot — belt-and-suspenders after index.html inline script.
-// Uses screen.width ONLY (never innerWidth — that locked ~980px and enlarged the whole UI).
-function ensureNativeViewport() {
-  if (typeof window === 'undefined') return
-  const proto = window.location.protocol
-  const ua = navigator.userAgent || ''
-  const isNative =
-    proto === 'capacitor:' || proto === 'ionic:' ||
-    !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) ||
-    (/iPhone|iPod|iPad/i.test(ua) && /AppleWebKit/i.test(ua) && !/Safari\//i.test(ua)) ||
-    (/Android/i.test(ua) && /; wv\)/.test(ua))
-  if (!isNative) return
-  const sw = Math.min(screen.width || 390, screen.height || 844)
-  const want = `width=${sw}, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover`
-  let meta = document.querySelector('meta[name="viewport"]')
-  if (!meta) {
-    meta = document.createElement('meta')
-    meta.setAttribute('name', 'viewport')
-    document.head.appendChild(meta)
-  }
-  if (meta.getAttribute('content') !== want) meta.setAttribute('content', want)
-}
-ensureNativeViewport()
-
 // Error monitoring — emails the owner when something actually breaks.
 // Privacy-conscious by design: errors only (NO Session Replay / screen
 // recording, NO performance tracing), and sendDefaultPii is off so we don't
@@ -66,13 +42,7 @@ const Fallback = (
   </div>
 )
 
-const rootEl = document.getElementById('root')
-// GUARD: root-shell-layout — index.html must not leave flex/center on #root; clear on boot.
-if (rootEl) {
-  rootEl.removeAttribute('style')
-  rootEl.textContent = ''
-}
-createRoot(rootEl).render(
+createRoot(document.getElementById('root')).render(
   <StrictMode>
     <Sentry.ErrorBoundary fallback={Fallback}>
       <App />
