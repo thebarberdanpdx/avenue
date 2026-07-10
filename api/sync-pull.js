@@ -4,6 +4,7 @@
 //
 // POST { shop } — pull full clients + appointments (default)
 // POST { shop, mode: "save", table, upserts: [{id,data}], deleteIds: [...] }
+//   → writes then returns fresh clients + appointments (server-authoritative-sync)
 //
 // Auth: Bearer JWT + canAccessShop (same gate as pull — personal Gmail logins OK).
 import { createClient } from "@supabase/supabase-js";

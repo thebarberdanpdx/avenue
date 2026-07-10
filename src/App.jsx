@@ -2204,6 +2204,18 @@ function App() {
   const mirrorFromServerRef = useRef(null);
   const mirrorInFlightRef = useRef(null);
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GUARD: calendar-sync-contract — staff calendar sync invariants (DO NOT BREAK).
+  // Appointments + clients are SERVER-AUTHORITATIVE. Each device is a cache, not a replica.
+  //
+  // READ (idle):  api/sync-pull → applyServerAuthoritative → REPLACE local state (never merge).
+  // WRITE:        api/sync-pull mode:save → API returns fresh tables → applyServerAuthoritative.
+  // WHILE EDITING: tableHasUnsavedWork blocks mirror, refetch, and debounced realtime pulls.
+  // CALENDAR EDITS: flushApptsNow on book, check-in, checkout, block, delete (no 800ms wait).
+  //
+  // If you change any of the above, update scripts/ship-check.mjs calendar-sync checks.
+  // ═══════════════════════════════════════════════════════════════════════════
+
   const lastRemoteRef = useRef({});
   const lastSaveAt = useRef({}); // when this device last saved each table — used to ignore the echo of our own write
   const applyServerAuthoritativeRef = useRef(null);
@@ -21858,6 +21870,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
   const deleteAppt = (id) => {
     const freed = appts.find((a) => a.id === id);
+    // cross-device-sync: deleteAppt flushes immediately — debounced save let deletes resurrect on other devices.
     setAppts((cur) => { const next = cur.filter((a) => a.id !== id); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
     setOpen(null);
     showToast("Appointment removed.");
