@@ -157,6 +157,22 @@ const sortProviders = (list) => {
     })
     .map(({ p }) => p);
 };
+// Map a staff login email to a provider row. Shop cards often carry the shared inbox while
+// owners sign in with personal Gmail (michaelsdan415@…) — hint from the address before @.
+const resolveAuthStaff = (authEmail, staff) => {
+  if (!authEmail || !staff || !staff.length) return null;
+  const norm = (e) => (e || "").trim().toLowerCase();
+  const cur = norm(authEmail);
+  const loginHint = cur.split("@")[0] || "";
+  const emailMatches = staff.filter((p) => norm(p.email) && norm(p.email) === cur);
+  if (emailMatches.length === 1) return emailMatches[0];
+  if (emailMatches.length > 1) return emailMatches.find((p) => p.pulseRole === "owner") || emailMatches[0];
+  return staff.find((p) => {
+    const n = (p.name || "").trim().toLowerCase().split(/\s+/)[0];
+    const id = String(p.id || "").toLowerCase();
+    return (n && loginHint.includes(n)) || (id && loginHint.includes(id));
+  }) || staff.find((p) => p.pulseRole === "owner") || null;
+};
 // Clients keep their colored initial unless a photo has been set explicitly.
 const clientPhoto = (c) => (c && c.photo) ? c.photo : null;
 // Reusable circular avatar — edge-to-edge photo or centered initial.
@@ -11965,36 +11981,23 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       setSignedInAs(realProviders[0]?.id || null);
     }
   }, [providers, signedInAs]);
-  // Identify who is "at the chair" from the LOGIN email. Provider cards often carry the shared
-  // shop inbox (sanctuarybarberco@…) while owners sign in with personal Gmail — so a failed match
-  // must NOT leave Heather's remembered chair on Dan's phone.
+  // Identify who is "at the chair" from the LOGIN email (see resolveAuthStaff).
   useEffect(() => {
     if (!authEmail) return;
     const norm = (e) => (e || "").trim().toLowerCase();
     const cur = norm(authEmail);
-    const loginHint = cur.split("@")[0] || "";
     try {
       const prev = localStorage.getItem("vero_last_auth_email");
       if (prev && prev !== cur) localStorage.removeItem("vero_signed_in_as");
       localStorage.setItem("vero_last_auth_email", cur);
     } catch (e) {}
-    const emailMatches = realProviders.filter((p) => norm(p.email) && norm(p.email) === cur);
-    let match = null;
-    if (emailMatches.length === 1) match = emailMatches[0];
-    else if (emailMatches.length > 1) {
-      match = emailMatches.find((p) => p.pulseRole === "owner") || emailMatches[0];
-    } else {
-      // Personal login (e.g. michaelsdan415@…) — hint from the address before @, else seat the owner.
-      match = realProviders.find((p) => {
-        const n = (p.name || "").trim().toLowerCase().split(/\s+/)[0];
-        const id = String(p.id || "").toLowerCase();
-        return (n && loginHint.includes(n)) || (id && loginHint.includes(id));
-      }) || realProviders.find((p) => p.pulseRole === "owner") || null;
-    }
+    const match = resolveAuthStaff(authEmail, realProviders);
     if (match && match.id !== signedInAs) setSignedInAs(match.id);
   }, [authEmail, providers]);
+  const authStaff = useMemo(() => resolveAuthStaff(authEmail, realProviders), [authEmail, providers]);
   const me = providers.find((p) => p.id === signedInAs);
-  const isOwner = me?.pulseRole === "owner";
+  // Owner powers (Settings tab, shop-wide Pulse) follow the LOGIN account — not a stale chair pick.
+  const isOwner = authStaff?.pulseRole === "owner" || me?.pulseRole === "owner";
 
   // ---- Restore & remember the current screen across app relaunches (see readSavedScreen) ----
   // activeClient is a live object, so we persist only its id and re-resolve from the loaded clients
