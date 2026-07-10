@@ -45,7 +45,7 @@ async function haptic(kind) {
 // GUARD: offline-store-boundary — all native offline read/write seeds go through this block and
 // persistLocalMirror / hydrateFromOfflineFailover inside App(). Default OFF — zero production change.
 // PowerSync WASM crashed WKWebView; this uses @capacitor-community/sqlite (native plugin).
-const OFFLINE_NATIVE = false;
+const OFFLINE_NATIVE = true;
 const OFFLINE_DB = "vero_offline";
 let _offlineDb = null;
 let _offlineSqlite = null;

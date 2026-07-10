@@ -145,7 +145,7 @@ const GUARDS = [
   { needle: "scheduleRtMirror", label: "realtime calendar pulls debounced when idle" },
   { needle: 'tableHasUnsavedWork("appointments") || tableHasUnsavedWork("clients")', label: "mirror skips while calendar edits are pending" },
   { needle: "deleteAppt flushes immediately", label: "deleteAppt calls flushApptsNow (cross-device delete)" },
-  { needle: "OFFLINE_NATIVE = false", label: "offline native SQLite flag stays OFF until Dan cutover on test device" },
+  { needle: "OFFLINE_NATIVE = true", label: "offline native SQLite reading enabled on the iOS/Android app" },
   { needle: "GUARD: offline-store-boundary", label: "offline native store boundary (sqlite seeds + failover hydrate)" },
   { needle: "hydrateFromOfflineFailover", label: "offline failover reads sqlite before localStorage cache" },
 ];
