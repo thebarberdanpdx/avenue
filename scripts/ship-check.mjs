@@ -134,6 +134,7 @@ const GUARDS = [
   { needle: "flushApptsNow", label: "check-in/book/checkout save to server immediately" },
   { needle: "time blocks must flush immediately", label: "time block confirm flushes to server immediately (2s mirror stomp)" },
   { needle: "apptsRef.current", label: "server mirror merges against latest local appts (stale-closure guard)" },
+  { needle: 'mode: "save"', label: "appointments/clients save via api/sync-pull service-role (iPad RLS write fix)" },
   { needle: "syncGuardRef", label: "auto-refresh waits for unsaved work; server pulls always merge local" },
   { needle: "mergeApptRow", label: "completed checkout beats stale in-service on cross-device sync" },
   { needle: "card-on-file-verified-only", label: "a saved card-on-file (brand + last-4) shows ONLY to a verified/signed-in client — never to an unverified booker who typed a matching phone (card disclosure + enumeration hole)" },
