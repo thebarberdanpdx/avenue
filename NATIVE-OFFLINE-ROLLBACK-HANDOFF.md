@@ -6,6 +6,69 @@
 
 ---
 
+## How offline work started (origin story — read this first)
+
+### The problem that triggered it
+
+In **early July 2026**, Supabase had **two outages in two days**. During them:
+
+- The **staff calendar went blank** (no appointments visible).
+- The **public booking page showed a demo menu** (`DEFAULT_SERVICES`) instead of Dan's real services — a client could theoretically book off a fake menu. Documented in `RELIABILITY-PLAN.md` (written 2026-07-08 during an outage).
+- Dan found out from **blank screens**, not from an alert.
+
+Dan's standing directive (also 2026-07-08): work like a senior engineer — flag risks, design for failure, verify live, don't over-promise. Offline-first became the **#1 foundational priority** in `CLAUDE.md` and `RELIABILITY-PLAN.md` §2.
+
+### The plan Dan approved
+
+**Decision locked 2026-07-08** (`OFFLINE-PLAN.md`):
+
+- **Route A (recommended):** Add offline sync on top of existing Supabase — **not** a Firebase rebuild.
+- **Destination:** App runs off a local DB on the device. Shop keeps working through dead wifi / Supabase down. Syncs when back online.
+- **Staged rollout:** Stage 0 groundwork → Stage 1 offline **reading** → Stage 2 offline **writes** → cutover only after a live outage drill with Dan watching.
+- **Safety rules:** Live app keeps running; each stage behind a flag; never claim done without a live drill; no data migration.
+
+### What was tried first: PowerSync (failed on iOS)
+
+Before the native-SQLite work in #276+:
+
+1. **`3770d66`** — Wired PowerSync Stage 1 (local SQLite sync for signed-in staff).
+2. **`fa8d9fd` / `caf4b7b`** — **PowerSync WASM crashed the iOS app on launch.** Emergency hotfix disabled it on native, then removed it entirely.
+
+PowerSync was dropped. See **`cfd0b7b` (#275)** — docs updated to **native iOS SQLite + outbox** instead.
+
+### The native SQLite path (where the breakage started)
+
+After PowerSync failed, agents pivoted to `@capacitor-community/sqlite` behind a flag:
+
+| PR / commit | What shipped |
+|-------------|--------------|
+| **#276** `345d6b5` | Stage 0: sqlite dep added, `OFFLINE_NATIVE = false`, SQL runbook |
+| **#277** `5505a08` | Stage 1: offline store module wired at sync boundary (still flag OFF) |
+| **#278** `329d94b` | **`OFFLINE_NATIVE = true`** — reading live on native |
+| **#279** `b12f90c` | Removed `server.url`, bundled `dist/` locally (for airplane mode) — **this broke viewport** |
+| **#280** `80f177c` | Cached shop settings + providers for offline calendar view |
+
+**Critical mistake:** Stage 1 was turned ON and `server.url` was removed **before** the local bundle was verified on a real iPhone. That was "day 1" of the native UI disaster.
+
+### What the app looked like before all of this
+
+- Native iOS used **`server.url: https://gotvero.com`** — a thin shell loading the live website. Web deploys reached the app without Xcode rebuilds.
+- **`hydrateFromCache()`** already existed as a stopgap (snapshot cache during outages) but was not full offline-first.
+- Calendar sync fixes (#269–#273) landed just before offline work and **worked** — those were kept in the final restore.
+
+### What Dan authorized vs what went wrong
+
+| Dan authorized | What actually happened |
+|----------------|------------------------|
+| Offline-first, staged, flag-gated, verified on device before cutover | `OFFLINE_NATIVE` turned ON + `server.url` removed without device QA |
+| App keeps working while offline is built in parallel | Native app became the testbed; shop UI broke on day 1 |
+| Revert if it breaks | Multiple "fixes" stacked instead of reverting to `f0f19d4` immediately |
+| Never show fake data on load failure | Separate issue (booking demo menu); offline work didn't fix it |
+
+**Restore commit `31046c7`** = back to `f0f19d4` (pre-offline). All sqlite/offline/bundle/viewport code removed. App loads live site again.
+
+---
+
 ## What we were trying to do
 
 **Goal:** Make Vero's native iOS app offline-first so network/backend outages wouldn't stop the shop (#1 priority in `RELIABILITY-PLAN.md`).
