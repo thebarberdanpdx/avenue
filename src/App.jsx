@@ -2204,6 +2204,10 @@ function App() {
   const mirrorFromServerRef = useRef(null);
   const mirrorInFlightRef = useRef(null);
 
+  const lastRemoteRef = useRef({});
+  const lastSaveAt = useRef({}); // when this device last saved each table — used to ignore the echo of our own write
+  const applyServerAuthoritativeRef = useRef(null);
+
   // Save a whole in-memory list to its shop-scoped table.
   // Strategy: upsert current items first (never destroys data), then delete rows that aren't in the list.
   // If anything fails, we log it and bail — existing server data is still intact, and the next save reconciles.
@@ -2279,6 +2283,15 @@ function App() {
         });
         const body = await r.json().catch(() => ({}));
         if (!r.ok || !body.ok) throw new Error(body.error || `sync-save HTTP ${r.status}`);
+        // server-authoritative-sync: apply the fresh server copy the API returns — never merge guesses.
+        if (Array.isArray(body.appointments) || Array.isArray(body.clients)) {
+          applyServerAuthoritativeRef.current && applyServerAuthoritativeRef.current({
+            clients: Array.isArray(body.clients) ? body.clients : clientsRef.current,
+            appointments: Array.isArray(body.appointments) ? body.appointments : apptsRef.current,
+            via: "save",
+          });
+          return;
+        }
       } else {
       // 1. Upsert what changed — adds new rows, updates existing ones, destroys nothing. Chunked so a
       //    photo-heavy batch (base64 galleries / appointment photos) never builds one oversized request.
@@ -2317,17 +2330,8 @@ function App() {
       lastRemoteRef.current[table] = list;
       lastSaveAt.current[table] = Date.now();
       setSaveFailed(false);
-      // If a mirror raced and resurrected a deleted row, snap UI back to what we just saved.
-      if (table === "appointments") {
-        const savedIds = new Set(list.map((it) => String(it && it.id)));
-        const cur = apptsRef.current || [];
-        if (cur.length !== list.length || cur.some((a) => a && !savedIds.has(String(a.id)))) setAppts(list);
-      }
-      if (table === "clients") {
-        const savedIds = new Set(list.map((it) => String(it && it.id)));
-        const cur = clientsRef.current || [];
-        if (cur.length !== list.length || cur.some((c) => c && !savedIds.has(String(c.id)))) setClients(list);
-      }
+      if (table === "appointments") setAppts(list);
+      if (table === "clients") setClients(list);
     } catch (err) {
       console.error(`[vero] save '${table}' failed (data on server unchanged):`, err);
       setSaveFailed(true);
@@ -2346,8 +2350,7 @@ function App() {
   // we applied (lastRemoteRef) so the matching save effect can tell "this is a remote update,
   // don't bounce it back as my own save" with a simple reference check — which also prevents
   // any save loop between two devices.
-  const lastRemoteRef = useRef({});
-  const lastSaveAt = useRef({}); // when this device last saved each table — used to ignore the echo of our own write
+  // (lastRemoteRef + lastSaveAt declared above syncList)
   // ---- OFFLINE READ-CACHE ---------------------------------------------------------------------
   // Every SUCCESSFUL server load is mirrored to localStorage. If a later load fails (Supabase or
   // network down), the app hydrates READ-ONLY from this cache so the barber still sees their last-
@@ -2476,6 +2479,10 @@ function App() {
       }
       let list = data ? data.map((r) => r.data) : [];
       const sv = savingRef.current[table];
+      if ((table === "appointments" || table === "clients") && tableHasUnsavedWork(table)) {
+        if (table === "appointments" || table === "clients") setSyncHealth((h) => ({ ...h, pulling: false }));
+        return;
+      }
       if (!force) {
         // Ignore the realtime echo of our OWN recent save: a read right after a write can come back
         // stale and stomp the very edit we just made (this was the email/phone "disappears" bug).
@@ -2487,11 +2494,27 @@ function App() {
         if (table === "appointments" || table === "clients") setSyncHealth((h) => ({ ...h, pulling: false }));
         return; // never stomp a write that's actively in flight
       }
-      // cross-device-sync: ALWAYS merge server rows with local — foreground pulls and realtime used
-      // to replace the whole table and revert edits that hadn't finished saving (the iPhone reset bug).
+      // server-authoritative-sync: appointments/clients replace from server when idle — no merge.
+      if (table === "appointments" || table === "clients") {
+        lastRemoteRef.current[table] = list;
+        const set = tableSetters[table];
+        if (set) set(list);
+        writeCache(table, list);
+        setUsingCache(false);
+        if (table === "appointments") { staffApptsLoadedRef.current = true; setSaveFailed(false); }
+        if (table === "clients") staffClientsLoadedRef.current = true;
+        setSyncHealth((h) => ({
+          ...h,
+          serverClients: table === "clients" ? list.length : h.serverClients,
+          serverAppts: table === "appointments" ? list.length : h.serverAppts,
+          err: null,
+          at: Date.now(),
+          pulling: false,
+        }));
+        return;
+      }
       const local = localTableState(table);
-      const prevBase = lastRemoteRef.current[table] || [];
-      list = mergeLocalOverServer(list, local, table, prevBase);
+      list = mergeLocalOverServer(list, local, table);
       if (table === 'services') list.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
       if (table === 'providers') list = sortProviders(list);
       lastRemoteRef.current[table] = data ? data.map((r) => r.data) : [];
@@ -2514,27 +2537,21 @@ function App() {
 
   // cross-device-sync — SERVER MIRROR: authoritative copy via api/sync-pull (service-role read
   // after JWT membership check). sync-pull allows read for valid login on small shops.
-  // Bypasses broken direct Supabase reads on iPad/Capacitor WebViews.
-  const applyServerMirror = (payload) => {
+  // When idle, REPLACE local state with server — never client-merge (server-authoritative-sync).
+  const applyServerAuthoritative = (payload) => {
     const serverCl = Array.isArray(payload.clients) ? payload.clients : [];
     const serverAp = Array.isArray(payload.appointments) ? payload.appointments : [];
-    // cross-device-sync: ALWAYS merge — never blind-replace with server rows. The old "only merge when
-    // dirty" path let the 30s heartbeat / foreground pull revert check-ins and edits that had already
-    // landed locally but looked "clean" because lastRemoteRef matched appts (the iPhone reset bug).
-    const prevAp = lastRemoteRef.current.appointments || [];
-    const prevCl = lastRemoteRef.current.clients || [];
-    const finalAp = mergeLocalOverServer(serverAp, apptsRef.current, "appointments", prevAp);
-    const finalCl = mergeLocalOverServer(serverCl, clientsRef.current, "clients", prevCl);
-    // Baseline stays the raw server copy so the save effect still pushes local edits up.
     lastRemoteRef.current.clients = serverCl;
     lastRemoteRef.current.appointments = serverAp;
     lastMirrorCountsRef.current = { clients: serverCl.length, appointments: serverAp.length };
-    setClients(finalCl);
-    setAppts(finalAp);
+    lastSaveAt.current.clients = Date.now();
+    lastSaveAt.current.appointments = Date.now();
+    setClients(serverCl);
+    setAppts(serverAp);
     staffClientsLoadedRef.current = true;
     staffApptsLoadedRef.current = true;
-    writeCache("clients", finalCl);
-    writeCache("appointments", finalAp);
+    writeCache("clients", serverCl);
+    writeCache("appointments", serverAp);
     setUsingCache(false);
     setSaveFailed(false);
     setSyncHealth({
@@ -2547,6 +2564,8 @@ function App() {
       email: payload.email || null,
     });
   };
+  applyServerAuthoritativeRef.current = applyServerAuthoritative;
+  const applyServerMirror = applyServerAuthoritative;
   const mirrorFromServer = async () => {
     if (!session) return false;
     // Never interleave a server mirror with an active write or a pending add/delete.
@@ -2844,21 +2863,24 @@ function App() {
     lastSaveAt.current.appointments = Date.now();
     firePending('appointments');
   };
-  // cross-device-sync: detect ANY in-flight local work so auto-refresh and server pulls never stomp it.
-  const SYNC_GUARD_MS = 45000;
+  // cross-device-sync: detect pending local edits (add/delete/change vs server baseline).
   const tableHasUnsavedWork = (table) => {
     const sv = savingRef.current[table];
     if (sv && (sv.running || sv.queued)) return true;
     if (pendingSaveRef.current[table] !== undefined) return true;
     if (table === "providers" && providersDirtyRef.current) return true;
-    if (lastSaveAt.current[table] && Date.now() - lastSaveAt.current[table] < SYNC_GUARD_MS) return true;
     const local = localTableState(table);
     const base = lastRemoteRef.current[table] || [];
     const localIds = new Set((local || []).map((r) => String(r && r.id)));
     const baseIds = new Set((base || []).map((r) => String(r && r.id)));
-    if ([...baseIds].some((id) => !localIds.has(id))) return true; // pending delete
-    if ([...localIds].some((id) => !baseIds.has(id))) return true; // pending add
-    if (Array.isArray(local) && JSON.stringify(mergeLocalOverServer(base, local, table, base)) !== JSON.stringify(base)) return true;
+    if ([...baseIds].some((id) => !localIds.has(id))) return true;
+    if ([...localIds].some((id) => !baseIds.has(id))) return true;
+    const baseById = new Map((base || []).map((r) => [String(r && r.id), r]));
+    for (const r of (local || [])) {
+      const id = String(r && r.id);
+      const b = baseById.get(id);
+      if (b && JSON.stringify(r) !== JSON.stringify(b)) return true;
+    }
     return false;
   };
   const hasUnsavedWork = () => {
@@ -2907,12 +2929,10 @@ function App() {
     if (session && list.some((t) => t === "appointments" || t === "clients")) mirrorFromServer();
     list.filter((t) => t !== "appointments" && t !== "clients").forEach((t) => refetchTable(t, { force: true }));
   };
-  // cross-device-sync: hammer the server mirror on sign-in — iPad WebViews often miss the first pull.
+  // cross-device-sync: one pull on sign-in (the old 0/2/5/10/20/45s hammer raced with saves).
   useEffect(() => {
     if (!dataLoaded || !sessionUid) return;
-    [0, 2000, 5000, 10000, 20000, 45000].forEach((ms) => {
-      setTimeout(() => { mirrorFromServerRef.current && mirrorFromServerRef.current(); }, ms);
-    });
+    setTimeout(() => { mirrorFromServerRef.current && mirrorFromServerRef.current(); }, 0);
   }, [dataLoaded, sessionUid]);
   useEffect(() => {
     if (!sessionUid) return;
@@ -2938,7 +2958,7 @@ function App() {
     window.addEventListener("focus", onFg);
     return () => { document.removeEventListener("visibilitychange", onFg); window.removeEventListener("focus", onFg); };
   }, [sessionUid]);
-  // Heartbeat: native 30s / web 20s — server mirror, but mergeLocalOverServer keeps check-ins mid-save.
+  // Heartbeat: native 30s / web 20s — server mirror when idle (server-authoritative replace).
   useEffect(() => {
     if (!sessionUid) return;
     const ms = IS_NATIVE ? 30000 : 20000;
@@ -2967,13 +2987,17 @@ function App() {
     })();
   };
 
+  const rtMirrorTimerRef = useRef(null);
+  const scheduleRtMirror = () => {
+    if (rtMirrorTimerRef.current) clearTimeout(rtMirrorTimerRef.current);
+    rtMirrorTimerRef.current = setTimeout(() => {
+      rtMirrorTimerRef.current = null;
+      mirrorFromServerRef.current && mirrorFromServerRef.current();
+    }, 800);
+  };
   // ---- LIVE SYNC ----
-  // Keep every device in step. When another device (e.g. Heather's phone) adds, edits, or
-  // removes a booking/client, Supabase Realtime tells us instantly and we re-pull that table —
-  // so this device always has the full picture and its next save can never delete a row it
-  // simply hadn't loaded yet. Purely additive: if Realtime is off/unavailable, the app behaves
-  // exactly as before (saves & loads unchanged); it just won't auto-refresh between devices.
-  // NOTE: enable Realtime for these tables in Supabase for this to fire.
+  // Keep every device in step. When another device adds/edits/removes a booking, Supabase
+  // Realtime tells us — debounced pull replaces local state from server when idle.
   useEffect(() => {
     if (!dataLoaded) return;
     const tables = session ? ['clients', 'appointments', 'waitlist', 'services', 'providers'] : ['appointments', 'services', 'providers'];
@@ -2982,13 +3006,13 @@ function App() {
       channel = supabase.channel(`vero-sync-${SHOP_ID}`);
       tables.forEach((table) => {
         channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `shop_id=eq.${SHOP_ID}` }, () => {
-          if (table === "clients" || table === "appointments") mirrorFromServer();
+          if (table === "clients" || table === "appointments") scheduleRtMirror();
           else refetchTable(table);
         });
       });
       channel.subscribe();
     } catch (e) { console.error('[vero] live-sync subscribe failed:', e); }
-    return () => { try { if (channel) supabase.removeChannel(channel); } catch (e) { /* ignore */ } };
+    return () => { try { if (rtMirrorTimerRef.current) clearTimeout(rtMirrorTimerRef.current); if (channel) supabase.removeChannel(channel); } catch (e) { /* ignore */ } };
   }, [dataLoaded, SHOP_ID, session]);
 
   // Client-facing surfaces ALWAYS render in the Studio look, whatever the shop/staff theme is —

@@ -86,6 +86,15 @@ export default async function handler(req, res) {
         const msg = String((result.error && result.error.message) || result.error);
         return res.status(502).json({ error: msg, email: user.email || null });
       }
+      // Return the authoritative server copy so clients never guess — no client-side merge.
+      const [clRes, apRes] = await Promise.all([
+        supabase.from("clients").select("data").eq("shop_id", shop),
+        supabase.from("appointments").select("data").eq("shop_id", shop),
+      ]);
+      if (clRes.error) return res.status(502).json({ error: clRes.error.message });
+      if (apRes.error) return res.status(502).json({ error: apRes.error.message });
+      const clients = (clRes.data || []).map((r) => r.data).filter(Boolean);
+      const appointments = (apRes.data || []).map((r) => r.data).filter(Boolean);
       return res.status(200).json({
         ok: true,
         mode: "save",
@@ -94,6 +103,9 @@ export default async function handler(req, res) {
         email: user.email || null,
         upserted: result.upserted,
         deleted: result.deleted,
+        clients,
+        appointments,
+        counts: { clients: clients.length, appointments: appointments.length },
       });
     }
 
