@@ -27,6 +27,11 @@ The app runs off a local database **on the device**. With no internet / no Supab
 - **D1 — Offline double-booking:** RECOMMENDED: offline bookings show as **"pending — confirming"** until the server accepts them on reconnect; a clash flags loudly for staff to resolve (rebook/call). Never silently double-book, never silently drop. Alternative (not recommended): trust-last-write.
 - **D2 — Offline checkout:** RECOMMENDED: **cash records fully offline; card checkouts queue as "charge when back online"** with a clear "not charged yet" state and a decline-later workflow (client card on file → retry/notify). Alternative: refuse card checkouts offline entirely (simpler, harsher on the shop).
 
+## How the native app loads (critical for offline)
+- The iOS/Android shell **bundles `dist/` on the device** (`capacitor.config.json` has **no** `server.url`).
+- **Do not** point Capacitor at `https://gotvero.com` for the webview — airplane mode can't fetch JS → white screen.
+- Tradeoff: web deploys no longer auto-update the installed app; run `npm run build && npx cap sync` + Xcode ▶ after meaningful native-facing changes.
+
 ## How it stays off production until cutover (dark-ship)
 - All offline code sits behind a **runtime flag, default OFF** in production. The live app's behavior is unchanged with the flag off.
 - The swap is gated at the **data-access / sync boundary** — one thin abstraction the components call — **not** scattered through `App.jsx`. Keeps the monolith almost untouched during the build.

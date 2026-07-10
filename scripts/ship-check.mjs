@@ -147,6 +147,7 @@ const GUARDS = [
   { needle: "deleteAppt flushes immediately", label: "deleteAppt calls flushApptsNow (cross-device delete)" },
   { needle: "OFFLINE_NATIVE = true", label: "offline native SQLite reading enabled on the iOS/Android app" },
   { needle: "GUARD: offline-store-boundary", label: "offline native store boundary (sqlite seeds + failover hydrate)" },
+  { needle: "OFFLINE-NATIVE-BUNDLE", label: "native app bundles dist locally for offline (not remote gotvero.com webview)" },
   { needle: "hydrateFromOfflineFailover", label: "offline failover reads sqlite before localStorage cache" },
 ];
 try {
@@ -186,6 +187,23 @@ try {
     calFails.length ? calFails.join(" · ") : "server-authoritative read/write/delete path intact");
 } catch (e) {
   record(false, "Calendar sync contract (structural)", "check error: " + e.message);
+}
+
+// 7) Native offline — the iOS shell must bundle dist locally (no server.url to gotvero.com).
+// Remote URL mode can't load JS on airplane mode → white screen before offline code runs.
+try {
+  const cap = readFileSync(join(ROOT, "capacitor.config.json"), "utf8");
+  const capFails = [];
+  if (/"url"\s*:\s*"https:\/\/gotvero\.com"/.test(cap)) {
+    capFails.push("remove server.url from capacitor.config.json — native app must bundle dist for offline");
+  }
+  if (!/"webDir"\s*:\s*"dist"/.test(cap)) {
+    capFails.push("capacitor.config.json must set webDir to dist");
+  }
+  record(capFails.length === 0, "Native offline bundle (Capacitor)",
+    capFails.length ? capFails.join(" · ") : "iOS app bundles dist locally (no remote server.url)");
+} catch (e) {
+  record(false, "Native offline bundle (Capacitor)", "check error: " + e.message);
 }
 
 // Report.

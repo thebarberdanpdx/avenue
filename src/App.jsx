@@ -19,6 +19,8 @@ import {
 // Inside the iOS/Android app there is no local server, so those calls must be
 // sent to the live site instead.
 // ============================================================
+// OFFLINE-NATIVE-BUNDLE: the iOS shell ships dist/ from the device (no server.url). Remote gotvero.com
+// loading breaks offline — airplane mode can't fetch JS. API calls still use API_BASE below.
 const IS_NATIVE = typeof window !== "undefined" && (
   window.location.protocol === "capacitor:" ||
   window.location.protocol === "ionic:" ||
@@ -1993,7 +1995,7 @@ function App() {
     });
     // Absolute backstop: if getSession neither resolves nor rejects (a true network hang), enable
     // login after a few seconds no matter what, rather than leaving the app frozen on a dead gate.
-    const readyTimer = setTimeout(markReady, 5000);
+    const readyTimer = setTimeout(markReady, (IS_NATIVE && typeof navigator !== "undefined" && !navigator.onLine) ? 400 : 5000);
     const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
       setSession(sess || null);
       markReady(); // any auth event means the client is alive — unblock the app
