@@ -24,9 +24,8 @@ import {
 // base './' so CSS/JS asset paths resolve inside the bundled shell. API calls still use API_BASE below.
 // GUARD: root-shell-layout — main.jsx runs rootEl.removeAttribute("style") so index.html never leaves
 // flex/center on #root after mount (iOS native looked zoomed/enlarged when that persisted).
-// GUARD: native-viewport-boot — index.html sets viewport from screen.width before paint (see
-// native-viewport-boot in index.html). lockNativeShellLayout was removed — it used innerWidth
-// after a bad layout pass and locked the zoomed viewport.
+// GUARD: native-viewport-boot — index.html isNativeShell() sets viewport from screen.width before paint.
+// main.jsx ensureNativeViewport() repeats on boot. Never use innerWidth — it locked ~980px and zoomed UI.
 const IS_NATIVE = typeof window !== "undefined" && (
   window.location.protocol === "capacitor:" ||
   window.location.protocol === "ionic:" ||

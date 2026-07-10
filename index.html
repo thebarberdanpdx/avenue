@@ -2,15 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- GUARD: native-viewport-boot — capacitor:// must set viewport from screen.width BEFORE
-         paint. device-width / innerWidth often resolve wrong (~980) and the whole UI looks zoomed. -->
+    <!-- GUARD: native-viewport-boot — WKWebView (capacitor:// OR server.url https) must set viewport
+         from screen.width BEFORE paint. device-width / innerWidth often resolve ~980px → whole UI zoomed. -->
     <script>
       (function () {
-        var proto = window.location.protocol;
-        var isCapBundle = proto === 'capacitor:' || proto === 'ionic:';
+        function isNativeShell() {
+          var p = window.location.protocol;
+          if (p === 'capacitor:' || p === 'ionic:') return true;
+          try {
+            if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return true;
+          } catch (e) {}
+          var ua = navigator.userAgent || '';
+          // Capacitor WKWebView on iOS — AppleWebKit without the Safari/ token Mobile Safari has
+          if (/iPhone|iPod|iPad/i.test(ua) && /AppleWebKit/i.test(ua) && !/Safari\//i.test(ua)) return true;
+          // Android System WebView
+          if (/Android/i.test(ua) && /; wv\)/.test(ua)) return true;
+          return false;
+        }
         var m = document.createElement('meta');
         m.name = 'viewport';
-        if (isCapBundle) {
+        if (isNativeShell()) {
           var sw = Math.min(screen.width || 390, screen.height || 844);
           m.content = 'width=' + sw + ', initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
         } else {

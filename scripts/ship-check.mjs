@@ -223,11 +223,14 @@ try {
     capFails.push("src/index.css must set -webkit-text-size-adjust: 100% (stops iOS inflating text)");
   }
   const indexHtml = readFileSync(join(ROOT, "index.html"), "utf8");
-  if (!indexHtml.includes("native-viewport-boot")) {
-    capFails.push("index.html must include native-viewport-boot (capacitor:// sets viewport from screen.width)");
+  if (!indexHtml.includes("native-viewport-boot") || !indexHtml.includes("isNativeShell")) {
+    capFails.push("index.html must include native-viewport-boot + isNativeShell (WKWebView viewport from screen.width)");
   }
   if (readFileSync(join(ROOT, "src/main.jsx"), "utf8").includes("lockNativeShellLayout")) {
     capFails.push("remove lockNativeShellLayout from main.jsx — innerWidth locks ~980px and enlarges the whole UI");
+  }
+  if (!readFileSync(join(ROOT, "src/main.jsx"), "utf8").includes("ensureNativeViewport")) {
+    capFails.push("main.jsx must call ensureNativeViewport() — screen.width belt-and-suspenders on native shell");
   }
   if (/<div id="root"[^>]*style=/.test(indexHtml)) {
     capFails.push('index.html #root must not use inline styles — flex/center on #root breaks native layout');

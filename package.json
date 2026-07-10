@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "build:cap": "CAPACITOR_BUILD=1 vite build",
+    "cap:prepare": "npm run build:cap && npx cap sync ios && node scripts/verify-cap-bundle.mjs",
+    "verify-cap": "node scripts/verify-cap-bundle.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "ship-check": "node scripts/ship-check.mjs"
