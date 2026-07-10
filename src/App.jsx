@@ -1685,6 +1685,22 @@ function StaffLogin({ authReady, onBack }) {
   );
 }
 
+// Shown when a signed-in login is NOT a member of this shop (sync-pull returned 403).
+// Replaces the old failure mode where a non-member landed on an empty, broken dashboard.
+function NotAuthorizedScreen({ email, onSignOut, onBook }) {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "var(--bg, #f6f3ec)" }}>
+      <div className="fade-up" style={{ width: "100%", maxWidth: 380, textAlign: "center" }}>
+        <span style={{ fontSize: 13, letterSpacing: 3, color: "var(--faint)", textTransform: "uppercase" }}>Not authorized</span>
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.12, margin: "14px 0 10px" }}>This login isn't part of the business</h1>
+        <p style={{ color: "var(--sub)", fontSize: 15, lineHeight: 1.55, margin: "0 0 24px" }}>{email ? <><strong style={{ color: "var(--text)" }}>{email}</strong> isn't a member of this shop. </> : null}Only the shop's owners and staff can open the business app.</p>
+        <button onClick={onBook} className="lift" style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "16px 20px", fontSize: 15, fontWeight: 600, borderRadius: 14, border: "none", marginBottom: 12, cursor: "pointer" }}>Are you a client? Book here →</button>
+        <button onClick={onSignOut} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "14px 20px", fontSize: 14.5, borderRadius: 14, border: "1px solid var(--border2)", cursor: "pointer" }}>Sign in with a different email</button>
+      </div>
+    </div>
+  );
+}
+
 // Catches render/runtime errors in a subtree and shows the message on-screen (instead of a blank
 // white page), keeping the rest of the app usable. Helps diagnose crashes without dev tools.
 class ErrorBoundary extends React.Component {
@@ -2183,6 +2199,24 @@ function App() {
   // feed NEVER populates a signed-in owner's staff list (root cause of staff email/phone vanishing). DO NOT REMOVE.
   const hasStoredSession = () => { try { return Object.keys(localStorage).some((k) => /^sb-.*-auth-token$/.test(k)); } catch (e) { return false; } };
   const [saveFailed, setSaveFailed] = useState(false); // drives a banner if a save to the server errors out
+  const [notAuthorized, setNotAuthorized] = useState(false); // a signed-in login that isn't a member of this shop; show a clean rejection, not an empty dashboard
+  // Membership guard: a signed-in login that isn't a member of THIS shop must not open the
+  // business app. get_my_shops is the definitive check (members get their shop, non-members []).
+  // Fails OPEN on any error/transient — never locks out a real member on a flaky check.
+  useEffect(() => {
+    if (!session) { setNotAuthorized(false); return; }
+    let alive = true;
+    (async () => {
+      try {
+        await ensureFreshSession();
+        const { data, error } = await supabase.rpc("get_my_shops");
+        if (!alive || error) return; // transient/network → don't reject
+        const mine = Array.isArray(data) && data.some((s) => s && String(s.shop_id || "").toLowerCase().replace(/[^a-z0-9-]/g, "") === SHOP_ID);
+        setNotAuthorized(!mine);
+      } catch (e) { /* never lock out a real member on an error */ }
+    })();
+    return () => { alive = false; };
+  }, [session]);
   const [lastSaveError, setLastSaveError] = useState(""); // actual save-error detail, surfaced in the banner for diagnosis
   // cross-device-sync: honest pull status so a device that failed to download never looks "empty by design".
   const [syncHealth, setSyncHealth] = useState({ serverClients: null, serverAppts: null, err: null, at: 0, pulling: false });
@@ -3295,7 +3329,9 @@ function App() {
       {view === "managetoken" && <ManageByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} providers={providers} services={services} onExit={goBooking} />}
       {view === "reviewtoken" && <ReviewByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} onExit={goBooking} />}
       {view === "shop" && (session
-        ? (masterMode
+        ? (notAuthorized
+          ? <NotAuthorizedScreen email={session?.user?.email || null} onSignOut={staffSignOut} onBook={goBooking} />
+          : masterMode
           ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={staffSignOut} />
           : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} syncHealth={syncHealth} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
