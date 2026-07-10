@@ -1,6 +1,6 @@
 # Offline-first build plan — native on-device SQLite on the existing Supabase (Route A, revised)
 
-> **STATUS (2026-07-10): PLAN ONLY — NOT STARTED.** No offline code exists in the app. Do **NOT** begin Stage 0 until Dan explicitly says go. This document is the agreed direction on paper; nothing here has been built.
+> **STATUS (2026-07-10): Stage 0 groundwork started — flag OFF, no production behavior change.** Dan said go on groundwork only. `OFFLINE_NATIVE = false` in `src/App.jsx`; native SQLite probe is inert until flipped on a test device. Do **NOT** begin Stage 1 (offline reading) until Dan explicitly says so.
 >
 > **PowerSync was removed from production.** Its browser/WASM SQLite crashed the iPhone app inside Capacitor's WKWebView. The revised route below uses **native** on-device SQLite instead — see "Why native SQLite" — and keeps sync on the app's existing server-authoritative `api/sync-pull` contract. Do not retry the PowerSync/WASM path.
 
