@@ -130,16 +130,21 @@ const GUARDS = [
   { needle: "blocked empty save", label: "never push empty clients/appts when server has rows" },
   { needle: "the whole shop shares one calendar", label: "all staff see every chair by default (Heather sees Dan bookings)" },
   { needle: "sync-pull allows read for valid login on small shops", label: "micro-shop sync-pull auth for Dan+Heather without provider emails on file" },
-  { needle: "mergeLocalOverServer", label: "server mirror keeps in-flight check-ins/edits until save lands" },
+  { needle: "mergeLocalOverServer", label: "non-calendar tables still merge on refetch (waitlist/services)" },
   { needle: "flushApptsNow", label: "check-in/book/checkout save to server immediately" },
   { needle: "time blocks must flush immediately", label: "time block confirm flushes to server immediately (2s mirror stomp)" },
   { needle: "apptsRef.current", label: "server mirror merges against latest local appts (stale-closure guard)" },
   { needle: 'mode: "save"', label: "appointments/clients save via api/sync-pull service-role (iPad RLS write fix)" },
   { needle: "deletion-aware merge", label: "server mirror respects local deletes and server deletes (no resurrect)" },
   { needle: "server-authoritative-sync", label: "idle calendar sync replaces from server — no client merge" },
-  { needle: "syncGuardRef", label: "auto-refresh waits for unsaved work; server pulls always merge local" },
+  { needle: "syncGuardRef", label: "auto-refresh waits for unsaved work before hard-reload during saves" },
   { needle: "mergeApptRow", label: "completed checkout beats stale in-service on cross-device sync" },
   { needle: "card-on-file-verified-only", label: "a saved card-on-file (brand + last-4) shows ONLY to a verified/signed-in client — never to an unverified booker who typed a matching phone (card disclosure + enumeration hole)" },
+  { needle: "GUARD: calendar-sync-contract", label: "calendar sync contract comment block (server-authoritative model)" },
+  { needle: "applyServerMirror = applyServerAuthoritative", label: "mirror pull uses authoritative replace, not merge" },
+  { needle: "scheduleRtMirror", label: "realtime calendar pulls debounced when idle" },
+  { needle: 'tableHasUnsavedWork("appointments") || tableHasUnsavedWork("clients")', label: "mirror skips while calendar edits are pending" },
+  { needle: "deleteAppt flushes immediately", label: "deleteAppt calls flushApptsNow (cross-device delete)" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
@@ -148,6 +153,36 @@ try {
     missing.length ? "REMOVED: " + missing.join(" · ") + " — a shipped fix was deleted; restore it before deploy" : `all ${GUARDS.length} guarded fixes still present`);
 } catch (e) {
   record(false, "Regression lock (shipped fixes intact)", "could not read src/App.jsx: " + e.message);
+}
+
+// 6) Calendar sync contract — structural checks beyond string needles (the #1 shop-critical path).
+try {
+  const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
+  const syncPull = readFileSync(join(ROOT, "api/sync-pull.js"), "utf8");
+  const calFails = [];
+  const authFn = app.match(/const applyServerAuthoritative = \(payload\) => \{[\s\S]*?\n  \};/);
+  if (!authFn || authFn[0].includes("mergeLocalOverServer")) {
+    calFails.push("applyServerAuthoritative must REPLACE server rows (no mergeLocalOverServer)");
+  }
+  if (!/server-authoritative-sync: appointments\/clients replace from server when idle/.test(app)) {
+    calFails.push("refetchTable must replace appts/clients from server when idle");
+  }
+  if (!/if \(table === "appointments" \|\| table === "clients"\)[\s\S]*?deleteIds: toDelete/.test(app)) {
+    calFails.push("appointments/clients saves must go through api/sync-pull mode:save with deleteIds");
+  }
+  if (!syncPull.includes('mode === "save"') || !syncPull.includes("const clients =") || !syncPull.includes("const appointments =")) {
+    calFails.push("api/sync-pull save must return fresh clients + appointments after write");
+  }
+  if (!/const deleteAppt[\s\S]*?flushApptsNow/.test(app)) {
+    calFails.push("deleteAppt must call flushApptsNow");
+  }
+  if (!/const confirmBlock[\s\S]*?flushApptsNow/.test(app)) {
+    calFails.push("confirmBlock must call flushApptsNow");
+  }
+  record(calFails.length === 0, "Calendar sync contract (structural)",
+    calFails.length ? calFails.join(" · ") : "server-authoritative read/write/delete path intact");
+} catch (e) {
+  record(false, "Calendar sync contract (structural)", "check error: " + e.message);
 }
 
 // Report.
