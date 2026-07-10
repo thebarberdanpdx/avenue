@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from './supabaseClient'
+import { connectPowerSync, disconnectPowerSync, powerSyncEnabled, readShopTable, watchShopTable } from './powersyncClient'
 import { tapToPayCharge, cardReaderCharge } from './tapToPay'
 import * as Sentry from '@sentry/react'
 import {
@@ -2510,6 +2511,93 @@ function App() {
     try { return await run; } finally { mirrorInFlightRef.current = null; }
   };
   mirrorFromServerRef.current = mirrorFromServer;
+
+  // PowerSync Stage 1 — signed-in staff keep a local SQLite copy; watches push live cross-device updates.
+  // Existing mirrorFromServer stays as fallback until the outage drill proves PowerSync end-to-end.
+  useEffect(() => {
+    if (!session || !powerSyncEnabled()) return undefined;
+    let alive = true;
+    const cleanups = [];
+    const applyPsClients = (serverList) => {
+      if (tableBusy('clients')) return;
+      setClients((local) => {
+        const finalCl = mergeLocalOverServer(serverList, local, 'clients');
+        lastRemoteRef.current.clients = serverList;
+        lastMirrorCountsRef.current = { ...lastMirrorCountsRef.current, clients: serverList.length };
+        staffClientsLoadedRef.current = true;
+        writeCache('clients', finalCl);
+        setUsingCache(false);
+        setSyncHealth((h) => ({ ...h, serverClients: serverList.length, err: null, at: Date.now(), via: 'powersync', pulling: false }));
+        return finalCl;
+      });
+    };
+    const applyPsAppts = (serverList) => {
+      if (tableBusy('appointments')) return;
+      setAppts((local) => {
+        const finalAp = mergeLocalOverServer(serverList, local, 'appointments');
+        lastRemoteRef.current.appointments = serverList;
+        lastMirrorCountsRef.current = { ...lastMirrorCountsRef.current, appointments: serverList.length };
+        staffApptsLoadedRef.current = true;
+        writeCache('appointments', finalAp);
+        setUsingCache(false);
+        setSaveFailed(false);
+        setSyncHealth((h) => ({ ...h, serverAppts: serverList.length, err: null, at: Date.now(), via: 'powersync', pulling: false }));
+        return finalAp;
+      });
+    };
+    const applyPsServices = (serverList) => {
+      if (tableBusy('services')) return;
+      const sorted = [...serverList].sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
+      if (!sorted.length) return;
+      lastRemoteRef.current.services = sorted;
+      setServices(sorted);
+      setServicesTrusted(true);
+      writeCache('services', sorted);
+    };
+    const applyPsProviders = (serverList) => {
+      const provBusy = () => { const s = savingRef.current.providers; return providersDirtyRef.current || (s && (s.running || s.queued)); };
+      providersFullRef.current = true;
+      if (provBusy()) return;
+      const sorted = sortProviders(serverList);
+      if (!sorted.length) return;
+      lastRemoteRef.current.providers = sorted;
+      setProviders(sorted);
+      writeCache('providers', sorted);
+    };
+    const applyPsWaitlist = (serverList) => {
+      if (tableBusy('waitlist')) return;
+      lastRemoteRef.current.waitlist = serverList;
+      setWaitlist(serverList);
+    };
+    (async () => {
+      try {
+        const res = await connectPowerSync(SHOP_ID);
+        if (!alive || !res.ok) return;
+        const boot = [
+          ['clients', applyPsClients],
+          ['appointments', applyPsAppts],
+          ['services', applyPsServices],
+          ['providers', applyPsProviders],
+          ['waitlist', applyPsWaitlist],
+        ];
+        for (const [table, apply] of boot) {
+          const list = await readShopTable(SHOP_ID, table);
+          if (alive && list.length) apply(list);
+        }
+        for (const [table, apply] of boot) {
+          cleanups.push(watchShopTable(SHOP_ID, table, (list) => { if (alive) apply(list); }));
+        }
+      } catch (e) {
+        console.error('[vero] PowerSync setup failed:', e);
+        try { Sentry.captureException(e, { tags: { area: 'powersync' } }); } catch (err) {}
+      }
+    })();
+    return () => {
+      alive = false;
+      cleanups.forEach((stop) => { try { stop(); } catch (e) {} });
+      disconnectPowerSync();
+    };
+  }, [sessionUid]);
 
   useEffect(() => {
     (async () => {
