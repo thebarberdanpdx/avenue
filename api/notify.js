@@ -72,6 +72,9 @@ async function handler(req, res) {
     const target = b.alert.providerId ? provs.find((p) => p.id === b.alert.providerId) : null;
     const recip = [target || owner].filter(Boolean);
     if (!recip.length) return res.status(404).json({ error: "no owner/provider on file for this shop" });
+    const alertChannel = String(b.alert.channel || "both").toLowerCase();
+    const sendMail = alertChannel === "email" || alertChannel === "both";
+    const sendText = alertChannel === "text" || alertChannel === "both";
     // SMS: one clean line (no "New booking" prefix). GSM-sanitized centrally in sendSms.
     const smsText = `${subject} — ${message}`.replace(/\s+/g, " ").trim().slice(0, 300);
     const sent = [];
@@ -79,9 +82,9 @@ async function handler(req, res) {
       const pEmail = String(p.email || "").trim();
       const pPhone = String(p.phone || "").replace(/\D/g, "");
       const r = { id: p.id };
-      try { if (pEmail) { await sendEmail({ to: pEmail, subject, text: message }); r.email = "sent"; } else r.email = "no-email"; }
+      try { if (sendMail && pEmail) { await sendEmail({ to: pEmail, subject, text: message }); r.email = "sent"; } else r.email = sendMail ? "no-email" : "skipped"; }
       catch (e) { r.email = "error: " + e.message; }
-      try { if (SMS_LIVE && pPhone) { await sendSms({ to: pPhone, text: smsText }); r.sms = "sent"; } else r.sms = SMS_LIVE ? "no-phone" : "sms-off"; }
+      try { if (sendText && SMS_LIVE && pPhone) { await sendSms({ to: pPhone, text: smsText }); r.sms = "sent"; } else r.sms = sendText ? (SMS_LIVE ? "no-phone" : "sms-off") : "skipped"; }
       catch (e) { r.sms = "error: " + e.message; }
       sent.push(r);
     }
