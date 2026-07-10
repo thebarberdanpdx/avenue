@@ -136,6 +136,7 @@ const GUARDS = [
   { needle: "apptsRef.current", label: "server mirror merges against latest local appts (stale-closure guard)" },
   { needle: 'mode: "save"', label: "appointments/clients save via api/sync-pull service-role (iPad RLS write fix)" },
   { needle: "deletion-aware merge", label: "server mirror respects local deletes and server deletes (no resurrect)" },
+  { needle: "server-authoritative-sync", label: "idle calendar sync replaces from server — no client merge" },
   { needle: "syncGuardRef", label: "auto-refresh waits for unsaved work; server pulls always merge local" },
   { needle: "mergeApptRow", label: "completed checkout beats stale in-service on cross-device sync" },
   { needle: "card-on-file-verified-only", label: "a saved card-on-file (brand + last-4) shows ONLY to a verified/signed-in client — never to an unverified booker who typed a matching phone (card disclosure + enumeration hole)" },
