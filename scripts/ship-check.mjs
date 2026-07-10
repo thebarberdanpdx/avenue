@@ -146,6 +146,8 @@ const GUARDS = [
   { needle: 'tableHasUnsavedWork("appointments") || tableHasUnsavedWork("clients")', label: "mirror skips while calendar edits are pending" },
   { needle: "deleteAppt flushes immediately", label: "deleteAppt calls flushApptsNow (cross-device delete)" },
   { needle: "OFFLINE_NATIVE = false", label: "offline native SQLite flag stays OFF until Dan cutover on test device" },
+  { needle: "GUARD: offline-store-boundary", label: "offline native store boundary (sqlite seeds + failover hydrate)" },
+  { needle: "hydrateFromOfflineFailover", label: "offline failover reads sqlite before localStorage cache" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");

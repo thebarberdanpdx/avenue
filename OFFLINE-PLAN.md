@@ -1,6 +1,6 @@
 # Offline-first build plan — native on-device SQLite on the existing Supabase (Route A, revised)
 
-> **STATUS (2026-07-10): Stage 0 groundwork started — flag OFF, no production behavior change.** Dan said go on groundwork only. `OFFLINE_NATIVE = false` in `src/App.jsx`; native SQLite probe is inert until flipped on a test device. Do **NOT** begin Stage 1 (offline reading) until Dan explicitly says so.
+> **STATUS (2026-07-10): Stage 1 READING shipped behind `OFFLINE_NATIVE = false`.** Native SQLite store seeds on every successful sync; boots + fails over from on-device copy when flag is ON. Stage 2 (offline writes / outbox replay) NOT started. Dan must flip the flag + Xcode rebuild to test on iPhone/iPad before any cutover.
 >
 > **PowerSync was removed from production.** Its browser/WASM SQLite crashed the iPhone app inside Capacitor's WKWebView. The revised route below uses **native** on-device SQLite instead — see "Why native SQLite" — and keeps sync on the app's existing server-authoritative `api/sync-pull` contract. Do not retry the PowerSync/WASM path.
 
@@ -33,13 +33,14 @@ The app runs off a local database **on the device**. With no internet / no Supab
 - Dan flips the flag only on his own test device, per stage. Cutover = flip the default after the drill; an instant rollback flag stays for **at least two weeks**.
 
 ## Stages (each independently shippable, verified, and reversible)
-### Stage 0 — Groundwork (no behavior change) — DO NOT START UNTIL DAN SAYS GO
-- [ ] **Schema/RLS/RPC dump committed to git** (`db/schema.sql`) — needed to design the local store anyway; also closes audit item #3 (structure not in version control). Dan runs the dump or pastes creds into the Supabase CLI flow — instructions in `db/`.
-- [ ] **Prove native SQLite loads on the device.** Add `@capacitor-community/sqlite` behind the OFF flag and confirm it opens a DB inside the TestFlight iOS app **without the WKWebView crash that killed PowerSync**. This is the single most important de-risking step — it's the exact failure we're routing around.
-- [ ] **Privacy probe:** whatever the local seed pulls must respect the same walls RLS enforces today (providers SANITIZED to the public feed's fields — never email/phone/pin in a client-readable store; clients staff-only). Verify with an anon token that private data is unreachable.
-- Gate: production app untouched; flag OFF; native SQLite opens on a real iPhone/iPad with no crash; privacy probe passes.
+### Stage 0 — Groundwork — DONE (flag OFF)
+- [x] `@capacitor-community/sqlite` added behind `OFFLINE_NATIVE` flag
+- [x] `outbox` table created in local DB (schema only — Stage 2 wires replay)
+- [ ] **Schema/RLS/RPC dump committed to git** (`db/schema.sql`) — still pending
+- [ ] **Prove native SQLite on device** — needs Dan: flip flag, `npx cap sync`, Xcode rebuild, airplane-mode drill
+- [ ] **Privacy probe** — verify local seed never exposed outside staff app sandbox
 
-### Stage 1 — Offline READING (kills the blank-screen class of outage for good)
+### Stage 1 — Offline READING — SHIPPED (dark, flag OFF)
 - App boots from the local SQLite store and renders calendar/clients/menu instantly; network only freshens it. Replaces the snapshot-cache stopgap (`hydrateFromCache`) with a real always-current local DB — the cache stays as fallback until cutover, then retires.
 - Public booking page reads the menu from the local copy on repeat visits; first-ever visit during an outage gets the honest "can't load the menu right now — call us" screen (never the demo menu).
 - Gate (live drill): airplane-mode the device → force-quit → reopen: full real calendar + clients + menu render. Cut Supabase reachability mid-scroll: no blank, no demo data. Staff banner shows "offline — showing local data".
