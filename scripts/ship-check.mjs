@@ -145,6 +145,7 @@ const GUARDS = [
   { needle: "scheduleRtMirror", label: "realtime calendar pulls debounced when idle" },
   { needle: 'tableHasUnsavedWork("appointments") || tableHasUnsavedWork("clients")', label: "mirror skips while calendar edits are pending" },
   { needle: "deleteAppt flushes immediately", label: "deleteAppt calls flushApptsNow (cross-device delete)" },
+  { needle: "OFFLINE_NATIVE = false", label: "offline native SQLite flag stays OFF until Dan cutover on test device" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");

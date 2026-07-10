@@ -41,6 +41,31 @@ async function haptic(kind) {
   } catch (e) { /* best-effort — haptics never block a tap */ }
 }
 
+// ---- OFFLINE STAGE 0 (native SQLite probe) ---------------------------------
+// PLAN ONLY until Dan flips OFFLINE_NATIVE on a test device. Default OFF — zero production
+// behavior change. Proves @capacitor-community/sqlite opens outside WKWebView WASM (PowerSync
+// crashed there). Do NOT wire calendar reads/writes here until later stages.
+const OFFLINE_NATIVE = false;
+let _offlineSqliteProbed = false;
+async function offlineNativeSqliteProbe() {
+  if (!OFFLINE_NATIVE || !IS_NATIVE || _offlineSqliteProbed) return;
+  _offlineSqliteProbed = true;
+  try {
+    const { CapacitorSQLite, SQLiteConnection } = await import("@capacitor-community/sqlite");
+    const sqlite = new SQLiteConnection(CapacitorSQLite);
+    const db = await sqlite.createConnection("vero_offline_probe", false, "no-encryption", 1, false);
+    await db.open();
+    await db.execute("CREATE TABLE IF NOT EXISTS probe (id INTEGER PRIMARY KEY);");
+    const r = await db.query("SELECT 1 AS ok;");
+    await db.close();
+    await sqlite.closeConnection("vero_offline_probe", false);
+    console.info("[offline-stage0] native SQLite probe OK", r);
+  } catch (e) {
+    console.warn("[offline-stage0] native SQLite probe failed", e);
+    _offlineSqliteProbed = false;
+  }
+}
+
 // ---- ensureFreshSession ----------------------------------------------------
 // iOS freezes Supabase's token-refresh timer whenever the app is backgrounded,
 // so a staff login's access token can silently expire. Reopening the app then
@@ -2052,6 +2077,7 @@ function App() {
     window.addEventListener("storage", sync);
     return () => { window.removeEventListener("vero-user-changed", sync); window.removeEventListener("storage", sync); };
   }, []);
+  useEffect(() => { offlineNativeSqliteProbe(); }, []);
   const userThemePref = signedInUser && business?.userThemes && business.userThemes[signedInUser];
   const theme = (userThemePref && THEME_IDS.includes(userThemePref)) ? userThemePref
               : (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : DEFAULT_THEME;

@@ -11,6 +11,7 @@
     "ship-check": "node scripts/ship-check.mjs"
   },
   "dependencies": {
+    "@capacitor-community/sqlite": "^7.0.3",
     "@capacitor-community/stripe-terminal": "^8.1.1",
     "@capacitor/cli": "^8.4.0",
     "@capacitor/core": "^8.4.0",
