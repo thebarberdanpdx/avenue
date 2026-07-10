@@ -1970,6 +1970,16 @@ function App() {
   };
   // Send anyone into a fresh client booking flow (used by "Book here" on the login, and "book another").
   const goBooking = () => { setClientNonce((n) => n + 1); setView("client"); };
+  // Staff sign-out must clear BOTH the Supabase session AND the per-device "who's at the chair"
+  // identity — otherwise Heather's chair pick sticks on Dan's phone after she used it.
+  const staffSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      localStorage.removeItem("vero_signed_in_as");
+      localStorage.removeItem("vero_last_auth_email");
+    } catch (e) {}
+    setView("shop");
+  };
   // cross-device-sync: signed-in staff always start empty — server is the source of truth. Booting
   // from cache showed stale calendars on iPad and could skip the real pull.
   const [clients, setClients] = useState(() => (_hasStoredAuth() ? [] : CLIENTS));
@@ -3103,7 +3113,7 @@ function App() {
           <div style={{ marginBottom: 8 }}><strong>Sync problem on this device.</strong> {syncGapDetail}. Signed in as {session?.user?.email || "unknown"} · shop {SHOP_ID}.</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button onClick={() => mirrorFromServer()} style={{ background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600 }}>Sync now</button>
-            <button onClick={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} style={{ background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,0.45)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600 }}>Sign out</button>
+            <button onClick={staffSignOut} style={{ background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,0.45)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600 }}>Sign out</button>
           </div>
         </div>
       )}
@@ -3158,8 +3168,8 @@ function App() {
       {view === "reviewtoken" && <ReviewByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} onExit={goBooking} />}
       {view === "shop" && (session
         ? (masterMode
-          ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} />
-          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} syncHealth={syncHealth} />)
+          ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={staffSignOut} />
+          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} syncHealth={syncHealth} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
@@ -11956,14 +11966,18 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       setSignedInAs(realProviders[0]?.id || null);
     }
   }, [providers, signedInAs]);
-  // Identify the person from their LOGIN email: if a staff member's email matches the
-  // signed-in account, act as that person — so Dan logs in and the register knows it's Dan,
-  // no PIN or manual pick. Runs when the email or staff list loads. Only overrides when a
-  // confident match exists; otherwise the device's last identity stands.
+  // Identify the person from their LOGIN email. When the account changes, drop the remembered
+  // chair identity so Heather's pick can't stick on Dan's phone after a handoff.
   useEffect(() => {
     if (!authEmail) return;
     const norm = (e) => (e || "").trim().toLowerCase();
-    const match = realProviders.find((p) => norm(p.email) && norm(p.email) === norm(authEmail));
+    const cur = norm(authEmail);
+    try {
+      const prev = localStorage.getItem("vero_last_auth_email");
+      if (prev && prev !== cur) localStorage.removeItem("vero_signed_in_as");
+      localStorage.setItem("vero_last_auth_email", cur);
+    } catch (e) {}
+    const match = realProviders.find((p) => norm(p.email) && norm(p.email) === cur);
     if (match && match.id !== signedInAs) setSignedInAs(match.id);
   }, [authEmail, providers]);
   const me = providers.find((p) => p.id === signedInAs);
