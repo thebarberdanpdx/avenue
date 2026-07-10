@@ -5,8 +5,8 @@
 # site returns 200 even when the database is down, which is exactly the failure a
 # plain ping would miss (2026-07-08).
 #
-# On a NEW outage it alerts the owner with a clean "Vero is DOWN" email + text
-# through the app's own messaging system (the channel proven to reach Dan). It
+# On a NEW outage it emails the owner with a clean "Vero is DOWN" alert through
+# the app's own messaging system (/api/notify, email only — no text). It
 # alerts ONCE per outage (reads this workflow's own run history), so a long
 # outage doesn't text every 5 minutes. See scripts/uptime-watch.py for the logic.
 #
@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       test_alert:
-        description: "Type 'yes' to send yourself a TEST downtime alert (email + text). Nothing is wrong."
+        description: "Type 'yes' to send yourself a TEST downtime alert (email only). Nothing is wrong."
         required: false
         default: "no"
 
@@ -42,7 +42,7 @@ jobs:
       - name: Check out the watchdog script
         uses: actions/checkout@v4
 
-      - name: Check site + database, alert once on a new outage
+      - name: Check site + database + sign-in, email once on a new outage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TEST_ALERT: ${{ github.event.inputs.test_alert }}

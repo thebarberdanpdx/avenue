@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Vero uptime watchdog (run by .github/workflows/uptime-check.yml).
 
-Checks the website + database from OUTSIDE every 5 minutes. When something is
-unreachable it sends the OWNER a clean "Vero is DOWN" alert (email + text) via
-the app's own messaging system (/api/notify alert mode) — the channel proven to
-reach Dan. It alerts only ONCE per outage: it reads this workflow's own history
+Checks the website + database + sign-in from OUTSIDE every 5 minutes. When
+something is unreachable it emails the OWNER a clean "Vero is DOWN" alert via
+the app's own messaging system (/api/notify alert mode, email only). It alerts
+only ONCE per outage: it reads this workflow's own history
 and stays quiet if the previous run was already failing, so a multi-hour outage
 doesn't text every 5 minutes. A recovery run (success) naturally resets that, so
 the next outage alerts again.
@@ -22,6 +22,8 @@ SITE_URL = "https://gotvero.com"
 DB_URL = ("https://iufgznminbujcabqeesk.supabase.co/rest/v1/services"
           "?select=id&limit=1&shop_id=eq.sanctuary"
           "&apikey=sb_publishable_aGX3akW7VfHO6Lm-FsZmEA_sf95Nu2i")
+AUTH_URL = ("https://iufgznminbujcabqeesk.supabase.co/auth/v1/health"
+            "?apikey=sb_publishable_aGX3akW7VfHO6Lm-FsZmEA_sf95Nu2i")
 NOTIFY_URL = "https://gotvero.com/api/notify"
 SHOP = "sanctuary"
 OWNER_PROVIDER = "dan"   # Dan's staff record — resolves to his on-file email + phone
@@ -69,7 +71,7 @@ def prev_conclusion():
 
 def send_alert(subject, message):
     body = json.dumps({"shop": SHOP,
-                       "alert": {"shopId": SHOP, "providerId": OWNER_PROVIDER},
+                       "alert": {"shopId": SHOP, "providerId": OWNER_PROVIDER, "channel": "email"},
                        "subject": subject, "message": message}).encode()
     try:
         req = urllib.request.Request(NOTIFY_URL, data=body,
@@ -88,17 +90,18 @@ def main():
         print("TEST_ALERT: sending a test downtime alert to the owner…")
         ok = send_alert("Vero downtime alarm — TEST",
                         "This is a TEST of your downtime alarm. Nothing is wrong; if you got this "
-                        "(text and/or email), real outage alerts will reach you the same way.")
+                        "email, real outage alerts will reach you the same way.")
         sys.exit(0 if ok else 1)
 
     site_ok, site_code = probe(SITE_URL)
     db_ok, db_code = probe(DB_URL)
-    down = [name for name, ok in (("the website", site_ok), ("the database", db_ok)) if not ok]
+    auth_ok, auth_code = probe(AUTH_URL)
+    down = [name for name, ok in (("the website", site_ok), ("the database", db_ok), ("sign-in", auth_ok)) if not ok]
     current = "down" if down else "up"
     prev_c = prev_conclusion()
     prev = "down" if prev_c == "failure" else "up"
     print(f"site={'OK' if site_ok else site_code}  db={'OK' if db_ok else db_code}  "
-          f"current={current}  prev={prev} (last conclusion={prev_c})")
+          f"auth={'OK' if auth_ok else auth_code}  current={current}  prev={prev} (last conclusion={prev_c})")
 
     if current == "down":
         if prev != "down":
