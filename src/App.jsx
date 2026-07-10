@@ -2183,6 +2183,7 @@ function App() {
   // feed NEVER populates a signed-in owner's staff list (root cause of staff email/phone vanishing). DO NOT REMOVE.
   const hasStoredSession = () => { try { return Object.keys(localStorage).some((k) => /^sb-.*-auth-token$/.test(k)); } catch (e) { return false; } };
   const [saveFailed, setSaveFailed] = useState(false); // drives a banner if a save to the server errors out
+  const [lastSaveError, setLastSaveError] = useState(""); // actual save-error detail, surfaced in the banner for diagnosis
   // cross-device-sync: honest pull status so a device that failed to download never looks "empty by design".
   const [syncHealth, setSyncHealth] = useState({ serverClients: null, serverAppts: null, err: null, at: 0, pulling: false });
   // Only nag about a failed save if it STAYS failed for a few seconds — a transient blip that the
@@ -2347,6 +2348,7 @@ function App() {
     } catch (err) {
       console.error(`[vero] save '${table}' failed (data on server unchanged):`, err);
       setSaveFailed(true);
+      setLastSaveError(`${table}: ${String((err && err.message) || err)}`);
       try { Sentry.captureException(new Error(`save failed: ${table}`), { tags: { area: "save", table }, extra: { detail: String((err && err.message) || err) } }); } catch (e) {}
     } finally {
       // Drain the queue: if more changes arrived while we were saving, run once more with the latest.
@@ -2847,7 +2849,7 @@ function App() {
     let keptCalSync = snap.business?.calSync;
     try { const { data } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle(); if (data?.settings && 'calSync' in data.settings) keptCalSync = data.settings.calSync; } catch (e) {}
     const { error } = await supabase.from('shops').upsert({ id: SHOP_ID, name: snap.business?.name || SHOP_ID, settings: { ...snap.business, calSync: keptCalSync, _categories: snap.categories, _cutLibrary: snap.cutLibrary } });
-    if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); try { Sentry.captureException(new Error('settings save failed'), { tags: { area: "save", table: "shops" }, extra: { detail: String((error && error.message) || error) } }); } catch (e) {} } else setSaveFailed(false);
+    if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); setLastSaveError(`settings: ${String((error && error.message) || error)}`); try { Sentry.captureException(new Error('settings save failed'), { tags: { area: "save", table: "shops" }, extra: { detail: String((error && error.message) || error) } }); } catch (e) {} } else setSaveFailed(false);
   };
   useEffect(() => { if (!loadedRef.current || !session) return; shopsPendingRef.current = { business, categories, cutLibrary }; const t = setTimeout(fireShopsSave, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
   // Stamp lastSaveAt the moment a LOCAL edit happens (this runs only for local changes — a
@@ -3246,7 +3248,7 @@ function App() {
 
       {showSaveBanner && !saveBannerDismissed && session && (
         <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#C2563F", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
-          <span style={{ flex: 1, minWidth: 0 }}>Couldn't save your last change to the server. It's still safe on this device — check your connection.</span>
+          <span style={{ flex: 1, minWidth: 0 }}>Couldn't save your last change to the server. It's still safe on this device — check your connection.{lastSaveError ? ` — ${lastSaveError}` : ""}</span>
           <button onClick={resaveAll} style={{ flexShrink: 0, background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600, letterSpacing: 0.5 }}>Retry</button>
           <button onClick={() => setSaveBannerDismissed(true)} aria-label="Dismiss" style={{ flexShrink: 0, background: "none", border: "none", color: "#fff", padding: 4, display: "flex", cursor: "pointer" }}><X size={18} /></button>
         </div>
