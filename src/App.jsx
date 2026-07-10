@@ -143,6 +143,33 @@ async function offlineStoreReadTable(shopId, table) {
   }
 }
 
+async function offlineStoreWriteMeta(shopId, key, value) {
+  if (!offlineStoreActive()) return;
+  if (!(await offlineStoreOpenConn()) || !_offlineDb) return;
+  try {
+    await _offlineDb.run(
+      "INSERT OR REPLACE INTO sync_meta (shop_id, meta_key, meta_value) VALUES (?,?,?)",
+      [String(shopId || ""), String(key || ""), JSON.stringify(value)]
+    );
+  } catch (e) { console.warn("[offline] meta write failed", key, e); }
+}
+
+async function offlineStoreReadMeta(shopId, key) {
+  if (!offlineStoreActive()) return null;
+  if (!(await offlineStoreOpenConn()) || !_offlineDb) return null;
+  try {
+    const r = await _offlineDb.query(
+      "SELECT meta_value FROM sync_meta WHERE shop_id = ? AND meta_key = ? LIMIT 1",
+      [String(shopId || ""), String(key || "")]
+    );
+    const raw = r && r.values && r.values[0] && r.values[0][0];
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    console.warn("[offline] meta read failed", key, e);
+    return null;
+  }
+}
+
 async function offlineStoreBootPaint(shopId, paint) {
   if (!offlineStoreActive()) return false;
   if (!(await offlineStoreOpenConn())) return false;
@@ -2494,6 +2521,29 @@ function App() {
     try { if (slim) localStorage.setItem(CACHE_PREFIX + table, JSON.stringify(slim)); } catch (e) { /* quota */ }
     if (slim && offlineStoreActive()) offlineStoreWriteTable(SHOP_ID, table, slim).catch(() => {});
   };
+  const writeShopSettingsCache = (biz, cats, cuts) => {
+    const payload = { business: biz, categories: cats || [], cutLibrary: cuts || [] };
+    try { localStorage.setItem(CACHE_PREFIX + "shop_settings", JSON.stringify(payload)); } catch (e) { /* quota */ }
+    if (offlineStoreActive()) offlineStoreWriteMeta(SHOP_ID, "shop_settings", payload).catch(() => {});
+  };
+  const readShopSettingsCache = () => {
+    try {
+      const raw = localStorage.getItem(CACHE_PREFIX + "shop_settings");
+      const v = raw ? JSON.parse(raw) : null;
+      return v && v.business ? v : null;
+    } catch (e) { return null; }
+  };
+  const hydrateShopSettingsCache = async () => {
+    let payload = readShopSettingsCache();
+    if ((!payload || !payload.business) && offlineStoreActive()) {
+      try { payload = await offlineStoreReadMeta(SHOP_ID, "shop_settings"); } catch (e) {}
+    }
+    if (!payload || !payload.business) return false;
+    setBusiness(payload.business);
+    if (Array.isArray(payload.categories) && payload.categories.length) setCategories(payload.categories);
+    if (Array.isArray(payload.cutLibrary)) setCutLibrary(payload.cutLibrary);
+    return true;
+  };
   const readCache = (table) => { try { const raw = localStorage.getItem(CACHE_PREFIX + table); const v = raw ? JSON.parse(raw) : null; return Array.isArray(v) ? v : null; } catch (e) { return null; } };
   const hydrateFromCache = (table, current, setter) => {
     if ((current || []).length) return false;
@@ -2696,6 +2746,7 @@ function App() {
     staffApptsLoadedRef.current = true;
     writeCache("clients", serverCl);
     writeCache("appointments", serverAp);
+    writeShopSettingsCache(business, categories, cutLibrary);
     setUsingCache(false);
     setSaveFailed(false);
     setSyncHealth({
@@ -2797,6 +2848,7 @@ function App() {
         }
         if (Array.isArray(_categories) && _categories.length) setCategories(_categories);
         if (Array.isArray(_cutLibrary)) savedCutLibrary = _cutLibrary;
+        writeShopSettingsCache(biz, _categories, _cutLibrary);
       }
 
       // Load a list table → array of stored item objects. Returns null ONLY on a real DB error (so we can skip and refuse saves).
@@ -2879,6 +2931,7 @@ function App() {
         if ((!c || !c.length) && offlineStoreActive()) { try { c = await offlineStoreReadTable(SHOP_ID, 'services'); } catch (e) {} }
         if (c && c.length) { lastRemoteRef.current.services = c; setServices(c); setServicesTrusted(true); }
       } // [outage-honest-menu] last-synced real menu from offline store or localStorage cache
+      if (!allLoaded) await hydrateShopSettingsCache();
 
       } catch (e) {
         // A load threw (hard network failure / abort). Treat as an incomplete load: never unblock saves.
@@ -2918,6 +2971,7 @@ function App() {
     let alive = true;
     (async () => {
       if (offlineStoreActive() && alive) {
+        await hydrateShopSettingsCache();
         await offlineStoreBootPaint(SHOP_ID, (tbl, rows) => {
           if (tbl === "appointments" && !(apptsRef.current || []).length) {
             lastRemoteRef.current.appointments = rows;
@@ -2945,7 +2999,12 @@ function App() {
           return false;
         });
       }
-      if (alive) await mirrorFromServer();
+      const mirrorOk = alive ? await mirrorFromServer() : false;
+      if (alive && !mirrorOk && session && ((apptsRef.current || []).length || (clientsRef.current || []).length)) {
+        setUsingCache(true);
+        loadedRef.current = false;
+        setLoadIncomplete(false);
+      }
     })();
     return () => { alive = false; };
   }, [sessionUid]);
@@ -2971,7 +3030,11 @@ function App() {
         // We now hold (or are mid-edit on) the FULL provider rows for this session — protect them
         // from the sanitized public feed even if an in-flight edit makes us skip applying below.
         providersFullRef.current = true;
-        if (!provBusy()) { const list = sortProviders(pr.data.map((r) => r.data)); lastRemoteRef.current.providers = list; if (list.length) setProviders(list); }
+        if (!provBusy()) {
+          const list = sortProviders(pr.data.map((r) => r.data));
+          lastRemoteRef.current.providers = list;
+          if (list.length) { setProviders(list); writeCache("providers", list); }
+        }
       }
       const wl = await supabase.from('waitlist').select('data').eq('shop_id', SHOP_ID);
       if (alive && !wl.error && Array.isArray(wl.data) && !tableBusy('waitlist')) { const list = wl.data.map((r) => r.data); lastRemoteRef.current.waitlist = list; setWaitlist(list); }

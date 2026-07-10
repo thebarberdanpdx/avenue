@@ -148,6 +148,7 @@ const GUARDS = [
   { needle: "OFFLINE_NATIVE = true", label: "offline native SQLite reading enabled on the iOS/Android app" },
   { needle: "GUARD: offline-store-boundary", label: "offline native store boundary (sqlite seeds + failover hydrate)" },
   { needle: "OFFLINE-NATIVE-BUNDLE", label: "native app bundles dist locally for offline (not remote gotvero.com webview)" },
+  { needle: "writeShopSettingsCache", label: "offline shop settings (hours/calendar) cached for native offline view" },
   { needle: "hydrateFromOfflineFailover", label: "offline failover reads sqlite before localStorage cache" },
 ];
 try {
