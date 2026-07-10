@@ -2317,6 +2317,17 @@ function App() {
       lastRemoteRef.current[table] = list;
       lastSaveAt.current[table] = Date.now();
       setSaveFailed(false);
+      // If a mirror raced and resurrected a deleted row, snap UI back to what we just saved.
+      if (table === "appointments") {
+        const savedIds = new Set(list.map((it) => String(it && it.id)));
+        const cur = apptsRef.current || [];
+        if (cur.length !== list.length || cur.some((a) => a && !savedIds.has(String(a.id)))) setAppts(list);
+      }
+      if (table === "clients") {
+        const savedIds = new Set(list.map((it) => String(it && it.id)));
+        const cur = clientsRef.current || [];
+        if (cur.length !== list.length || cur.some((c) => c && !savedIds.has(String(c.id)))) setClients(list);
+      }
     } catch (err) {
       console.error(`[vero] save '${table}' failed (data on server unchanged):`, err);
       setSaveFailed(true);
@@ -2395,16 +2406,47 @@ function App() {
     if (JSON.stringify(local) !== JSON.stringify(server)) return local;
     return server;
   };
-  const mergeAppointments = (serverList, localList) => {
-    const byId = new Map((serverList || []).map((a) => [String(a && a.id), a]));
-    for (const la of (localList || [])) {
-      if (!la || la.id == null) continue;
-      byId.set(String(la.id), mergeApptRow(byId.get(String(la.id)), la));
+  const mergeAppointments = (serverList, localList, prevBaseline = []) => {
+    const prevIds = new Set((prevBaseline || []).map((a) => String(a && a.id)));
+    const localById = new Map((localList || []).filter((a) => a && a.id != null).map((a) => [String(a.id), a]));
+    const serverById = new Map((serverList || []).filter((a) => a && a.id != null).map((a) => [String(a.id), a]));
+    const out = new Map();
+    // cross-device-sync: deletion-aware merge — local omissions must beat a stale server row, and a
+    // server omission must drop a stale local copy (iPad delete resurrecting / iPhone undelete bug).
+    for (const [id, la] of localById) {
+      const sa = serverById.get(id);
+      if (prevIds.has(id) && !sa) continue; // another device deleted — drop stale local
+      out.set(id, mergeApptRow(sa, la));
     }
-    return Array.from(byId.values());
+    for (const [id, sa] of serverById) {
+      if (localById.has(id)) continue;
+      if (prevIds.has(id)) continue; // local delete in flight — never resurrect from server
+      out.set(id, sa); // brand-new row from another device
+    }
+    return Array.from(out.values());
   };
-  const mergeLocalOverServer = (serverList, localList, table) => {
-    if (table === "appointments") return mergeAppointments(serverList, localList);
+  const mergeClientsList = (serverList, localList, prevBaseline = []) => {
+    const prevIds = new Set((prevBaseline || []).map((a) => String(a && a.id)));
+    const localById = new Map((localList || []).filter((a) => a && a.id != null).map((a) => [String(a.id), a]));
+    const serverById = new Map((serverList || []).filter((a) => a && a.id != null).map((a) => [String(a.id), a]));
+    const out = new Map();
+    for (const [id, la] of localById) {
+      const sa = serverById.get(id);
+      if (prevIds.has(id) && !sa) continue;
+      const sr = serverById.get(id);
+      out.set(id, (!sr || JSON.stringify(la) !== JSON.stringify(sr)) ? la : sr);
+    }
+    for (const [id, sa] of serverById) {
+      if (localById.has(id)) continue;
+      if (prevIds.has(id)) continue;
+      out.set(id, sa);
+    }
+    return Array.from(out.values());
+  };
+  const mergeLocalOverServer = (serverList, localList, table, prevBaseline) => {
+    const base = prevBaseline !== undefined ? prevBaseline : (lastRemoteRef.current[table] || []);
+    if (table === "appointments") return mergeAppointments(serverList, localList, base);
+    if (table === "clients") return mergeClientsList(serverList, localList, base);
     const byId = new Map((serverList || []).map((a) => [String(a && a.id), a]));
     for (const la of (localList || [])) {
       if (!la || la.id == null) continue;
@@ -2448,7 +2490,8 @@ function App() {
       // cross-device-sync: ALWAYS merge server rows with local — foreground pulls and realtime used
       // to replace the whole table and revert edits that hadn't finished saving (the iPhone reset bug).
       const local = localTableState(table);
-      list = mergeLocalOverServer(list, local, table);
+      const prevBase = lastRemoteRef.current[table] || [];
+      list = mergeLocalOverServer(list, local, table, prevBase);
       if (table === 'services') list.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
       if (table === 'providers') list = sortProviders(list);
       lastRemoteRef.current[table] = data ? data.map((r) => r.data) : [];
@@ -2478,8 +2521,10 @@ function App() {
     // cross-device-sync: ALWAYS merge — never blind-replace with server rows. The old "only merge when
     // dirty" path let the 30s heartbeat / foreground pull revert check-ins and edits that had already
     // landed locally but looked "clean" because lastRemoteRef matched appts (the iPhone reset bug).
-    const finalAp = mergeLocalOverServer(serverAp, apptsRef.current, "appointments");
-    const finalCl = mergeLocalOverServer(serverCl, clientsRef.current, "clients");
+    const prevAp = lastRemoteRef.current.appointments || [];
+    const prevCl = lastRemoteRef.current.clients || [];
+    const finalAp = mergeLocalOverServer(serverAp, apptsRef.current, "appointments", prevAp);
+    const finalCl = mergeLocalOverServer(serverCl, clientsRef.current, "clients", prevCl);
     // Baseline stays the raw server copy so the save effect still pushes local edits up.
     lastRemoteRef.current.clients = serverCl;
     lastRemoteRef.current.appointments = serverAp;
@@ -2504,10 +2549,11 @@ function App() {
   };
   const mirrorFromServer = async () => {
     if (!session) return false;
-    // Never interleave a server mirror with an active write — wait for the next heartbeat.
+    // Never interleave a server mirror with an active write or a pending add/delete.
     const apSv = savingRef.current.appointments;
     const clSv = savingRef.current.clients;
     if ((apSv && apSv.running) || (clSv && clSv.running)) return false;
+    if (tableHasUnsavedWork("appointments") || tableHasUnsavedWork("clients")) return false;
     if (mirrorInFlightRef.current) return mirrorInFlightRef.current;
     const run = (async () => {
       setSyncHealth((h) => ({ ...h, pulling: true }));
@@ -2808,7 +2854,11 @@ function App() {
     if (lastSaveAt.current[table] && Date.now() - lastSaveAt.current[table] < SYNC_GUARD_MS) return true;
     const local = localTableState(table);
     const base = lastRemoteRef.current[table] || [];
-    if (Array.isArray(local) && JSON.stringify(mergeLocalOverServer(base, local, table)) !== JSON.stringify(base)) return true;
+    const localIds = new Set((local || []).map((r) => String(r && r.id)));
+    const baseIds = new Set((base || []).map((r) => String(r && r.id)));
+    if ([...baseIds].some((id) => !localIds.has(id))) return true; // pending delete
+    if ([...localIds].some((id) => !baseIds.has(id))) return true; // pending add
+    if (Array.isArray(local) && JSON.stringify(mergeLocalOverServer(base, local, table, base)) !== JSON.stringify(base)) return true;
     return false;
   };
   const hasUnsavedWork = () => {
