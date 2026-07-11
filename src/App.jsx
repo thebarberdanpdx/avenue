@@ -2931,6 +2931,24 @@ function App() {
     lastSaveAt.current.services = Date.now();
     firePending('services');
   };
+  // MONEY-DURABILITY: a completed sale is written into Vero's own ledger — client.payments[] for a
+  // known client, business.sales[] for a walk-in. That ledger (not Stripe) is what the revenue /
+  // payments reports read. On the 800ms debounce alone, a checkout followed by an iOS swipe-away (or a
+  // crash) inside that window silently drops the sale from every report even though Stripe charged the
+  // card and the appt shows paid. These flush the sale to the server the instant it's recorded.
+  const flushClientsNow = (snap) => {
+    if (!loadedRef.current || !session || !staffClientsLoadedRef.current) return;
+    const list = snap || clients;
+    pendingSaveRef.current.clients = list;
+    lastSaveAt.current.clients = Date.now();
+    firePending('clients');
+  };
+  const flushShopsNow = (bizSnap) => {
+    if (!loadedRef.current || !session) return;
+    // Snapshot with the passed-in business (post-sale) so we don't race React's async state.
+    shopsPendingRef.current = { business: bizSnap || business, categories, cutLibrary };
+    fireShopsSave();
+  };
   // cross-device-sync: detect pending local edits (add/delete/change vs server baseline).
   const tableHasUnsavedWork = (table) => {
     const sv = savingRef.current[table];
@@ -3351,7 +3369,7 @@ function App() {
       {view === "shop" && (session
         ? (masterMode
           ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={staffSignOut} />
-          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} flushServicesNow={flushServicesNow} syncHealth={syncHealth} />)
+          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} flushServicesNow={flushServicesNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} syncHealth={syncHealth} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
@@ -4653,6 +4671,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [waProvId, setWaProvId] = useState(null); // Who & When merged screen: selected barber tab ("anyone" = First free)
   const [wwPhase, setWwPhase] = useState("provider"); // merged who&when: "provider" (pick barber) → "when" (date/time)
   const [booking, setBooking] = useState(false);   // true while the confirmed booking is being saved to the server
+  // Synchronous double-submit guard. `booking` state disables the button once the server write starts,
+  // but there's an async window BEFORE that (client-lookup awaits) where a fast double-tap could re-enter
+  // and fire two commits (two appts for a staff booking, a duplicate write for a client one). This ref
+  // closes that window; it's reset in doCommitBooking's finally so every exit path re-enables it.
+  const commitInFlightRef = useRef(false);
   const [pendingFinish, setPendingFinish] = useState(false); // set when card is saved → effect commits the booking once
   const [bookErr, setBookErr] = useState(false);   // true if that save failed — client is told to retry, nothing was held
   const [reschedTooLate, setReschedTooLate] = useState(false); // a home reschedule/change-service was CONFIRMED after the change window closed mid-flow — blocked; the original appointment stays
@@ -5245,6 +5268,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   };
 
   const doCommitBooking = async (finalPhone, finalEmail) => {
+    // Double-submit guard (see commitInFlightRef): bail if a commit is already running. Reset in the
+    // finally below so a validation bail, a staff success, or the async server write all re-enable it.
+    if (commitInFlightRef.current) return;
+    commitInFlightRef.current = true;
+    try {
     // Re-check the slot is still free before writing — guards against a double-booking if the
     // chair got taken between showing times and tapping confirm.
     {
@@ -5492,6 +5520,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             .catch((e) => console.error("[vero] card-on-file save threw:", e));
         }
       }).catch(() => { setBooking(false); setBookErr(true); });
+    } finally {
+      // Reset the sync guard. The async book_public path is guarded from here on by `booking` state
+      // (the button is disabled once setBooking(true) ran), so releasing the ref now is safe.
+      commitInFlightRef.current = false;
+    }
   };
 
   // Returning client with a card already on file → prefill so they don't re-enter it.
@@ -12021,7 +12054,7 @@ function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
   );
 }
 
-function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables, flushApptsNow, flushServicesNow, syncHealth }) {
+function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables, flushApptsNow, flushServicesNow, flushClientsNow, flushShopsNow, syncHealth }) {
   // Remember where the owner/staff was so leaving the app and coming back (iOS reloads the webview
   // on resume) restores the SAME screen instead of dumping them on the Pulse home. Persisted as
   // { tab, pulseDetail, activeClientId } in localStorage; mirrors the vero_signed_in_as pattern.
@@ -12393,9 +12426,9 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={navBack} onOpenNudge={() => goTab("clients")} onOpenClient={(c) => navTo({ pulseDetail: null, activeClient: c, tab: "clients" })} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={navBack} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={navBack} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} flushApptsNow={flushApptsNow} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
-        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} onOpenAppt={(a) => { setPulseOpenApptId(a.id); navTo({ tab: "calendar", activeClient: null }); }} flushApptsNow={flushApptsNow} />}
+        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} onOpenAppt={(a) => { setPulseOpenApptId(a.id); navTo({ tab: "calendar", activeClient: null }); }} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} />}
         {tab === "messages" && <MessagesView key={`messages-${tabNonce}`} clients={clients} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} appts={appts} setAppts={setAppts} clients={clients} business={business} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} flushServicesNow={flushServicesNow} />}
@@ -21674,7 +21707,7 @@ function ColumnOrderEditor({ providers, setProviders }) {
     </div>
   );
 }
-function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId, deepLinkApptId, onDeepLinkHandled, rebookSeed, onRebookHandled, flushApptsNow }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId, deepLinkApptId, onDeepLinkHandled, rebookSeed, onRebookHandled, flushApptsNow, flushClientsNow, flushShopsNow }) {
   const sizeId = business?.calendarRowSize || "L";
   // Visible calendar window — configurable in Calendar Settings; falls back to 7 AM–10 PM.
   const DAY_START = ((business?.calendar?.dayStartHr ?? 7)) * 60;
@@ -22592,7 +22625,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           }}
         />
       </Sheet>
-      <RegisterView open={registerOpen} onClose={() => setRegisterOpen(false)} services={services} business={business} setBusiness={setBusiness} clients={clients} setClients={setClients} providers={providers} me={me} showToast={showToast} shopId={shopId} />
+      <RegisterView open={registerOpen} onClose={() => setRegisterOpen(false)} services={services} business={business} setBusiness={setBusiness} clients={clients} setClients={setClients} providers={providers} me={me} showToast={showToast} shopId={shopId} flushShopsNow={flushShopsNow} />
       {/* Calendar header — date headline + a clean action row. VISUAL ONLY; all handlers unchanged. */}
       <div style={{ marginTop: 10, marginBottom: 20 }}>
         <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, margin: "8px 0 14px", textAlign: "left", color: "inherit", cursor: "pointer", display: "block", width: "auto" }}>
@@ -23121,6 +23154,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onClose={() => setCheckout(null)}
           onDone={finishCheckout}
           onCommit={commitCheckout}
+          flushClientsNow={flushClientsNow}
+          flushShopsNow={flushShopsNow}
           rebookOnReopen
         />
       )}
@@ -23197,7 +23232,7 @@ function CardChargeInline({ amount, appt, onCancel, onPaid, money }) {
   );
 }
 
-function Checkout({ appt, service, provider, business, setBusiness, clients, appts, setClients, allServices = [], reopen = false, alreadyPaid = 0, showToast, onClose, onDone, onCommit, rebookOnReopen = false }) {
+function Checkout({ appt, service, provider, business, setBusiness, clients, appts, setClients, allServices = [], reopen = false, alreadyPaid = 0, showToast, onClose, onDone, onCommit, rebookOnReopen = false, flushClientsNow, flushShopsNow }) {
   // ---- auto-timing: measure actual service time, round UP to next 5 ----
   const measuredMin = appt.serviceStartedAt ? Math.round((Date.now() - appt.serviceStartedAt) / 60000) : null;
   const roundUp5 = (m) => Math.max(5, Math.ceil(m / 5) * 5);
@@ -23300,18 +23335,30 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const money = (n) => `$${n.toFixed(2)}`;
 
   // Write the sale into the ledger PaymentsView reads (client.payments, or business.sales for walk-ins).
+  // This ledger — NOT Stripe — is what every revenue/payments report reads, so it must survive an iOS
+  // swipe-away or crash the instant checkout finishes. Each branch flushes to the server immediately
+  // (flushClientsNow / flushShopsNow) rather than trusting the 800ms debounce, which drops the sale if
+  // the app is suspended inside that window (the card was charged, the appt shows paid — but the report
+  // would silently under-count). See flushClientsNow's note in App.
   const recordSale = (rec) => {
     setPaidRec(rec);
-    if (liveClient) setClients(clients.map((c) => c.id === liveClient.id ? { ...c, payments: [...(c.payments || []), rec] } : c));
-    else if (setBusiness) setBusiness((b) => ({ ...b, sales: [...((b && b.sales) || []), { ...rec, clientName: appt.name || "Walk-in" }] }));
-    // Count down inventory for tracked product lines. First sale only — a reopened ticket
-    // re-charges the balance and must never decrement stock again.
-    if (!reopen && setBusiness) {
-      const sold = {};
-      lines.forEach((l) => { if (l.productId) sold[l.productId] = (sold[l.productId] || 0) + 1; });
-      if (Object.keys(sold).length) {
-        setBusiness((b) => ({ ...b, products: (b.products || []).map((p) => (sold[p.id] && p.trackStock) ? { ...p, onHand: Math.max(0, (p.onHand || 0) - sold[p.id]) } : p) }));
-      }
+    if (liveClient) {
+      const nextClients = clients.map((c) => c.id === liveClient.id ? { ...c, payments: [...(c.payments || []), rec] } : c);
+      setClients(nextClients);
+      if (flushClientsNow) flushClientsNow(nextClients);
+    }
+    // Inventory count-down (tracked products) and the walk-in sale record both live on `business`.
+    // First sale only — a reopened ticket re-charges the balance and must never decrement stock again.
+    const sold = {};
+    if (!reopen) lines.forEach((l) => { if (l.productId) sold[l.productId] = (sold[l.productId] || 0) + 1; });
+    const touchesStock = Object.keys(sold).length > 0;
+    const isWalkinSale = !liveClient;
+    if (setBusiness && (isWalkinSale || touchesStock)) {
+      const nb = { ...(business || {}) };
+      if (isWalkinSale) nb.sales = [...((business && business.sales) || []), { ...rec, clientName: appt.name || "Walk-in" }];
+      if (touchesStock) nb.products = ((business && business.products) || []).map((p) => (sold[p.id] && p.trackStock) ? { ...p, onHand: Math.max(0, (p.onHand || 0) - sold[p.id]) } : p);
+      setBusiness(nb);
+      if (flushShopsNow) flushShopsNow(nb);
     }
   };
   const makeRec = (methodId, payRes, charged) => ({
@@ -24214,7 +24261,7 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
 
 // The register — ring up a walk-in sale (no client needed). Records into the
 // Payments ledger via business.sales.
-function RegisterView({ open, onClose, services, business, setBusiness, clients, setClients, providers, me, showToast, shopId }) {
+function RegisterView({ open, onClose, services, business, setBusiness, clients, setClients, providers, me, showToast, shopId, flushShopsNow }) {
   const [items, setItems] = useState([]);
   const [discount, setDiscount] = useState("");
   const [customOpen, setCustomOpen] = useState(false);
@@ -24287,7 +24334,11 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
       note: items.map((x) => (x.qty > 1 ? `${x.qty}× ` : "") + x.name).join(", "),
       ...extra,
     };
-    setBusiness((b) => ({ ...b, sales: [...(b.sales || []), sale] }));
+    // Register sales live in business.sales — the same reports ledger. Flush immediately (see
+    // flushShopsNow) so a swipe-away/crash right after ringing up can't drop the sale from reports.
+    const nb = { ...(business || {}), sales: [...((business && business.sales) || []), sale] };
+    setBusiness(nb);
+    if (flushShopsNow) flushShopsNow(nb);
   };
 
   const completeCash = () => {
@@ -26821,7 +26872,7 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
   );
 }
 
-function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, setAppts, business, setBusiness, me, shopId, onBack, showToast, onRebook, onOpenAppt, flushApptsNow }) {
+function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, setAppts, business, setBusiness, me, shopId, onBack, showToast, onRebook, onOpenAppt, flushApptsNow, flushClientsNow, flushShopsNow }) {
   const live = clients.find((c) => c.id === client.id) || client;
   const provider = providers.find((p) => p.id === live.provider) || providers[1] || providers[0] || {};
   const firstName = (live.name || "").split(" ")[0] || "this client";
@@ -27449,6 +27500,8 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           onClose={() => setCheckout(null)}
           onDone={finishCheckoutLite}
           onCommit={commitCheckoutLite}
+          flushClientsNow={flushClientsNow}
+          flushShopsNow={flushShopsNow}
         />
       )}
     </div>
