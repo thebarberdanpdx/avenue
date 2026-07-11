@@ -3279,7 +3279,7 @@ function App() {
 
       {showSaveBanner && !saveBannerDismissed && session && (
         <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#C2563F", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
-          <span style={{ flex: 1, minWidth: 0 }}>Couldn't save your last change to the server. It's still safe on this device — check your connection.{lastSaveError ? ` — ${lastSaveError}` : ""}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>Couldn't save your last change to the server — it's safe on this device. Check your connection and tap Retry.</span>
           <button onClick={resaveAll} style={{ flexShrink: 0, background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600, letterSpacing: 0.5 }}>Retry</button>
           <button onClick={() => setSaveBannerDismissed(true)} aria-label="Dismiss" style={{ flexShrink: 0, background: "none", border: "none", color: "#fff", padding: 4, display: "flex", cursor: "pointer" }}><X size={18} /></button>
         </div>
