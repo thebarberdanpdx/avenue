@@ -7446,7 +7446,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               if (!newMemberName.trim()) return;
               if (memberPhoneOk && !newMemberConsent) return; // hard stop: a phone can't be saved without the opt-in box checked
               const member = { id: "fm" + Date.now(), name: newMemberName.trim(), note: newMemberNote.trim(), phone: memberPhoneOk ? newMemberPhone.trim() : "", smsConsent: memberPhoneOk ? true : undefined, smsConsentAt: memberPhoneOk ? new Date().toISOString() : undefined, customDurations: {}, gallery: [], timeline: [] };
-              supabase.rpc("append_family_member", { p_shop: SHOP_ID, p_client_id: matched.id, p_member: member }).then(({ error }) => { if (error) console.error('[vero] append_family_member failed:', error); }).catch(() => {});
+              supabase.rpc("append_family_member", { p_shop: shopId, p_client_id: matched.id, p_member: member }).then(({ error }) => { if (error) console.error('[vero] append_family_member failed:', error); }).catch(() => {});
               setMatched({ ...matched, family: [...(matched.family || []), member] });
               setGroupPeople((cur) => [...cur, { id: member.id, name: member.name, note: member.note, isMember: true }]);
               setAddingMember(false); // back to the multi-select, now with this person added & selected
@@ -8899,7 +8899,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
                   {a.rebookDiscount > 0 && (
                     <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 10, padding: "11px 13px", marginBottom: 14 }}>
                       <AlertCircle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
-                      <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text2)" }}>Heads up — the {money(a.rebookDiscount)} rebooking discount applies to this time. Moving it means that comes off.</div>
+                      <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text2)" }}>Heads up — the {"$" + a.rebookDiscount} rebooking discount applies to this time. Moving it means that comes off.</div>
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 10 }}>
@@ -10621,7 +10621,7 @@ function AppointmentsView({ appts, providers, services, onBack }) {
           <RptStat label="Cancel rate" value={`${cancelRate}%`} sub={`${cancelled} cancels`} />
         </div>
         {lost > 0 && (
-          <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>Roughly <b style={{ color: "var(--text)" }}>{fmtMoney(lost)}</b> in lost bookings from no-shows &amp; cancels <span style={{ color: "var(--faint)" }}>(est.)</span>. A card on file cuts this.</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>Roughly <b style={{ color: "var(--text)" }}>{"$" + Math.round(lost).toLocaleString()}</b> in lost bookings from no-shows &amp; cancels <span style={{ color: "var(--faint)" }}>(est.)</span>. A card on file cuts this.</div>
         )}
       </RptSection>
 
@@ -20519,7 +20519,7 @@ function NativeDiagnostics() {
         got = true;
         try {
           await ensureFreshSession();
-          const { error } = await supabase.rpc("save_device_token", { p_token: token.value, p_shop: SHOP_ID, p_platform: "ios" });
+          const { error } = await supabase.rpc("save_device_token", { p_token: token.value, p_shop: _shopIdFromUrl(), p_platform: "ios" });
           setStatus(error ? ("Phone alerts: save error — " + (error.message || "unknown")) : "Phone alerts: ON \u2705 (token saved)");
         } catch (e) { setStatus("Phone alerts: save threw — " + (e && e.message ? e.message : String(e))); }
         await run(); setPushBusy(false);

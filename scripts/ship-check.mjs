@@ -185,6 +185,38 @@ try {
   record(false, "Calendar sync contract (structural)", "check error: " + e.message);
 }
 
+// 7) No out-of-scope variable references (eslint no-undef). This is the EXACT class of bug
+//    that crashed the Settings tab on 2026-07-11 — a variable used where it isn't in scope
+//    (a prop not passed down). `npm run build` does NOT catch it: it only throws when that
+//    component actually renders. eslint does catch it, so gate the deploy on it. The config
+//    (eslint.config.js) whitelists real globals (Node in api/lib, __BUILD_VERSION__), so any
+//    no-undef here is a genuine render-crash risk, not noise.
+try {
+  // Use --format json (stable, in-core). eslint exits non-zero when ANY rule errors, so the
+  // results come back on stdout even then — we catch and read stdout. JSON.parse throwing means
+  // eslint truly failed to run (config/parse error), which we treat as a FAILED check, never a
+  // false "clean". We count ONLY no-undef (the render-crash class) — other rules don't gate.
+  let raw = "";
+  try {
+    raw = execSync("npx eslint src api lib --format json", { cwd: ROOT, stdio: "pipe", maxBuffer: 64 * 1024 * 1024 }).toString();
+  } catch (e) {
+    raw = e.stdout?.toString() || "";
+  }
+  const parsed = JSON.parse(raw); // throws → caught below → check FAILS (safe)
+  const hits = [];
+  for (const file of parsed) {
+    for (const m of file.messages || []) {
+      if (m.ruleId === "no-undef") hits.push(`${file.filePath.replace(ROOT + "/", "")}:${m.line} — ${m.message}`);
+    }
+  }
+  record(hits.length === 0, "No out-of-scope variables (no-undef)",
+    hits.length
+      ? `${hits.length} undefined-variable reference(s) — would crash at render:\n` + hits.slice(0, 6).join("\n")
+      : "eslint no-undef clean across src/ api/ lib/");
+} catch (e) {
+  record(false, "No out-of-scope variables (no-undef)", "lint gate could not run eslint: " + String(e.message || e).slice(0, 160));
+}
+
 // Report.
 console.log("\n  Pre-flight check\n  " + "─".repeat(40));
 for (const r of results) {
