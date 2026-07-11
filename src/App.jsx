@@ -2915,6 +2915,16 @@ function App() {
     lastSaveAt.current.appointments = Date.now();
     firePending('appointments');
   };
+  // Same immediate-save for a menu REORDER: don't wait on the 800ms debounce (which a quick
+  // navigate-away or a re-render can drop) — persist the new order to the server right now, so
+  // it survives a reopen instead of the reload pulling the server's old order back.
+  const flushServicesNow = (snap) => {
+    if (!loadedRef.current || !session) return;
+    const list = snap || services;
+    pendingSaveRef.current.services = list;
+    lastSaveAt.current.services = Date.now();
+    firePending('services');
+  };
   // cross-device-sync: detect pending local edits (add/delete/change vs server baseline).
   const tableHasUnsavedWork = (table) => {
     const sv = savingRef.current[table];
@@ -3335,7 +3345,7 @@ function App() {
       {view === "shop" && (session
         ? (masterMode
           ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={staffSignOut} />
-          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} syncHealth={syncHealth} />)
+          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} flushServicesNow={flushServicesNow} syncHealth={syncHealth} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
@@ -12005,7 +12015,7 @@ function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
   );
 }
 
-function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables, flushApptsNow, syncHealth }) {
+function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables, flushApptsNow, flushServicesNow, syncHealth }) {
   // Remember where the owner/staff was so leaving the app and coming back (iOS reloads the webview
   // on resume) restores the SAME screen instead of dumping them on the Pulse home. Persisted as
   // { tab, pulseDetail, activeClientId } in localStorage; mirrors the vero_signed_in_as pattern.
@@ -12382,7 +12392,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} onOpenAppt={(a) => { setPulseOpenApptId(a.id); navTo({ tab: "calendar", activeClient: null }); }} flushApptsNow={flushApptsNow} />}
         {tab === "messages" && <MessagesView key={`messages-${tabNonce}`} clients={clients} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} appts={appts} setAppts={setAppts} clients={clients} business={business} />}
-        {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
+        {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} flushServicesNow={flushServicesNow} />}
         {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView key={`settings-${tabNonce}`} business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} onSignOutAccount={onSignOutAccount} authEmail={authEmail} /></ErrorBoundary>}
       </div>
 
@@ -12584,7 +12594,7 @@ function CategorySheet({ open, onClose, categories, setCategories, services, set
   );
 }
 
-function MenuEditor({ services, setServices, categories, setCategories, providers, business, setBusiness, showToast, cutLibrary, setCutLibrary, onBackRef }) {
+function MenuEditor({ services, setServices, categories, setCategories, providers, business, setBusiness, showToast, cutLibrary, setCutLibrary, flushServicesNow, onBackRef }) {
   const [menuTab, setMenuTab] = useState("services"); // hub tab: services | addons
   const [menuSearch, setMenuSearch] = useState(""); // filters the service list by name
   const [editing, setEditing] = useState(null); // service id or "new"
@@ -14077,7 +14087,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     commitOrder(arr);
   };
   // Stamp each service with its position so the order is saved and survives reload.
-  const commitOrder = (arr) => setServices(arr.map((x, i) => ({ ...x, order: i })));
+  const commitOrder = (arr) => {
+    const stamped = arr.map((x, i) => ({ ...x, order: i }));
+    setServices(stamped);
+    // Persist the new order to the server immediately (don't wait on the debounce — that's what
+    // let a reopen pull the old order back). Pass the stamped array so we save the new state, not
+    // the stale closure value.
+    if (flushServicesNow) flushServicesNow(stamped);
+  };
   // ---- Premium long-press drag-to-reorder (touch): the held row tracks the finger 1:1, the
   // others glide aside to open a gap, and the array is committed ONCE on release. ----
   const ROW_GAP = 10;
@@ -19920,7 +19937,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "servicesmenu", fullBleed: true, title: "Services & Menu", icon: ImageIcon, category: "Services & Menu",
       status: `${(services || []).length} services`,
       keywords: "menu services service list edit add price duration photo category haircut beard add-ons addons cut types",
-      editor: <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} onBackRef={editorBack} />,
+      editor: <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} flushServicesNow={flushServicesNow} onBackRef={editorBack} />,
     },
     {
       id: "products", fullBleed: true, title: "Products", icon: Sparkles, category: "Services & Menu",
