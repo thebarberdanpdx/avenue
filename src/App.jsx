@@ -2270,11 +2270,16 @@ function App() {
   // Save a whole in-memory list to its shop-scoped table.
   // Strategy: upsert current items first (never destroys data), then delete rows that aren't in the list.
   // If anything fails, we log it and bail — existing server data is still intact, and the next save reconciles.
-  const syncList = async (table, items) => {
+  const syncList = async (table, items, orderWrite = false) => {
     // Serialize: if a save for this table is already running, remember the latest items and return.
-    const slot = savingRef.current[table] || { running: false, queued: null };
-    if (slot.running) { slot.queued = items; savingRef.current[table] = slot; return; }
-    slot.running = true; slot.queued = null; savingRef.current[table] = slot;
+    // orderWrite (services only) rides through the queue so a reorder queued behind another save still
+    // gets to write `order` when it runs (see the [service-order-dataloss] backstop below). It is STICKY
+    // across a collapsed queue: if a reorder AND a later normal edit both queue onto the single slot, we
+    // keep orderWrite=true so the reorder's order isn't dropped — the drained `items` already carry the
+    // reordered orders, so writing them is correct. Only becomes true when a real reorder happened.
+    const slot = savingRef.current[table] || { running: false, queued: null, queuedOrderWrite: false };
+    if (slot.running) { slot.queued = items; slot.queuedOrderWrite = slot.queuedOrderWrite || orderWrite; savingRef.current[table] = slot; return; }
+    slot.running = true; slot.queued = null; slot.queuedOrderWrite = false; savingRef.current[table] = slot;
     try {
       await ensureFreshSession(); // refresh a stale token before writing (fixes native 42501)
       const list = items || [];
@@ -2317,6 +2322,37 @@ function App() {
               const d = { ...r.data };
               for (const k of ['email', 'phone', 'pin']) { if (d[k] === undefined && prev[k] !== undefined && prev[k] !== '') d[k] = prev[k]; }
               return { ...r, data: d };
+            });
+          }
+        } catch (e) { /* safety read failed — fall through with the un-merged rows */ }
+      }
+      // SAFETY BACKSTOP [service-order-dataloss] (recurring "menu order resets / reshuffles" bug).
+      // ROOT: service `order` was multi-device last-write-wins — ANY save carried the device's whole
+      // service object, so a device with stale services (missing OR stale-numeric `order`) clobbered the
+      // server's good order on every price/name edit, migration, or cache write. The menu then sorted by
+      // the arbitrary DB return order and reshuffled — the exact failure the owner hit 5+ times.
+      // FIX: `order` is now SERVER-AUTHORITATIVE. Only a deliberate reorder (orderWrite === true, set by
+      // commitReorder/commitOrder via flushServicesNow) is allowed to write it. EVERY other services save
+      // takes the server's current `order` for each row, so it can never move the menu. A reorder still
+      // wins: it writes local order, backfilling only a genuinely missing one. Mirrors the provider
+      // email/phone guard above; the orderWrite flag rides through the save queue. DO NOT REMOVE.
+      if (table === 'services' && rows.length) {
+        try {
+          const { data: serverRows } = await supabase.from('services').select('id,data').eq('shop_id', SHOP_ID);
+          if (Array.isArray(serverRows)) {
+            const sv = new Map(serverRows.map((r) => [String(r.id), r.data || {}]));
+            rows = rows.map((r) => {
+              const prev = sv.get(String(r.id)); if (!prev) return r; // new service not on server yet → keep local order
+              const serverHasOrder = typeof prev.order === 'number';
+              const localHasOrder = typeof (r.data && r.data.order) === 'number';
+              if (orderWrite) {
+                // Deliberate reorder: local order wins; only backfill a truly-missing order from the server.
+                if (!localHasOrder && serverHasOrder) return { ...r, data: { ...r.data, order: prev.order } };
+                return r;
+              }
+              // Any non-reorder save: never change order — take the server's so a stale device can't reshuffle.
+              if (serverHasOrder) return { ...r, data: { ...r.data, order: prev.order } };
+              return r;
             });
           }
         } catch (e) { /* safety read failed — fall through with the un-merged rows */ }
@@ -2399,9 +2435,11 @@ function App() {
     } finally {
       // Drain the queue: if more changes arrived while we were saving, run once more with the latest.
       const next = savingRef.current[table].queued;
+      const nextOrderWrite = savingRef.current[table].queuedOrderWrite;
       savingRef.current[table].running = false;
       savingRef.current[table].queued = null;
-      if (next !== null && next !== undefined) syncList(table, next);
+      savingRef.current[table].queuedOrderWrite = false;
+      if (next !== null && next !== undefined) syncList(table, next, nextOrderWrite);
     }
   };
 
@@ -2914,12 +2952,18 @@ function App() {
   // otherwise an iOS swipe-away right after an edit (e.g. finishing a checkout) suspends the JS
   // before the write ever starts and the edit silently never reaches the server.
   const pendingSaveRef = useRef({});
+  // Marks a queued services save as a deliberate REORDER (allowed to write `order`). Set by
+  // flushServicesNow(snap, true) from commitReorder/commitOrder; consumed + cleared here. Any services
+  // save WITHOUT this flag is treated as order-preserving (server-authoritative) by the backstop.
+  const pendingOrderWriteRef = useRef({});
   const firePending = (table) => {
     const v = pendingSaveRef.current[table];
     if (v === undefined) return;
     delete pendingSaveRef.current[table];
+    const orderWrite = !!pendingOrderWriteRef.current[table];
+    delete pendingOrderWriteRef.current[table];
     if (table === 'providers') syncList('providers', v).finally(() => { providersDirtyRef.current = false; });
-    else syncList(table, v);
+    else syncList(table, v, orderWrite);
   };
   // cross-device-sync: calendar actions (check-in, book, checkout) flush to the server immediately
   // instead of waiting on the 800ms debounce — so the 30s mirror never stomps them.
@@ -2933,10 +2977,14 @@ function App() {
   // Same immediate-save for a menu REORDER: don't wait on the 800ms debounce (which a quick
   // navigate-away or a re-render can drop) — persist the new order to the server right now, so
   // it survives a reopen instead of the reload pulling the server's old order back.
-  const flushServicesNow = (snap) => {
+  // orderWrite=true marks this as a deliberate reorder — the ONLY services save allowed to change
+  // each service's `order` (see the [service-order-dataloss] backstop). Menu reorders pass true;
+  // callers persisting other edits leave it false so they can't move the menu.
+  const flushServicesNow = (snap, orderWrite = false) => {
     if (!loadedRef.current || !session) return;
     const list = snap || services;
     pendingSaveRef.current.services = list;
+    if (orderWrite) pendingOrderWriteRef.current.services = true;
     lastSaveAt.current.services = Date.now();
     firePending('services');
   };
@@ -3495,7 +3543,7 @@ function Storefront({ business, services = [], providers = [], categories = [], 
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const hours = business.hours || {};
   const realProviders = providers.filter((p) => p.id !== "anyone" && !p.archived);
-  const onlineServices = services.filter((s) => !s.archived);
+  const onlineServices = services.filter((s) => !s.archived).sort(byServiceOrder);
   const ig = (w.instagram || "").replace(/^@/, "").trim();
   const addr = [business.address, business.cityZip].filter(Boolean).join(", ");
 
@@ -14131,8 +14179,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
   // ---- reorder + category helpers ----
   const moveService = (id, dir) => {
-    // reorder within the SAME category (dir: -1 up, +1 down)
-    const arr = [...services];
+    // reorder within the SAME category (dir: -1 up, +1 down).
+    // Work in DISPLAY order (byServiceOrder), NOT raw array order — commitOrder stamps order by index,
+    // so if the array diverges from what the user sees, the arrows would write a scrambled order.
+    const arr = [...services].sort(byServiceOrder);
     const idx = arr.findIndex((s) => s.id === id);
     if (idx < 0) return;
     const cat = arr[idx].category || cats[0];
@@ -14145,14 +14195,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     [arr[a], arr[b]] = [arr[b], arr[a]];
     commitOrder(arr);
   };
-  // Stamp each service with its position so the order is saved and survives reload.
+  // Stamp each service with its position so the order is saved and survives reload. Callers MUST pass
+  // `arr` in the intended DISPLAY order (sorted by byServiceOrder), since we stamp order = index.
   const commitOrder = (arr) => {
     const stamped = arr.map((x, i) => ({ ...x, order: i }));
     setServices(stamped);
-    // Persist the new order to the server immediately (don't wait on the debounce — that's what
-    // let a reopen pull the old order back). Pass the stamped array so we save the new state, not
-    // the stale closure value.
-    if (flushServicesNow) flushServicesNow(stamped);
+    // Persist immediately AND mark it a deliberate reorder (orderWrite=true) — the only services save
+    // allowed to change `order` (see the [service-order-dataloss] backstop). Pass the stamped array so
+    // we save the new state, not the stale closure value.
+    if (flushServicesNow) flushServicesNow(stamped, true);
   };
   // ---- Premium long-press drag-to-reorder (touch): the held row tracks the finger 1:1, the
   // others glide aside to open a gap, and the array is committed ONCE on release. ----
@@ -14209,7 +14260,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     const rank = new Map(fullIds.map((id, i) => [id, i]));
     const stamped = services.map((s) => (rank.has(s.id) ? { ...s, order: rank.get(s.id) } : s));
     setServices(stamped);
-    if (flushServicesNow) flushServicesNow(stamped);
+    if (flushServicesNow) flushServicesNow(stamped, true); // deliberate reorder → allowed to write order
   };
   // Category add / rename / reorder / delete now live in <CategorySheet> (one direct-manipulation surface).
   // drag-and-drop (works in the artifact frame; arrows are the mobile-safe fallback)
@@ -14218,7 +14269,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     e.preventDefault();
     const from = dragId.current; dragId.current = null;
     if (!from || from === targetId) return;
-    const arr = [...services];
+    // Display order (byServiceOrder), not raw array order — commitOrder stamps by index (see moveService).
+    const arr = [...services].sort(byServiceOrder);
     const fi = arr.findIndex((s) => s.id === from);
     if (fi < 0) return;
     const moved = { ...arr[fi], category: targetCat };
@@ -16568,7 +16620,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         } />
         <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18, fontWeight: 400 }}>Turn services on or off for {first}, and set {first === "this staff member" ? "their" : "their"} own time or price. Blank means the shop default.</p>
         {usedCats.map((cat) => {
-          const inCat = services.filter((s) => (s.category || "Services") === cat);
+          const inCat = services.filter((s) => (s.category || "Services") === cat).sort(byServiceOrder);
           if (!inCat.length) return null;
           return (
             <div key={cat} style={{ marginBottom: 22 }}>
