@@ -2198,6 +2198,7 @@ function App() {
   const [acctLocs, setAcctLocs] = useState([]);
   const locParam = (() => { try { return typeof window !== "undefined" && new URL(window.location.href).searchParams.get("loc") === "1"; } catch (e) { return false; } })();
   const loadedRef = useRef(false); // blocks saves until the first load finishes (so seed data can't overwrite real data)
+  const initialLoadOkRef = useRef(false); // true once the FULL initial load succeeded (all core tables authoritative). Lets a later server-mirror recovery safely re-enable saves without a page reload.
   const [dataLoaded, setDataLoaded] = useState(false); // true once the first load finishes — used to avoid flashing placeholder names
   // [outage-honest-menu] TRUE only once a REAL services menu is in hand — from the server, or from
   // the last-synced offline cache. Stays FALSE if the menu load failed with no cache, i.e. the app
@@ -2608,6 +2609,12 @@ function App() {
       via: payload.via || "direct",
       email: payload.email || null,
     });
+    // OUTAGE RECOVERY: a successful authoritative mirror means the server is reachable again
+    // and local state now equals the server copy. If the FULL initial load had succeeded once
+    // (so providers/services/settings are real, not seed), re-enable saves — otherwise the app
+    // stayed silently read-only after an outage cleared, and the next change was dropped with no
+    // warning. Gated on initialLoadOkRef so we never unblock saves over un-loaded seed data.
+    if (initialLoadOkRef.current && !loadedRef.current) { loadedRef.current = true; setLoadIncomplete(false); }
   };
   applyServerAuthoritativeRef.current = applyServerAuthoritative;
   const applyServerMirror = applyServerAuthoritative;
@@ -2779,7 +2786,7 @@ function App() {
         console.error('[vero] load routine threw — treating as incomplete; saves stay blocked:', e);
       } finally {
         // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
-        if (allLoaded) { loadedRef.current = true; setLoadIncomplete(false); setUsingCache(false); }
+        if (allLoaded) { loadedRef.current = true; initialLoadOkRef.current = true; setLoadIncomplete(false); setUsingCache(false); }
         else { console.error('[vero] one or more loads failed — saves are blocked until reload to protect existing data'); setLoadIncomplete(true); }
         setDataLoaded(true);
       }
