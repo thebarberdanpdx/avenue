@@ -23163,7 +23163,11 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     setClients(clients.map((c) => c.id === liveClient.id ? { ...c, customDurations: { ...(c.customDurations || {}), [service.id]: val } } : c));
     if (showToast) showToast(`Saved — ${service.name} now books at ${val} min for ${liveClient.name.split(" ")[0]}.`);
   };
-  const tipCfg = business?.tipping || { enabled: true, presets: [18, 20, 25], allowCustom: true, allowNoTip: true, smartDefault: 20 };
+  const tipCfgRaw = business?.tipping || { enabled: true, presets: [18, 20, 25], allowCustom: true, allowNoTip: true, smartDefault: 20 };
+  // Normalize presets to ALWAYS be a non-empty array. Downstream this screen reads
+  // tipCfg.presets[0]/.length/.map unguarded; malformed settings (tipping set but with
+  // no/blank presets) would otherwise throw and white-screen checkout mid-sale.
+  const tipCfg = { ...tipCfgRaw, presets: (Array.isArray(tipCfgRaw.presets) && tipCfgRaw.presets.length) ? tipCfgRaw.presets : [18, 20, 25] };
   const rebookCfg = business?.rebook || { enabled: true, discountEnabled: true, discountType: "amount", discount: 5, weeks: [2, 3, 4, 6, 8] };
   // Rhythm intelligence: the client's real cadence (avg gap between past visits) → recommended rebook week.
   const cadenceDays = (() => {
