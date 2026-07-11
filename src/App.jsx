@@ -14141,11 +14141,21 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     const newIds = [...ids];
     const [m] = newIds.splice(fromIndex, 1);
     newIds.splice(overIndex, 0, m);
-    const positions = [];
-    services.forEach((s, i) => { if ((s.category || cats[0]) === cat) positions.push(i); });
-    const arr = [...services];
-    newIds.forEach((id, j) => { arr[positions[j]] = services.find((x) => x.id === id); });
-    commitOrder(arr);
+    // Order-based, NOT array-position based. The list is displayed sorted by `order`, so the
+    // reorder must stamp `order` from the new DISPLAYED sequence — not from internal array slots
+    // (those diverge from the display, which scrambled the result). Build the full desired id
+    // sequence (every category in cats order, each sorted by order, with THIS category = newIds),
+    // then stamp order = position in that sequence. Deterministic regardless of array order.
+    const catIds = (c) => services
+      .filter((s) => (s.category || cats[0]) === c)
+      .sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9))
+      .map((s) => s.id);
+    const fullIds = [];
+    cats.forEach((c) => { (c === cat ? newIds : catIds(c)).forEach((id) => fullIds.push(id)); });
+    const rank = new Map(fullIds.map((id, i) => [id, i]));
+    const stamped = services.map((s) => (rank.has(s.id) ? { ...s, order: rank.get(s.id) } : s));
+    setServices(stamped);
+    if (flushServicesNow) flushServicesNow(stamped);
   };
   // Category add / rename / reorder / delete now live in <CategorySheet> (one direct-manipulation surface).
   // drag-and-drop (works in the artifact frame; arrows are the mobile-safe fallback)
