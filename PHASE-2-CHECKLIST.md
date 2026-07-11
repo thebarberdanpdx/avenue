@@ -56,8 +56,11 @@ phase is proving it in real use.
 ## 🔧 Optional hardening (on me, not blocking)
 
 - Automated test safety net — biggest long-term win; stops future changes from
-  quietly breaking things. A real investment; scope it when ready.
-- Contain a crash to one screen instead of the whole app.
+  quietly breaking things. A real investment; scope it when ready. **← this is the
+  next big decision; everything else in "on me" is now done.**
+- ~~Contain a crash to one screen instead of the whole app.~~ **DONE & live** — a
+  crash in one dashboard tab now shows a recoverable panel and the tab bar keeps
+  working, instead of white-screening the whole app (still emails you via Sentry).
 - Surface the payment Live/Test mode more prominently (today it's 3 taps deep).
 
 ## The real Phase 2 work — only you can do this
