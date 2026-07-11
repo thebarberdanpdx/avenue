@@ -12393,7 +12393,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "messages" && <MessagesView key={`messages-${tabNonce}`} clients={clients} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} appts={appts} setAppts={setAppts} clients={clients} business={business} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} flushServicesNow={flushServicesNow} />}
-        {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView key={`settings-${tabNonce}`} business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} onSignOutAccount={onSignOutAccount} authEmail={authEmail} /></ErrorBoundary>}
+        {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView key={`settings-${tabNonce}`} business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} onSignOutAccount={onSignOutAccount} authEmail={authEmail} flushServicesNow={flushServicesNow} /></ErrorBoundary>}
       </div>
 
       {/* fixed bottom tab bar — anchors to viewport bottom. transform:translateZ(0) puts it on its own GPU layer so iOS Safari doesn't let it drift during scroll/overscroll. */}
@@ -19571,7 +19571,7 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
   );
 }
 
-function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary, shopId, setAppts, setClients, waitlist, setWaitlist, reviews, setReviews, onSignOutAccount, authEmail }) {
+function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary, shopId, setAppts, setClients, waitlist, setWaitlist, reviews, setReviews, onSignOutAccount, authEmail, flushServicesNow }) {
   // Fill in any missing top-level settings from the defaults so a sparse/older saved blob can't
   // crash a card that reads a nested field (a single absent key used to white-screen the whole page).
   const baseBiz = { ...DEFAULT_BUSINESS, ...(business || {}) };
