@@ -22832,7 +22832,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               </div>
             ); })}
           </div>
-          <button className="lift" onClick={() => sendWaitlistNotices(waitlistMatch.matches, waitlistMatch.freed)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Bell size={17} /> {wlRules.order === "longest" ? `Notify ${waitlistMatch.matches[0].name.split(" ")[0]}` : `Notify ${waitlistMatch.matches.length > 1 ? `all ${waitlistMatch.matches.length}` : waitlistMatch.matches[0].name.split(" ")[0]}`}</button>
+          <button className="lift" onClick={() => sendWaitlistNotices(waitlistMatch.matches, waitlistMatch.freed)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Bell size={17} /> {wlRules.order === "longest" ? `Notify ${(waitlistMatch.matches[0].name || "client").split(" ")[0]}` : `Notify ${waitlistMatch.matches.length > 1 ? `all ${waitlistMatch.matches.length}` : (waitlistMatch.matches[0].name || "client").split(" ")[0]}`}</button>
           <button onClick={() => setWaitlistMatch(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "10px 0 2px" }}>Not now</button>
         </>)}
       </ConfirmModal>
@@ -24851,7 +24851,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
       window.scrollTo(0, y);
     };
   }, []);
-  const provider = providers.find((p) => p.id === appt.providerId) || providers[1];
+  const provider = providers.find((p) => p.id === appt.providerId) || providers[1] || providers[0] || {};
   const client = clients.find((c) => c.id === appt.clientId);
   const service = services.find((s) => s.id === appt.serviceId);
   const dur = appt.end - appt.start;
@@ -26592,7 +26592,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         <User size={17} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}</div>
+      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1] || providers[0] || {}; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}</div>
       {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : "No clients yet — tap + to add your first one."}</p>}
     </div>
 
@@ -26653,7 +26653,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         ) : (
           <div style={{ display: "grid", gap: 8, marginBottom: 8 }}>
             {overdue.map((o) => {
-              const provider = providers.find((p) => p.id === o.c.provider) || providers[1];
+              const provider = providers.find((p) => p.id === o.c.provider) || providers[1] || providers[0] || {};
               return (
                 <div key={o.c.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, padding: "12px 14px" }}>
                   <Avatar size={40} photo={clientPhoto(o.c)} initial={o.c.name?.charAt(0)} color={provider.color} />
