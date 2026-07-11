@@ -1428,6 +1428,15 @@ const getPrice = (service, providerId) => {
   if (se && se.price != null) return se.price;
   return service.price;
 };
+// The ONE service sort comparator — used everywhere the menu is ordered (load, refetch, editor,
+// booking). Primary key is the saved `order`; the tiebreak on `id` makes it TOTAL and DETERMINISTIC.
+// Without the tiebreak, services with a missing/equal order (e.g. legacy rows never stamped) tie, and
+// Array.sort leaves ties in input order — which is whatever arbitrary order Postgres returned that
+// load, so the menu silently reshuffled on every reload. The id tiebreak guarantees a stable order
+// even when `order` is absent, so a data gap can never present as a shuffling menu again.
+const byServiceOrder = (a, b) =>
+  (((a && a.order) ?? 1e9) - ((b && b.order) ?? 1e9)) ||
+  String((a && a.id) ?? "").localeCompare(String((b && b.id) ?? ""));
 // Per-cut-style cascades — used when a client picks a specific style at booking.
 // price:  per-barber override (staff.cutPrice[ctId]) → the style's own price → service/staff default
 // length: per-barber override (staff.cutDur[ctId], absolute) → service/staff length + the style's extra minutes
@@ -2566,7 +2575,7 @@ function App() {
       }
       const local = localTableState(table);
       list = mergeLocalOverServer(list, local, table);
-      if (table === 'services') list.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
+      if (table === 'services') list.sort(byServiceOrder);
       if (table === 'providers') list = sortProviders(list);
       lastRemoteRef.current[table] = data ? data.map((r) => r.data) : [];
       const set = tableSetters[table]; if (set) set(list);
@@ -2735,7 +2744,7 @@ function App() {
       // the full rows, never let this stripped copy overwrite them — that race blanked staff email/phone.
       if (pr && pr.length && !providersFullRef.current && !hasStoredSession()) setProviders(pr);
       if (pr && pr.length) setProvidersTrusted(true); // [outage-honest-menu] real staff list from feed/direct
-      const sv = await loadList('services');     if (sv) sv.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9)); if (sv && sv.length) { setServices(sv); setServicesTrusted(true); } // [outage-honest-menu] real menu from the server
+      const sv = await loadList('services');     if (sv) sv.sort(byServiceOrder); if (sv && sv.length) { setServices(sv); setServicesTrusted(true); } // [outage-honest-menu] real menu from the server
 
       // Record the loaded baseline so the safe-delete reconciliation knows which rows this device
       // already knew about (so it never deletes a row another device adds later).
@@ -5988,7 +5997,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {simpleStep === "what" && !cutFlow && (() => {
           const cats = (categories && categories.length) ? categories : ["Services"];
           const visible = (s) => !s.archived && !s.hidden && (s.booking?.available !== false); // #8: honor the per-service "Available in online booking" toggle
-          const inCat = (cat) => services.filter((s) => visible(s) && (s.category || cats[0]) === cat);
+          const inCat = (cat) => services.filter((s) => visible(s) && (s.category || cats[0]) === cat).sort(byServiceOrder);
           const bs = (business && business.bookingStep) || {};
           const selectService = (svc) => {
             if (!svc) return;
@@ -6048,7 +6057,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           }
 
           const activeCat = simpleCat || (liveCats.length === 1 ? liveCats[0] : null);
-          const list = activeCat ? inCat(activeCat) : services.filter(visible);
+          const list = activeCat ? inCat(activeCat) : services.filter(visible).sort(byServiceOrder);
           return (
             <div className="fade-up">
               {simpleCat && <button onClick={() => setSimpleCat(null)} style={{ background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 14, cursor: "pointer", letterSpacing: 0.3 }}>‹ {simpleCat}</button>}
@@ -6246,7 +6255,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {step === 1 && !cutFlow && (() => {
           const visible = (s) => !s.archived && !s.hidden && (s.booking?.available !== false); // #8: honor the per-service "Available in online booking" toggle
           const cats = (categories && categories.length) ? categories : ["Services"];
-          const inCat = (cat) => services.filter((s) => visible(s) && (s.category || cats[0]) === cat);
+          const inCat = (cat) => services.filter((s) => visible(s) && (s.category || cats[0]) === cat).sort(byServiceOrder);
           const liveCats = cats.filter((c) => inCat(c).length > 0);
           const pickGuidedService = (svc) => {
             if (!svc) return;
@@ -6298,7 +6307,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           // Service list — clean flat rows (matches the first-time flow: no big heading, sans names,
           // thin dividers, chevron). Returning/back-to-start must look identical, not the old boxed tiles.
           const activeCat = guidedCat || (liveCats.length === 1 ? liveCats[0] : null);
-          const list = activeCat ? inCat(activeCat) : services.filter(visible);
+          const list = activeCat ? inCat(activeCat) : services.filter(visible).sort(byServiceOrder);
           return (
             <div className="fade-up">
               {guidedCat && <button onClick={() => setGuidedCat(null)} style={{ background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 14, cursor: "pointer", letterSpacing: 0.3 }}>‹ {guidedCat}</button>}
@@ -14193,7 +14202,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     // then stamp order = position in that sequence. Deterministic regardless of array order.
     const catIds = (c) => services
       .filter((s) => (s.category || cats[0]) === c)
-      .sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9))
+      .sort(byServiceOrder)
       .map((s) => s.id);
     const fullIds = [];
     cats.forEach((c) => { (c === cat ? newIds : catIds(c)).forEach((id) => fullIds.push(id)); });
@@ -14250,7 +14259,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         <CategorySheet open={catSheet} onClose={() => setCatSheet(false)} categories={categories} setCategories={setCategories} services={services} setServices={setServices} showToast={showToast} />
 
         {cats.map((cat) => {
-          const inCat = services.filter((s) => !s.archived && (s.category || cats[0]) === cat && matchesSearch(s)).sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
+          const inCat = services.filter((s) => !s.archived && (s.category || cats[0]) === cat && matchesSearch(s)).sort(byServiceOrder);
           if (q && inCat.length === 0) return null;
           const cardClipping = !(tDrag && tDrag.cat === cat);
           return (
