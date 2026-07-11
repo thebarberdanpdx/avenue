@@ -145,6 +145,8 @@ const GUARDS = [
   { needle: "scheduleRtMirror", label: "realtime calendar pulls debounced when idle" },
   { needle: 'tableHasUnsavedWork("appointments") || tableHasUnsavedWork("clients")', label: "mirror skips while calendar edits are pending" },
   { needle: "deleteAppt flushes immediately", label: "deleteAppt calls flushApptsNow (cross-device delete)" },
+  { needle: "service-order-dataloss", label: "services save never blanks an `order` the server has (stale device can't revert/reshuffle the menu)" },
+  { needle: "byServiceOrder", label: "one deterministic menu sort (order + id tiebreak) — a missing order can't reshuffle the menu across loads" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
