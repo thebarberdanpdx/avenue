@@ -1710,7 +1710,18 @@ function StaffLogin({ authReady, onBack }) {
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { err: null }; }
   static getDerivedStateFromError(err) { return { err }; }
-  componentDidCatch(err, info) { try { console.error("[vero] UI error:", err, info); } catch (e) {} }
+  componentDidCatch(err, info) {
+    try { console.error("[vero] UI error:", err, info); } catch (e) {}
+    // Report the crash so it actually reaches the owner's Sentry inbox. This inner boundary
+    // catches app render crashes BEFORE the outer Sentry.ErrorBoundary (main.jsx) can — so
+    // without this, white-screen crashes were only console-logged and never alerted.
+    try {
+      Sentry.captureException(err, {
+        tags: { area: "error-boundary", label: this.props.label || (this.props.minimal ? "app-root" : "section") },
+        extra: { componentStack: (info && info.componentStack) || null },
+      });
+    } catch (e) {}
+  }
   render() {
     if (this.state.err) {
       if (this.props.minimal) {
