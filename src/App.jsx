@@ -12721,8 +12721,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     });
     const photos = Array.isArray(form.photos) ? form.photos.filter(Boolean) : [];
     const clean = { ...form, price: Math.min(100000, priceNum), duration: Math.max(5, Math.min(600, Number(form.duration) || 30)), staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false };
-    if (editing === "new") setServices([...services, clean]);
-    else setServices(services.map((s) => (s.id === editing ? clean : s)));
+    if (editing === "new") {
+      // A new service MUST get a defined order (appended to the end). Blank orders were the
+      // root cause of the reorder-doesn't-stick saga: an undefined order sorts unpredictably
+      // and lets a stale copy quietly win. Never create a service without one.
+      const maxOrder = services.reduce((m, s) => Math.max(m, (s && typeof s.order === "number") ? s.order : -1), -1);
+      setServices([...services, { ...clean, order: maxOrder + 1 }]);
+    } else setServices(services.map((s) => (s.id === editing ? { ...clean, order: (typeof s.order === "number" ? s.order : clean.order) } : s)));
     // MangoMint pattern: saving a section lands on the service's section menu. A brand-new
     // service becomes a real one (editing → its id) so its menu opens with add-ons/staff ready.
     if (editing === "new") setEditing(clean.id);
