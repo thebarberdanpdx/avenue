@@ -174,12 +174,12 @@ async function ensureConnected({ live, apiBase, authToken, onStatus, mode = "tap
 }
 
 // Charge `amount` dollars in person. Resolves { id } on success; throws on failure/cancel.
-export async function tapToPayCharge({ amount, description, live, apiBase, authToken, onStatus }) {
+export async function tapToPayCharge({ amount, description, live, apiBase, authToken, onStatus, idempotencyKey }) {
   const { St } = await ensureConnected({ live, apiBase, authToken, onStatus });
   onStatus && onStatus("Starting…");
   let intent;
   try {
-    intent = await postStripe(apiBase, authToken, { action: "terminal_intent", amount, description }, INTENT_TIMEOUT_MS);
+    intent = await postStripe(apiBase, authToken, { action: "terminal_intent", amount, description, idempotencyKey }, INTENT_TIMEOUT_MS);
   } catch (e) {
     throw new Error("Couldn't start the charge: " + ((e && e.message) || "payment service error."));
   }
@@ -196,12 +196,12 @@ export async function tapToPayCharge({ amount, description, live, apiBase, authT
 // Charge `amount` dollars on a paired PHYSICAL reader (Bluetooth or internet-connected).
 // Identical intent → collect → confirm flow as Tap to Pay; only reader discovery/connect differs
 // (handled by ensureConnected mode:"reader"). Resolves { id } on success; throws on failure/cancel.
-export async function cardReaderCharge({ amount, description, live, apiBase, authToken, onStatus }) {
+export async function cardReaderCharge({ amount, description, live, apiBase, authToken, onStatus, idempotencyKey }) {
   const { St } = await ensureConnected({ live, apiBase, authToken, onStatus, mode: "reader" });
   onStatus && onStatus("Starting…");
   let intent;
   try {
-    intent = await postStripe(apiBase, authToken, { action: "terminal_intent", amount, description }, INTENT_TIMEOUT_MS);
+    intent = await postStripe(apiBase, authToken, { action: "terminal_intent", amount, description, idempotencyKey }, INTENT_TIMEOUT_MS);
   } catch (e) {
     throw new Error("Couldn't start the charge: " + ((e && e.message) || "payment service error."));
   }

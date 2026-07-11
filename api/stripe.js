@@ -319,17 +319,21 @@ async function handler(req, res) {
     // collects and confirms when the client taps their card/phone. `amount` is
     // in dollars. Auto-captures so the sale completes on tap.
     if (action === "terminal_intent") {
-      const { amount, description } = body;
+      const { amount, description, idempotencyKey } = body;
       if (!validAmount(amount)) {
         return res.status(400).json({ error: "Invalid amount." });
       }
+      // idempotencyKey (optional): a "Try again" after an ambiguous card-present failure
+      // reuses the SAME PaymentIntent instead of minting a new one. If the first tap already
+      // captured, the SDK re-collect on that succeeded intent fails cleanly (no second capture)
+      // rather than charging the card again.
       const pi = await stripe.paymentIntents.create({
         amount: Math.round(Number(amount) * 100),
         currency: "usd",
         payment_method_types: ["card_present"],
         capture_method: "automatic",
         description: description || "Vero — Tap to Pay",
-      });
+      }, idempotencyKey ? { idempotencyKey } : undefined);
       return res.status(200).json({ clientSecret: pi.client_secret, id: pi.id });
     }
 

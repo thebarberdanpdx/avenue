@@ -23199,6 +23199,10 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [prodCat, setProdCat] = useState(null); // active category filter in the "+ Product" picker (null = all)
   const [payBusy, setPayBusy] = useState(false);
   const [payErr, setPayErr] = useState("");
+  // Per-checkout idempotency seed for the card-present path: stable while this checkout
+  // is open (so a "Try again" reuses the same PaymentIntent — no double capture), fresh
+  // each time the sheet remounts for a new sale.
+  const idemNonce = useRef(newIdemKey());
   const [pendingMethod, setPendingMethod] = useState(null); // chosen on the method screen; charged after tip
   const [tapStatus, setTapStatus] = useState(""); // live status text while the Tap to Pay reader runs
   const [paidRec, setPaidRec] = useState(null);     // the ledger record written on success
@@ -23374,30 +23378,32 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     else { if (m === "cof") setStage("charging"); executeCharge(m); }
   };
   const runTapToPay = async () => {
+    if (payBusy) return; setPayBusy(true); // guard: a "Try again" double-tap can't fire a second charge mid-flight
     setPayErr(""); setTapStatus("Starting…");
     try {
       await ensureFreshSession(); // iOS freezes the refresh timer when backgrounded — refresh so the staff JWT isn't stale (else /api/stripe 401s and the reader hangs)
       const { data: sess } = await supabase.auth.getSession();
       const token = sess && sess.session && sess.session.access_token;
-      const res = await tapToPayCharge({ amount: chargeBase, description: `Vero — ${appt.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
+      const res = await tapToPayCharge({ amount: chargeBase, description: `Vero — ${appt.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus, idempotencyKey: idemKeyFor(`terminal:${idemNonce.current}:${Math.round(Number(chargeBase) * 100)}`) });
       recordSale(makeRec("card", { id: res && res.id }, chargeBase));
       setStage("approved");
     } catch (e) {
       setPayErr((e && e.message) || "Tap to Pay didn't complete. Try again or pick another way.");
-    }
+    } finally { setPayBusy(false); }
   };
   const runCardReader = async () => {
+    if (payBusy) return; setPayBusy(true); // guard: a "Try again" double-tap can't fire a second charge mid-flight
     setPayErr(""); setTapStatus("Starting…");
     try {
       await ensureFreshSession(); // keep the staff JWT fresh so /api/stripe doesn't 401 and hang the reader
       const { data: sess } = await supabase.auth.getSession();
       const token = sess && sess.session && sess.session.access_token;
-      const res = await cardReaderCharge({ amount: chargeBase, description: `Vero — ${appt.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
+      const res = await cardReaderCharge({ amount: chargeBase, description: `Vero — ${appt.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus, idempotencyKey: idemKeyFor(`terminal:${idemNonce.current}:${Math.round(Number(chargeBase) * 100)}`) });
       recordSale(makeRec("card", { id: res && res.id }, chargeBase));
       setStage("approved");
     } catch (e) {
       setPayErr((e && e.message) || "The reader didn't complete. Try again or pick another way.");
-    }
+    } finally { setPayBusy(false); }
   };
   const executeCharge = (m) => {
     if (m === "tap") { setStage("tapPay"); runTapToPay(); return; }
