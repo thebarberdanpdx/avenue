@@ -4653,6 +4653,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [waProvId, setWaProvId] = useState(null); // Who & When merged screen: selected barber tab ("anyone" = First free)
   const [wwPhase, setWwPhase] = useState("provider"); // merged who&when: "provider" (pick barber) → "when" (date/time)
   const [booking, setBooking] = useState(false);   // true while the confirmed booking is being saved to the server
+  // Synchronous double-submit guard. `booking` state disables the button once the server write starts,
+  // but there's an async window BEFORE that (client-lookup awaits) where a fast double-tap could re-enter
+  // and fire two commits (two appts for a staff booking, a duplicate write for a client one). This ref
+  // closes that window; it's reset in doCommitBooking's finally so every exit path re-enables it.
+  const commitInFlightRef = useRef(false);
   const [pendingFinish, setPendingFinish] = useState(false); // set when card is saved → effect commits the booking once
   const [bookErr, setBookErr] = useState(false);   // true if that save failed — client is told to retry, nothing was held
   const [reschedTooLate, setReschedTooLate] = useState(false); // a home reschedule/change-service was CONFIRMED after the change window closed mid-flow — blocked; the original appointment stays
@@ -5245,6 +5250,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   };
 
   const doCommitBooking = async (finalPhone, finalEmail) => {
+    // Double-submit guard (see commitInFlightRef): bail if a commit is already running. Reset in the
+    // finally below so a validation bail, a staff success, or the async server write all re-enable it.
+    if (commitInFlightRef.current) return;
+    commitInFlightRef.current = true;
+    try {
     // Re-check the slot is still free before writing — guards against a double-booking if the
     // chair got taken between showing times and tapping confirm.
     {
@@ -5492,6 +5502,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             .catch((e) => console.error("[vero] card-on-file save threw:", e));
         }
       }).catch(() => { setBooking(false); setBookErr(true); });
+    } finally {
+      // Reset the sync guard. The async book_public path is guarded from here on by `booking` state
+      // (the button is disabled once setBooking(true) ran), so releasing the ref now is safe.
+      commitInFlightRef.current = false;
+    }
   };
 
   // Returning client with a card already on file → prefill so they don't re-enter it.
