@@ -12421,7 +12421,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => goTab(t)} onOpenRevenue={() => navTo({ pulseDetail: "revenue" })} onOpenPayments={() => navTo({ pulseDetail: "payments" })} onOpenAppointments={() => navTo({ pulseDetail: "appointments" })} onOpenClients={() => navTo({ pulseDetail: "clients" })} onOpenServices={() => navTo({ pulseDetail: "services" })} onOpenBarbers={() => navTo({ pulseDetail: "barbers" })} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c, pulseDetail: null })} onOpenAppt={(id) => { setPulseOpenApptId(id); navTo({ tab: "calendar", pulseDetail: null, activeClient: null }); }} showToast={showToast} notifCount={unseenCount} onOpenNotifications={() => navTo({ pulseDetail: "notifications" })} />}
         {tab === "pulse" && pulseDetail === "notifications" && <NotificationsView notifs={myNotifs} notifSeenAt={notifSeenAt} markSeen={markNotifsSeen} onClear={() => setNotifs([])} clients={clients} providers={providers} isOwner={isOwner} me={me} onBack={navBack} onOpenCalendar={(n) => { if (n && n.apptId != null) setPulseOpenApptId(n.apptId); goTab("calendar"); }} onOpenNudge={() => goTab("clients")} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} business={business} onBack={navBack} />}
-        {tab === "pulse" && pulseDetail === "payments" && <PaymentsView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={navBack} showToast={showToast} />}
+        {tab === "pulse" && pulseDetail === "payments" && <PaymentsView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={navBack} showToast={showToast} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={navBack} />}
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={navBack} onOpenNudge={() => goTab("clients")} onOpenClient={(c) => navTo({ pulseDetail: null, activeClient: c, tab: "clients" })} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={navBack} />}
@@ -23133,7 +23133,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       )}
 
       {refundAppt && (
-        <ApptRefundSheet appt={refundAppt} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} showToast={showToast} onClose={() => setRefundAppt(null)}
+        <ApptRefundSheet appt={refundAppt} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} showToast={showToast} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} onClose={() => setRefundAppt(null)}
           onFullyRefunded={() => { applyApptPatch(refundAppt.id, { status: "confirmed", paid: null, serviceStartedAt: null, serviceEndedAt: null, pendingDurationSave: null }); showToast("Fully refunded — appointment is back to confirmed, like they haven't come in yet."); }} />
       )}
 
@@ -24017,7 +24017,7 @@ function RefundSheet({ open, onClose, client, payment, onApply, showToast }) {
   );
 }
 
-function PaymentsView({ appts, setAppts, clients, setClients, business, setBusiness, providers, onBack, showToast }) {
+function PaymentsView({ appts, setAppts, clients, setClients, business, setBusiness, providers, onBack, showToast, flushApptsNow, flushClientsNow, flushShopsNow }) {
   const [openId, setOpenId] = useState(null);
   const [refundFor, setRefundFor] = useState(null);
   const [period, setPeriod] = useState("month");
@@ -24066,12 +24066,18 @@ function PaymentsView({ appts, setAppts, clients, setClients, business, setBusin
     return <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.5, color: col }}>{label}</span>;
   };
 
-  // Write a field change back to whichever store the row came from.
+  // Write a field change back to whichever store the row came from. A refund/status edit is
+  // money-critical — flush it to the server immediately (see flushShopsNow/flushClientsNow) so it
+  // can't be lost on a swipe-away, which would leave the report showing a refunded sale as still paid.
   const patchRow = (row, patch) => {
     if (row.source === "sale") {
-      setBusiness((b) => ({ ...b, sales: (b.sales || []).map((s) => s.id === row.id ? { ...s, ...patch } : s) }));
+      const nb = { ...(business || {}), sales: ((business && business.sales) || []).map((s) => s.id === row.id ? { ...s, ...patch } : s) };
+      setBusiness(nb);
+      if (flushShopsNow) flushShopsNow(nb);
     } else {
-      setClients((prev) => prev.map((c) => c.id === row.clientId ? { ...c, payments: (c.payments || []).map((p) => p.id === row.id ? { ...p, ...patch } : p) } : c));
+      const nextClients = (clients || []).map((c) => c.id === row.clientId ? { ...c, payments: (c.payments || []).map((p) => p.id === row.id ? { ...p, ...patch } : p) } : c);
+      setClients(nextClients);
+      if (flushClientsNow) flushClientsNow(nextClients);
     }
   };
 
@@ -24091,7 +24097,7 @@ function PaymentsView({ appts, setAppts, clients, setClients, business, setBusin
       const others = rows.filter((r) => r.apptId === row.apptId && r.id !== row.id);
       const allOut = others.every((r) => (r.refunded || 0) >= (r.amount || 0) - 0.001);
       if (allOut) {
-        setAppts((cur) => cur.map((a) => a.id === row.apptId ? { ...a, status: "confirmed", paid: null, serviceStartedAt: null, serviceEndedAt: null, pendingDurationSave: null } : a));
+        setAppts((cur) => { const next = cur.map((a) => a.id === row.apptId ? { ...a, status: "confirmed", paid: null, serviceStartedAt: null, serviceEndedAt: null, pendingDurationSave: null } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
         showToast && showToast("Fully refunded — the appointment is back to confirmed.");
       }
     }
@@ -24824,7 +24830,7 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
 
 // Refund (full or partial) straight from the appointment sheet. Card payments refund
 // through Stripe by payment intent; cash payments are recorded as returned.
-function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, showToast, onClose, onFullyRefunded }) {
+function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, showToast, onClose, onFullyRefunded, flushClientsNow, flushShopsNow }) {
   const live = business?.payments?.live === true;
   const findRecs = () => {
     const out = [];
@@ -24841,9 +24847,19 @@ function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, sho
   const [err, setErr] = useState("");
   const [done, setDone] = useState(null);
   useEffect(() => { if (sel) setAmt(String(remaining)); }, [selId]);
+  // Records a refund into the ledger AFTER Stripe has already returned the money — so the local
+  // write is money-critical: flush it immediately (see flushClientsNow/flushShopsNow) or a swipe-away
+  // could lose it and the report would show a refunded sale as still fully paid.
   const patch = (rec, p) => {
-    if (rec._src === "client") setClients(clients.map((c) => c.id === rec._cid ? { ...c, payments: (c.payments || []).map((x) => x.id === rec.id ? { ...x, ...p } : x) } : c));
-    else if (setBusiness) setBusiness((b) => ({ ...b, sales: ((b && b.sales) || []).map((x) => x.id === rec.id ? { ...x, ...p } : x) }));
+    if (rec._src === "client") {
+      const nextClients = clients.map((c) => c.id === rec._cid ? { ...c, payments: (c.payments || []).map((x) => x.id === rec.id ? { ...x, ...p } : x) } : c);
+      setClients(nextClients);
+      if (flushClientsNow) flushClientsNow(nextClients);
+    } else if (setBusiness) {
+      const nb = { ...(business || {}), sales: ((business && business.sales) || []).map((x) => x.id === rec.id ? { ...x, ...p } : x) };
+      setBusiness(nb);
+      if (flushShopsNow) flushShopsNow(nb);
+    }
   };
   const doRefund = async () => {
     const n = Math.round((Number(amt) || 0) * 100) / 100;
@@ -27480,7 +27496,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {/* ============ MONEY ENGINES (reused) ============ */}
       {refundAppt && (
-        <ApptRefundSheet appt={refundAppt} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} showToast={showToast} onClose={() => setRefundAppt(null)}
+        <ApptRefundSheet appt={refundAppt} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} showToast={showToast} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} onClose={() => setRefundAppt(null)}
           onFullyRefunded={() => { setAppts((cur) => cur.map((a) => a.id === refundAppt.id ? { ...a, status: "confirmed", paid: null, serviceStartedAt: null, serviceEndedAt: null, pendingDurationSave: null } : a)); showToast("Fully refunded — appointment is back to confirmed, like they haven't come in yet."); }} />
       )}
       {checkout && (
