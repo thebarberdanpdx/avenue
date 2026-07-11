@@ -14190,7 +14190,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         <CategorySheet open={catSheet} onClose={() => setCatSheet(false)} categories={categories} setCategories={setCategories} services={services} setServices={setServices} showToast={showToast} />
 
         {cats.map((cat) => {
-          const inCat = services.filter((s) => !s.archived && (s.category || cats[0]) === cat && matchesSearch(s));
+          const inCat = services.filter((s) => !s.archived && (s.category || cats[0]) === cat && matchesSearch(s)).sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
           if (q && inCat.length === 0) return null;
           const cardClipping = !(tDrag && tDrag.cat === cat);
           return (
