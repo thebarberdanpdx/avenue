@@ -2207,6 +2207,11 @@ function App() {
   // that isn't the shop's (the outage masquerade). Fails SAFE: a wrong FALSE shows "call us" (a lost
   // tap), never a fake booking.
   const [servicesTrusted, setServicesTrusted] = useState(false);
+  // [outage-honest-menu] Same idea for PROVIDERS: TRUE only once a REAL staff list is in hand
+  // (public feed, direct load, or offline cache). Stays FALSE if providers failed to load, so the
+  // public page shows the honest "can't load" state instead of driving a booking off DEFAULT_PROVIDERS
+  // demo hours (which could let a client book a time the shop is actually closed).
+  const [providersTrusted, setProvidersTrusted] = useState(false);
   const savingRef = useRef({});    // per-table { running, queued } — guarantees in-order saves
   const providersDirtyRef = useRef(false); // true between a local provider edit and its successful sync — blocks focus-reload clobber
   const providersFullRef = useRef(false); // true once a signed-in session holds FULL provider rows (with email/phone/PIN) — stops the sanitized public feed from overwriting them on a remount race (the "email/phone disappears" bug)
@@ -2729,6 +2734,7 @@ function App() {
       // The public feed is SANITIZED (no email/phone/PIN). If a signed-in session has already loaded
       // the full rows, never let this stripped copy overwrite them — that race blanked staff email/phone.
       if (pr && pr.length && !providersFullRef.current && !hasStoredSession()) setProviders(pr);
+      if (pr && pr.length) setProvidersTrusted(true); // [outage-honest-menu] real staff list from feed/direct
       const sv = await loadList('services');     if (sv) sv.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9)); if (sv && sv.length) { setServices(sv); setServicesTrusted(true); } // [outage-honest-menu] real menu from the server
 
       // Record the loaded baseline so the safe-delete reconciliation knows which rows this device
@@ -2777,7 +2783,7 @@ function App() {
       // Mirror the columns/services the calendar needs to render into the offline cache on success.
       // Only fall back to the cache when a load actually ERRORED (!allLoaded) — never over a
       // genuinely-empty shop, which would show stale rows.
-      if (pr && pr.length) writeCache('providers', pr); else if (!allLoaded) { const c = readCache('providers'); if (c && c.length && !providersFullRef.current) { lastRemoteRef.current.providers = c; setProviders(c); } }
+      if (pr && pr.length) writeCache('providers', pr); else if (!allLoaded) { const c = readCache('providers'); if (c && c.length && !providersFullRef.current) { lastRemoteRef.current.providers = c; setProviders(c); setProvidersTrusted(true); } } // [outage-honest-menu] last-synced real staff list from cache
       if (sv && sv.length) writeCache('services', sv); else if (!allLoaded) { const c = readCache('services'); if (c && c.length) { lastRemoteRef.current.services = c; setServices(c); setServicesTrusted(true); } } // [outage-honest-menu] last-synced real menu from the offline cache
 
       } catch (e) {
@@ -3338,7 +3344,7 @@ function App() {
       {view === "privacy" && <PrivacyPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "client" && ((!session && acctLocs.length > 1 && !locParam)
         ? <LocationChooser shopId={SHOP_ID} locations={acctLocs} business={business} />
-        : <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} dataLoaded={dataLoaded} servicesTrusted={servicesTrusted} onExit={goBooking} onManage={() => setView("manage")} onHoldReload={(v) => { holdReloadRef.current = !!v; }} />)}
+        : <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} dataLoaded={dataLoaded} servicesTrusted={servicesTrusted} providersTrusted={providersTrusted} onExit={goBooking} onManage={() => setView("manage")} onHoldReload={(v) => { holdReloadRef.current = !!v; }} />)}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={goBooking} />}
       {view === "managetoken" && <ManageByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} providers={providers} services={services} onExit={goBooking} />}
       {view === "reviewtoken" && <ReviewByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} onExit={goBooking} />}
@@ -4296,7 +4302,7 @@ function GroupedTimes({ slots, selected, onPick, bestSet, cell }) {
   );
 }
 
-function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, dataLoaded = true, servicesTrusted = true, onExit, onManage, onHoldReload }) {
+function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, dataLoaded = true, servicesTrusted = true, providersTrusted = true, onExit, onManage, onHoldReload }) {
   const [step, setStep] = useState(0);
   const [bookingFor, setBookingFor] = useState(null); // null until chosen: "self" or "other"
   const [showWhoFor, setShowWhoFor] = useState(false); // who's-it-for screen for a matched returning client
@@ -4684,7 +4690,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       const bt = entry.service.beardTypes.find((b) => b.id === entry.beardType);
       if (bt) { m += (bt.min || 0); }
     }
-    entry.service.addonGroups.forEach((g) => {
+    (entry.service.addonGroups || []).forEach((g) => {
       const sel = entry.addons[g.id];
       if (g.type === "choice" && sel) { const opt = g.options.find((o) => o.id === sel); if (opt) { p += answerPriceFor(entry.service, provId, g, opt); m += answerDuration(entry.service, provId, g, opt); } }
       if (g.type === "addon" && sel) { if (g.item.addsPrice !== false) p += addonPriceFor(entry.service, provId, g); if (g.item.addsTime !== false) m += addonDuration(entry.service, provId, g); }
@@ -4711,7 +4717,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     const picks = [];
     if (entry.service.cutTypes && entry.cutType) { const ct = entry.service.cutTypes.find((c) => c.id === entry.cutType); if (ct) picks.push(ct.label); }
     if (entry.service.beardTypes && entry.beardType) { const bt = entry.service.beardTypes.find((b) => b.id === entry.beardType); if (bt) picks.push(bt.label); }
-    entry.service.addonGroups.forEach((g) => {
+    (entry.service.addonGroups || []).forEach((g) => {
       const sel = entry.addons[g.id];
       if (g.type === "choice" && sel) picks.push(g.options.find((o) => o.id === sel)?.label);
       if (g.type === "addon" && sel) picks.push(g.item.name);
@@ -5691,7 +5697,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // instead. Scoped to the public page (staff/owner preview is exempt) and only fires once loading
   // is done, so it never flashes during a normal load. Fails safe — the worst case is a real menu
   // wrongly gated to "call us", never a fake menu shown as real.
-  if (!isStaff && dataLoaded && !servicesTrusted) {
+  if (!isStaff && dataLoaded && (!servicesTrusted || !providersTrusted)) {
     const shopPhone = (business && business.phones && business.phones[0] && business.phones[0].number) || (business && business.phone) || "";
     const telHref = shopPhone ? `tel:${String(shopPhone).replace(/[^0-9+]/g, "")}` : "";
     return (
