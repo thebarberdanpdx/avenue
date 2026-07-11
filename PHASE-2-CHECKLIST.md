@@ -26,6 +26,13 @@ phase is proving it in real use.
   back on (fixed a silent read-only trap). Shipped on reasoning (see parked #2).
 - Monitoring **confirmed working**: both the "shop is down" alarm and Sentry
   "app errored" alerts reach your inbox (you have the test emails).
+- **Sales can't fall out of the reports anymore.** Every checkout/register sale
+  now saves to the server the *instant* it's rung up. Before, it waited ~1 sec —
+  so if the app got swiped away or crashed in that sliver, Stripe still charged
+  the card and the appointment still showed paid, but the sale could vanish from
+  your revenue report. (Fixed the appointment checkout AND the register.)
+- **Double-tap on "Book" can't create two appointments** — the confirm button is
+  now guarded against a fast double-press.
 
 ## ⏸️ Parked — needs YOU (a few minutes each, no rush)
 
@@ -52,8 +59,6 @@ phase is proving it in real use.
   quietly breaking things. A real investment; scope it when ready.
 - Contain a crash to one screen instead of the whole app.
 - Surface the payment Live/Test mode more prominently (today it's 3 taps deep).
-- Revenue-report edge: a sale could miss the report if the app hard-crashes in
-  the same second it's recorded (the appointment still shows paid).
 
 ## The real Phase 2 work — only you can do this
 
