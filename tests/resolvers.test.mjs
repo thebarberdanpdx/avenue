@@ -70,10 +70,20 @@ function grab(name) {
 // The consolidation migration references one string constant — pull it in first (no braces → line grab).
 const CUT_DESC_LINE = (src.match(/const CONSOLIDATE_CUT_DESC = "[^"]*";/) || [])[0];
 if (!CUT_DESC_LINE) throw new Error("resolvers.test: CONSOLIDATE_CUT_DESC not found in src/App.jsx — refusing to pass");
-const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu"];
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate"];
 const extraSrc = CUT_DESC_LINE + "\n" + EXTRA.map(grab).join("\n");
-const ALL = [...NAMES, ...EXTRA];
-const moduleSrc = block + "\n" + block2 + "\n" + extraSrc + `\nexport { ${ALL.join(", ")} };`;
+// computeFreeSlots has a destructuring parameter ({...}), which grab()'s brace-matcher
+// mistakes for the body — extract it by anchors instead. It depends on hoursForDate +
+// apptHoldsSlot, both already pulled in above.
+const CFS_START = "function computeFreeSlots(";
+const CFS_END_ANCHOR = "return out.sort((a, b) => a.start - b.start);";
+const cfsS = src.indexOf(CFS_START), cfsE = src.indexOf(CFS_END_ANCHOR);
+if (cfsS === -1 || cfsE === -1 || cfsE < cfsS) throw new Error("resolvers.test: could not locate computeFreeSlots in src/App.jsx — refusing to pass");
+const cfsEnd = src.indexOf("}", cfsE);
+if (cfsEnd === -1) throw new Error("resolvers.test: could not find end of computeFreeSlots — refusing to pass");
+const cfsSrc = src.slice(cfsS, cfsEnd + 1);
+const ALL = [...NAMES, ...EXTRA, "computeFreeSlots"];
+const moduleSrc = block + "\n" + block2 + "\n" + extraSrc + "\n" + cfsSrc + `\nexport { ${ALL.join(", ")} };`;
 const R = await import("data:text/javascript," + encodeURIComponent(moduleSrc));
 
 // ─── getPrice: per-staff price → service default ───────────────────────────
@@ -260,4 +270,66 @@ test("consolidateHaircutMenu: drops the leftover split-child junk services", () 
   const list = [{ id: "cut", name: "Haircut", cutTypes: [{ id: "std", label: "Standard" }] }, { id: "cut_skinfade_ab12", name: "junk" }];
   const out = R.consolidateHaircutMenu(list);
   assert.ok(!out.find((s) => s.id === "cut_skinfade_ab12")); // split-created child removed
+});
+
+// ─── computeFreeSlots: the booking availability engine ─────────────────────
+// The money-critical booking rules: never offer a taken slot (double-book),
+// never offer a closed day, honor the notice window, and honor daily caps.
+const allDaysOn = (start = 540, end = 1020) => Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, { on: true, start, end }]));
+const daysOut = (n) => { const d = new Date(); d.setDate(d.getDate() + n); d.setHours(0, 0, 0, 0); return d; };      // a future date (no lead-time noise)
+const onDay = (date, min = 600) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), Math.floor(min / 60), min % 60).toISOString();
+const gridBiz = (extra = {}) => ({ booking: { timeMode: "grid", gridMin: 30, leadTimeMin: 0, ...extra } });
+
+test("computeFreeSlots: a closed / no-hours day offers nothing", () => {
+  const prov = { id: "dan", hours: {} };
+  assert.deepEqual(R.computeFreeSlots({ prov, date: daysOut(30), durMin: 30, providers: [prov] }), []);
+});
+
+test("computeFreeSlots: a taken slot is never offered (double-book prevention)", () => {
+  const prov = { id: "dan", hours: allDaysOn() };
+  const date = daysOut(30);
+  const busy = { providerId: "dan", status: "confirmed", bookedFor: onDay(date, 600), start: 600, end: 630 }; // 10:00–10:30
+  const starts = R.computeFreeSlots({ prov, date, durMin: 30, providers: [prov], appts: [busy], business: gridBiz() }).map((s) => s.start);
+  assert.ok(!starts.includes(600), "the taken 10:00 slot must not be offered");
+  assert.ok(starts.includes(570), "9:30 (ends as the appt starts) is still bookable");
+  assert.ok(starts.includes(630), "10:30 (right after the appt) is bookable");
+});
+
+test("computeFreeSlots: a cancelled appt frees its slot again", () => {
+  const prov = { id: "dan", hours: allDaysOn() };
+  const date = daysOut(30);
+  const cancelled = { providerId: "dan", status: "cancelled", bookedFor: onDay(date, 600), start: 600, end: 630 };
+  const starts = R.computeFreeSlots({ prov, date, durMin: 30, providers: [prov], appts: [cancelled], business: gridBiz() }).map((s) => s.start);
+  assert.ok(starts.includes(600), "a cancelled appt does not hold the chair");
+});
+
+test("computeFreeSlots: the notice window (leadTimeMin) can push all of today out", () => {
+  const prov = { id: "dan", hours: allDaysOn() };
+  // 100000 minutes of required notice → today's earliest is far past close → nothing today.
+  assert.deepEqual(R.computeFreeSlots({ prov, date: new Date(), durMin: 30, providers: [prov], business: gridBiz({ leadTimeMin: 100000 }) }), []);
+});
+
+test("computeFreeSlots: a full provider (maxPerDay) offers nothing", () => {
+  const prov = { id: "dan", hours: allDaysOn(), maxPerDay: 1 };
+  const date = daysOut(30);
+  const one = { providerId: "dan", status: "confirmed", bookedFor: onDay(date, 600), start: 600, end: 630 };
+  assert.deepEqual(R.computeFreeSlots({ prov, date, durMin: 30, providers: [prov], appts: [one], business: gridBiz() }), []);
+});
+
+test("computeFreeSlots: the shop daily cap limits ONLINE bookings only (#24)", () => {
+  const prov = { id: "dan", hours: allDaysOn() };
+  const date = daysOut(30);
+  const online = { providerId: "dan", status: "confirmed", bookedOnline: true, bookedFor: onDay(date, 600), start: 600, end: 630 };
+  const manual = { providerId: "dan", status: "confirmed", bookedFor: onDay(date, 600), start: 600, end: 630 }; // phone/walk-in
+  // one ONLINE booking hits the cap of 1 → closed for online
+  assert.deepEqual(R.computeFreeSlots({ prov, date, durMin: 30, providers: [prov], appts: [online], business: gridBiz({ dailyCap: 1 }) }), []);
+  // one MANUAL booking must NOT count toward the online cap → still bookable
+  const starts = R.computeFreeSlots({ prov, date, durMin: 30, providers: [prov], appts: [manual], business: gridBiz({ dailyCap: 1 }) }).map((s) => s.start);
+  assert.ok(starts.length > 0, "manual appts don't consume the online daily cap");
+});
+
+test("computeFreeSlots: 'anyone' resolves to a real provider's availability", () => {
+  const dan = { id: "dan", hours: allDaysOn() };
+  const starts = R.computeFreeSlots({ prov: { id: "anyone" }, date: daysOut(30), durMin: 30, providers: [{ id: "anyone" }, dan], business: gridBiz() }).map((s) => s.start);
+  assert.ok(starts.length > 0, "'anyone' books against a concrete provider, not an empty set");
 });
