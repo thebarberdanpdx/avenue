@@ -20709,7 +20709,7 @@ function NativeDiagnostics() {
   useEffect(() => { run(); }, []);
   return (
     <div style={{ marginTop: 18, padding: "14px 16px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--panel2)" }}>
-      <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-6</div>
+      <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-7</div>
       <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, color: "var(--text2)", lineHeight: 1.75, wordBreak: "break-all" }}>
         <div>app code: <b style={{ color: "var(--gold)" }}>{(typeof __BUILD_VERSION__ !== "undefined" ? String(__BUILD_VERSION__) : "dev").slice(0, 7)}</b> <span style={{ color: "var(--faint)" }}>(if this changes without a force-quit, auto-update works)</span></div>
         {(() => { let u = null; try { u = JSON.parse(localStorage.getItem("vero_update_status") || "null"); } catch (e) {} return u
