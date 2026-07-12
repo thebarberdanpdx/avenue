@@ -1361,6 +1361,33 @@ const resolveDiscount = (d, gross) => {
   const amt = d.type === "percent" ? (g * v) / 100 : v;
   return +Math.min(g, amt).toFixed(2);
 };
+// Pure checkout money math — extracted VERBATIM from the Checkout component so the money
+// path is unit-testable (a silent drift in tip/total/discount/credit math would mischarge
+// clients). Every downstream amount derives from the lines, the booking credits, the discount
+// and the tip. This MUST stay behaviorally identical to what the component used inline.
+function computeCheckoutMoney(m) {
+  const { lines = [], appt = {}, reopen = false, alreadyPaid = 0, checkoutDiscount = null, customTip = null, tipPct = 0, business = {} } = m || {};
+  const grossSubtotal = +lines.reduce((s, l) => s + (Number(l.price) || 0), 0).toFixed(2);
+  const prepaidService = (!reopen && appt.prepaid) ? Math.max(0, +(((Number(appt.prepaidTotal) || 0) - (Number(appt.prepaidTip) || 0))).toFixed(2)) : 0;
+  const depositCredit = (!reopen && !appt.prepaid && Number(appt.deposit) > 0) ? +Number(appt.deposit).toFixed(2) : 0;
+  const bookingCredit = +(prepaidService + depositCredit).toFixed(2); // pre-tip credit for money paid at booking
+  const noNewTip = reopen || prepaidService > 0; // prepaid already collected a tip; deposit still tips on the balance
+  const discountAmt = reopen ? (Number(appt.paid && appt.paid.discount) || 0) : resolveDiscount(checkoutDiscount, grossSubtotal);
+  const subtotal = +Math.max(0, grossSubtotal - discountAmt).toFixed(2);
+  const netDue = +Math.max(0, subtotal - bookingCredit).toFixed(2); // what's genuinely still owed for services/products
+  const tipAmt = noNewTip ? 0 : (customTip != null ? +Number(customTip).toFixed(2) : +(netDue * tipPct / 100).toFixed(2));
+  const balance = reopen ? Math.max(0, +(subtotal - alreadyPaid).toFixed(2)) : netDue; // reopen charges only the balance
+  const chargeBase = reopen ? balance : +(netDue + tipAmt).toFixed(2);
+  const total = +(subtotal + tipAmt).toFixed(2); // grand total of the ticket (incl. what was paid at booking)
+  const fullyPaidAtBooking = !reopen && bookingCredit > 0 && netDue === 0; // nothing left to charge — settle & close
+  const nothingToCharge = (reopen ? balance : netDue) <= 0;
+  const canCloseOut = fullyPaidAtBooking || nothingToCharge;
+  const scCfg = (business?.checkout && business.checkout.cofSurcharge) || {}; // card-on-file surcharge
+  const scOn = !!scCfg.on;
+  const scPct = Number(scCfg.pct) > 0 ? Number(scCfg.pct) : 1.5;
+  const cofTotal = scOn ? +(chargeBase * (1 + scPct / 100)).toFixed(2) : chargeBase;
+  return { grossSubtotal, prepaidService, depositCredit, bookingCredit, noNewTip, discountAmt, subtotal, netDue, tipAmt, balance, chargeBase, total, fullyPaidAtBooking, nothingToCharge, canCloseOut, scOn, scPct, cofTotal };
+}
 const discountLabel = (d) => !d ? "" : (d.type === "percent" ? `${+d.value || 0}% off` : `$${+d.value || 0} off`);
 const DAYS_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const apptDateLabel = () => { const d = new Date(); return `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
@@ -23432,37 +23459,10 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [paidRec, setPaidRec] = useState(null);     // the ledger record written on success
   const [checkoutDiscount, setCheckoutDiscount] = useState(appt.discount || null); // applied discount preset (from the appt or chosen here)
   const [showDiscPick, setShowDiscPick] = useState(false);
-  // Subtotal is the line total minus any applied discount, so every downstream amount (tip,
-  // total, balance, the charge) follows automatically. Tip is calculated on the discounted total.
-  const grossSubtotal = +lines.reduce((s, l) => s + (Number(l.price) || 0), 0).toFixed(2);
-  // Money already collected for THIS ticket at booking — credited so checkout never charges it twice.
-  //  • PREPAID (#7/#11): the full amount incl. tip was charged at booking. Credit the PRE-TIP service
-  //    portion (prepaidTotal − prepaidTip) and take NO second tip (they already tipped).
-  //  • DEPOSIT (#6/#12): a partial payment toward the total. Credit it, but STILL tip — on the balance,
-  //    matching the booking promise "the rest is due at your visit."
-  const prepaidService = (!reopen && appt.prepaid) ? Math.max(0, +(((Number(appt.prepaidTotal) || 0) - (Number(appt.prepaidTip) || 0))).toFixed(2)) : 0;
-  const depositCredit = (!reopen && !appt.prepaid && Number(appt.deposit) > 0) ? +Number(appt.deposit).toFixed(2) : 0;
-  const bookingCredit = +(prepaidService + depositCredit).toFixed(2); // pre-tip credit for money paid at booking
-  const noNewTip = reopen || prepaidService > 0; // prepaid already collected a tip; deposit still tips on the balance
-  // #4: on reopen, re-apply the discount that was locked at first checkout (appt.paid.discount) instead
-  // of zeroing it — else the subtotal rebuilds at full price and shows a phantom balance = the discount,
-  // re-charging the client money they don't owe. (Fixed $ amount, so it doesn't grow with added items.)
-  const discountAmt = reopen ? (Number(appt.paid && appt.paid.discount) || 0) : resolveDiscount(checkoutDiscount, grossSubtotal);
-  const subtotal = +Math.max(0, grossSubtotal - discountAmt).toFixed(2);
-  const netDue = +Math.max(0, subtotal - bookingCredit).toFixed(2); // what's genuinely still owed for services/products
-  const tipAmt = noNewTip ? 0 : (customTip != null ? +Number(customTip).toFixed(2) : +(netDue * tipPct / 100).toFixed(2));
-  // Reopened tickets only ever charge the balance — what's on the ticket minus what was already paid.
-  const balance = reopen ? Math.max(0, +(subtotal - alreadyPaid).toFixed(2)) : netDue;
-  const chargeBase = reopen ? balance : +(netDue + tipAmt).toFixed(2);
-  const total = +(subtotal + tipAmt).toFixed(2); // grand total of the ticket (incl. what was paid at booking)
-  const fullyPaidAtBooking = !reopen && bookingCredit > 0 && netDue === 0; // nothing left to charge — settle & close
-  const nothingToCharge = (reopen ? balance : netDue) <= 0;
-  const canCloseOut = fullyPaidAtBooking || nothingToCharge;
-  // Card-on-file surcharge — only when the shop turned it on in Checkout & money.
-  const scCfg = (business?.checkout && business.checkout.cofSurcharge) || {};
-  const scOn = !!scCfg.on;
-  const scPct = Number(scCfg.pct) > 0 ? Number(scCfg.pct) : 1.5;
-  const cofTotal = scOn ? +(chargeBase * (1 + scPct / 100)).toFixed(2) : chargeBase;
+  // Money math (subtotal, booking credits, discount, tip, balance, charge base, card-on-file
+  // surcharge) is computed by computeCheckoutMoney (defined near resolveDiscount) so it can be
+  // unit-tested. Identical to the former inline math; destructure the values this component uses.
+  const { bookingCredit, noNewTip, discountAmt, subtotal, netDue, tipAmt, balance, chargeBase, total, fullyPaidAtBooking, nothingToCharge, canCloseOut, scOn, scPct, cofTotal } = computeCheckoutMoney({ lines, appt, reopen, alreadyPaid, checkoutDiscount, customTip, tipPct, business });
   const liveMode = business?.payments?.live === true;
   // Card on file is saved in one of two shapes: `card` (paymentMethodId) or the canonical
   // booking shape `savedCard` (pmId). Accept BOTH and normalize — otherwise a client who saved

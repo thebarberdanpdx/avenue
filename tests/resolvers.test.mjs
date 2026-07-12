@@ -70,7 +70,7 @@ function grab(name) {
 // The consolidation migration references one string constant — pull it in first (no braces → line grab).
 const CUT_DESC_LINE = (src.match(/const CONSOLIDATE_CUT_DESC = "[^"]*";/) || [])[0];
 if (!CUT_DESC_LINE) throw new Error("resolvers.test: CONSOLIDATE_CUT_DESC not found in src/App.jsx — refusing to pass");
-const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate"];
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney"];
 const extraSrc = CUT_DESC_LINE + "\n" + EXTRA.map(grab).join("\n");
 // computeFreeSlots has a destructuring parameter ({...}), which grab()'s brace-matcher
 // mistakes for the body — extract it by anchors instead. It depends on hoursForDate +
@@ -332,4 +332,70 @@ test("computeFreeSlots: 'anyone' resolves to a real provider's availability", ()
   const dan = { id: "dan", hours: allDaysOn() };
   const starts = R.computeFreeSlots({ prov: { id: "anyone" }, date: daysOut(30), durMin: 30, providers: [{ id: "anyone" }, dan], business: gridBiz() }).map((s) => s.start);
   assert.ok(starts.length > 0, "'anyone' books against a concrete provider, not an empty set");
+});
+
+// ─── computeCheckoutMoney: the checkout money math (what actually gets charged) ─────
+test("computeCheckoutMoney: a plain sale — subtotal, no tip, nothing left over", () => {
+  const r = R.computeCheckoutMoney({ lines: [{ price: 42 }] });
+  assert.equal(r.subtotal, 42);
+  assert.equal(r.tipAmt, 0);
+  assert.equal(r.total, 42);
+  assert.equal(r.chargeBase, 42);
+  assert.equal(r.canCloseOut, false); // there's a real balance to collect
+});
+
+test("computeCheckoutMoney: a percent tip is added on top; a custom tip overrides it", () => {
+  const pct = R.computeCheckoutMoney({ lines: [{ price: 40 }], tipPct: 20 });
+  assert.equal(pct.tipAmt, 8);   // 20% of 40
+  assert.equal(pct.total, 48);
+  assert.equal(pct.chargeBase, 48);
+  const custom = R.computeCheckoutMoney({ lines: [{ price: 40 }], tipPct: 20, customTip: 5 });
+  assert.equal(custom.tipAmt, 5); // custom wins over the percent
+  assert.equal(custom.total, 45);
+});
+
+test("computeCheckoutMoney: the tip is calculated on the DISCOUNTED total, not the gross", () => {
+  const r = R.computeCheckoutMoney({ lines: [{ price: 80 }], checkoutDiscount: { type: "percent", value: 25 }, tipPct: 10 });
+  assert.equal(r.discountAmt, 20); // 25% of 80
+  assert.equal(r.subtotal, 60);    // 80 − 20
+  assert.equal(r.tipAmt, 6);       // 10% of 60, NOT of 80
+  assert.equal(r.total, 66);
+});
+
+test("computeCheckoutMoney: a deposit is credited and the tip is taken on the balance", () => {
+  const r = R.computeCheckoutMoney({ lines: [{ price: 50 }], appt: { deposit: 20 }, tipPct: 10 });
+  assert.equal(r.bookingCredit, 20);
+  assert.equal(r.netDue, 30);       // 50 − 20 deposit
+  assert.equal(r.tipAmt, 3);        // 10% of the 30 balance
+  assert.equal(r.chargeBase, 33);   // balance + tip
+  assert.equal(r.total, 53);        // whole ticket incl. deposit
+  assert.equal(r.fullyPaidAtBooking, false);
+});
+
+test("computeCheckoutMoney: paid-in-full at booking → nothing to charge, no second tip", () => {
+  const r = R.computeCheckoutMoney({ lines: [{ price: 42 }], appt: { prepaid: true, prepaidTotal: 50, prepaidTip: 8 }, tipPct: 20 });
+  assert.equal(r.noNewTip, true);          // they already tipped at booking
+  assert.equal(r.netDue, 0);
+  assert.equal(r.tipAmt, 0);
+  assert.equal(r.chargeBase, 0);
+  assert.equal(r.fullyPaidAtBooking, true);
+  assert.equal(r.canCloseOut, true);
+});
+
+test("computeCheckoutMoney: a reopened ticket charges only the unpaid balance, at the locked discount", () => {
+  const r = R.computeCheckoutMoney({ lines: [{ price: 50 }], reopen: true, alreadyPaid: 30, appt: { paid: { discount: 5 } } });
+  assert.equal(r.discountAmt, 5);   // re-applies the discount locked at first checkout
+  assert.equal(r.subtotal, 45);     // 50 − 5
+  assert.equal(r.balance, 15);      // 45 − 30 already paid
+  assert.equal(r.chargeBase, 15);   // only the balance is charged
+  assert.equal(r.noNewTip, true);   // reopen never re-tips
+});
+
+test("computeCheckoutMoney: the card-on-file surcharge is added to the charge (default 1.5%)", () => {
+  const three = R.computeCheckoutMoney({ lines: [{ price: 100 }], business: { checkout: { cofSurcharge: { on: true, pct: 3 } } } });
+  assert.equal(three.scOn, true);
+  assert.equal(three.cofTotal, 103);       // 100 + 3%
+  const dflt = R.computeCheckoutMoney({ lines: [{ price: 100 }], business: { checkout: { cofSurcharge: { on: true } } } });
+  assert.equal(dflt.scPct, 1.5);
+  assert.equal(dflt.cofTotal, 101.5);      // default 1.5% when no pct set
 });
