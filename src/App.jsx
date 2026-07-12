@@ -1406,6 +1406,19 @@ function computeCheckoutMoney(m) {
   const cofTotal = scOn ? +(chargeBase * (1 + scPct / 100)).toFixed(2) : chargeBase;
   return { grossSubtotal, prepaidService, depositCredit, bookingCredit, noNewTip, discountAmt, subtotal, netDue, tipAmt, balance, chargeBase, total, fullyPaidAtBooking, nothingToCharge, canCloseOut, scOn, scPct, cofTotal };
 }
+// Pure money math for the calendar "New sale" register (walk-in sales) — extracted VERBATIM from
+// RegisterView so it's unit-testable. Its own rounding style (Math.round(x*100)/100) is preserved
+// exactly; behavior must stay identical to the former inline lines.
+function computeRegisterSale(m) {
+  const { items = [], discount = "", customTip = null, tipPct = 0, tendered = "", tipEnabled = true } = m || {};
+  const gross = items.reduce((s, x) => s + x.price * x.qty, 0);
+  const disc = Math.min(gross, Math.max(0, parseFloat(String(discount).replace(/[^0-9.]/g, "")) || 0));
+  const total = Math.round((gross - disc) * 100) / 100;
+  const tipAmt = !tipEnabled ? 0 : (customTip != null ? Math.max(0, Math.round((Number(customTip) || 0) * 100) / 100) : Math.round(total * ((tipPct ?? 0) / 100) * 100) / 100);
+  const chargeTotal = Math.round((total + tipAmt) * 100) / 100;
+  const changeDue = Math.max(0, Math.round(((parseFloat(String(tendered).replace(/[^0-9.]/g, "")) || 0) - chargeTotal) * 100) / 100);
+  return { gross, disc, total, tipAmt, chargeTotal, changeDue };
+}
 const discountLabel = (d) => !d ? "" : (d.type === "percent" ? `${+d.value || 0}% off` : `$${+d.value || 0} off`);
 const DAYS_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const apptDateLabel = () => { const d = new Date(); return `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
@@ -24477,15 +24490,12 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
   const setQty = (id, d) => setItems((it) => it.map((x) => x.id === id ? { ...x, qty: Math.max(1, x.qty + d) } : x));
   const removeItem = (id) => setItems((it) => it.filter((x) => x.id !== id));
 
-  const gross = items.reduce((s, x) => s + x.price * x.qty, 0);
-  const disc = Math.min(gross, Math.max(0, parseFloat(String(discount).replace(/[^0-9.]/g, "")) || 0));
-  const total = Math.round((gross - disc) * 100) / 100;
   const liveMode = business?.payments?.live === true;
   // Tip step mirrors the appointment checkout so the register rings up the same way.
   const tipCfg = business?.tipping || { enabled: true, presets: [18, 20, 25], allowCustom: true, allowNoTip: true, smartDefault: 20 };
-  const tipAmt = !tipCfg.enabled ? 0 : (customTip != null ? Math.max(0, Math.round((Number(customTip) || 0) * 100) / 100) : Math.round(total * ((tipPct ?? 0) / 100) * 100) / 100);
-  const chargeTotal = Math.round((total + tipAmt) * 100) / 100;
-  const changeDue = Math.max(0, Math.round(((parseFloat(String(tendered).replace(/[^0-9.]/g, "")) || 0) - chargeTotal) * 100) / 100);
+  // Sale money math (gross, discount, total, tip, charge, change) — computed by computeRegisterSale
+  // (near resolveDiscount) so it's unit-tested. Identical arithmetic to the former inline lines.
+  const { gross, disc, total, tipAmt, chargeTotal, changeDue } = computeRegisterSale({ items, discount, customTip, tipPct, tendered, tipEnabled: tipCfg.enabled });
   const goldBtn = { width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 14.5, fontWeight: 600, letterSpacing: 1.5, borderRadius: 16, border: "none", boxShadow: "var(--shadow-sm)", cursor: "pointer" };
 
   const recordSale = (extra) => {

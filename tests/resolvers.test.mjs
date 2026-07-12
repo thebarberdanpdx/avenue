@@ -72,7 +72,7 @@ const CUT_DESC_LINE = (src.match(/const CONSOLIDATE_CUT_DESC = "[^"]*";/) || [])
 if (!CUT_DESC_LINE) throw new Error("resolvers.test: CONSOLIDATE_CUT_DESC not found in src/App.jsx — refusing to pass");
 const SHOP_TZ_LINE = (src.match(/const SHOP_TZ = "[^"]*";/) || [])[0];
 if (!SHOP_TZ_LINE) throw new Error("resolvers.test: SHOP_TZ not found in src/App.jsx — refusing to pass");
-const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant"];
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale"];
 const extraSrc = CUT_DESC_LINE + "\n" + SHOP_TZ_LINE + "\n" + EXTRA.map(grab).join("\n");
 // computeFreeSlots has a destructuring parameter ({...}), which grab()'s brace-matcher
 // mistakes for the body — extract it by anchors instead. It depends on hoursForDate +
@@ -412,4 +412,21 @@ test("shopWallToInstant: a picked time anchors to Oregon/Pacific, correct across
   assert.equal(R.shopWallToInstant(new Date(2026, 6, 13), 870).toISOString(), "2026-07-13T21:30:00.000Z");
   // midnight (0 min) summer → 07:00 UTC (the day starts at 00:00 Pacific)
   assert.equal(R.shopWallToInstant(new Date(2026, 6, 13), 0).toISOString(), "2026-07-13T07:00:00.000Z");
+});
+
+// ─── computeRegisterSale: the walk-in "New sale" money math ─────────────────
+test("computeRegisterSale: gross across item quantities, a clamped $ discount, tip and change", () => {
+  const r = R.computeRegisterSale({ items: [{ price: 30, qty: 2 }, { price: 5, qty: 1 }], discount: "$10", tipPct: 20, tendered: "$70" });
+  assert.equal(r.gross, 65);          // 30×2 + 5
+  assert.equal(r.disc, 10);           // "$10" parsed
+  assert.equal(r.total, 55);          // 65 − 10
+  assert.equal(r.tipAmt, 11);         // 20% of 55
+  assert.equal(r.chargeTotal, 66);    // 55 + 11
+  assert.equal(r.changeDue, 4);       // 70 tendered − 66
+});
+test("computeRegisterSale: discount never exceeds the gross; custom tip overrides percent; tip can be off", () => {
+  assert.equal(R.computeRegisterSale({ items: [{ price: 30, qty: 1 }], discount: "500" }).total, 0); // disc clamped to gross
+  assert.equal(R.computeRegisterSale({ items: [{ price: 40, qty: 1 }], tipPct: 20, customTip: 5 }).tipAmt, 5); // custom wins
+  assert.equal(R.computeRegisterSale({ items: [{ price: 40, qty: 1 }], tipPct: 20, tipEnabled: false }).tipAmt, 0); // tipping off
+  assert.equal(R.computeRegisterSale({ items: [{ price: 40, qty: 1 }] }).changeDue, 0); // nothing tendered → no change
 });
