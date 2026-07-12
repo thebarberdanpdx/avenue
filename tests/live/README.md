@@ -48,6 +48,7 @@ source <scratchpad>/.vero-secret
 | `public-smoke.mjs [baseUrl] [shop]` | Loads the public booking page, screenshots it. No login, no writes. |
 | `seed-test-shop.mjs` | Stands up / refreshes the isolated `vero-test` shop (account + login + membership + shop in Test mode + cloned services/providers + a fake client). Idempotent. |
 | `authed-smoke.mjs [email] [shop]` | Logs into the dashboard headlessly and reports whether writes succeed (no RLS 403 / "couldn't save" banner). Screenshots. |
+| `appt-flow.mjs` | Full staff-side flow: open an appointment by deep-link, **CHECK-IN → CHECKOUT (Cash, Test mode)**, verifying each step in the DB. Prints PASS/FAIL. |
 
 ```bash
 node tests/live/seed-test-shop.mjs                          # create/refresh vero-test
@@ -86,10 +87,11 @@ RLS**, not a client gate.
 - **Initial-load race:** a row inserted via the service key may not appear in
   the staff UI on first paint; a `page.reload()` (or the app's ~60s refetch)
   surfaces it. Wait for the row's text before interacting.
-- **Calendar tiles are virtualized, unstyled divs** (no test IDs). Opening an
-  appointment tile is flaky to automate. The single biggest improvement to
-  staff-side testability would be a stable `data-testid` on appointment tiles
-  (and key action buttons), or a way to deep-link an appointment.
+- **Calendar tiles are virtualized, unstyled divs** (no test IDs), so
+  tile-clicking is flaky. **Solved by the `?appt=<id>` deep-link** (shipped in
+  `src/App.jsx`): it opens the appointment sheet directly, no tile-clicking.
+  `appt-flow.mjs` uses it to drive check-in → checkout reliably. Combine with the
+  reload trick above to defeat the initial-load race.
 
 ## Cleanup / teardown
 
