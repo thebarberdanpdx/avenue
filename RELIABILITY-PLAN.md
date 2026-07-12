@@ -28,6 +28,13 @@ Things that are **already solid** (so you know the whole board): card/payment se
 
 ## 2. The reliability plan — offline-first (the fix for #1)
 
+> **⚠️ UPDATE 2026-07-12 — the *engine* choices below (PowerSync / ElectricSQL) are void.**
+> PowerSync was tried and **crashed the iOS app** (WASM in Capacitor/WKWebView); the native-SQLite
+> fallback broke the UI. Both fully reverted — **no offline feature is in production.** Offline-first
+> is a NATIVE problem that CANNOT be built or verified from a cloud agent; it needs Dan on the device
+> with Xcode at every stage. Do not re-attempt without a device-test plan. Full account + rules:
+> **`NATIVE-OFFLINE-ROLLBACK-HANDOFF.md`**. The *destination* below is still the goal; the *how* is open.
+
 **Destination (non-negotiable):** the app runs off a database *on the device*. It works with no internet / no server / dead wifi — view, book, check out, edit — and syncs automatically when the connection returns. Once opened even once, no backend outage can blank it again. This is what every field app you trust (Square, Mangomint) actually does.
 
 Two honest routes to get there:
