@@ -70,8 +70,10 @@ function grab(name) {
 // The consolidation migration references one string constant — pull it in first (no braces → line grab).
 const CUT_DESC_LINE = (src.match(/const CONSOLIDATE_CUT_DESC = "[^"]*";/) || [])[0];
 if (!CUT_DESC_LINE) throw new Error("resolvers.test: CONSOLIDATE_CUT_DESC not found in src/App.jsx — refusing to pass");
-const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney"];
-const extraSrc = CUT_DESC_LINE + "\n" + EXTRA.map(grab).join("\n");
+const SHOP_TZ_LINE = (src.match(/const SHOP_TZ = "[^"]*";/) || [])[0];
+if (!SHOP_TZ_LINE) throw new Error("resolvers.test: SHOP_TZ not found in src/App.jsx — refusing to pass");
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant"];
+const extraSrc = CUT_DESC_LINE + "\n" + SHOP_TZ_LINE + "\n" + EXTRA.map(grab).join("\n");
 // computeFreeSlots has a destructuring parameter ({...}), which grab()'s brace-matcher
 // mistakes for the body — extract it by anchors instead. It depends on hoursForDate +
 // apptHoldsSlot, both already pulled in above.
@@ -398,4 +400,16 @@ test("computeCheckoutMoney: the card-on-file surcharge is added to the charge (d
   const dflt = R.computeCheckoutMoney({ lines: [{ price: 100 }], business: { checkout: { cofSurcharge: { on: true } } } });
   assert.equal(dflt.scPct, 1.5);
   assert.equal(dflt.cofTotal, 101.5);      // default 1.5% when no pct set
+});
+
+// ─── shopWallToInstant: bookings land at the SHOP's clock, not the booker's device ──
+test("shopWallToInstant: a picked time anchors to Oregon/Pacific, correct across DST", () => {
+  // 9:00 AM (540 min) on a summer day → PDT (UTC−7) → 16:00 UTC, regardless of the booker's tz
+  assert.equal(R.shopWallToInstant(new Date(2026, 6, 13), 540).toISOString(), "2026-07-13T16:00:00.000Z");
+  // 9:00 AM on a winter day → PST (UTC−8) → 17:00 UTC
+  assert.equal(R.shopWallToInstant(new Date(2026, 0, 13), 540).toISOString(), "2026-01-13T17:00:00.000Z");
+  // 2:30 PM (870 min) summer → 21:30 UTC
+  assert.equal(R.shopWallToInstant(new Date(2026, 6, 13), 870).toISOString(), "2026-07-13T21:30:00.000Z");
+  // midnight (0 min) summer → 07:00 UTC (the day starts at 00:00 Pacific)
+  assert.equal(R.shopWallToInstant(new Date(2026, 6, 13), 0).toISOString(), "2026-07-13T07:00:00.000Z");
 });

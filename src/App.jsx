@@ -1327,6 +1327,24 @@ function DurPick({ value, defaultMin, onChange, step = 5, maxMin = 240 }) {
 }
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+// The shop's home timezone (Oregon = Pacific). Bookings are anchored to THIS wall clock so a
+// client booking from a device in any timezone (a traveler, or a wrong device clock) still lands
+// at the correct shop-local time — not shifted by the booker's own offset. (Root cause of the
+// off-tz-booker bug: the appt instant was built with the BOOKER's device tz via Date.setHours.)
+const SHOP_TZ = "America/Los_Angeles";
+// Turn a picked wall-clock (a Date whose Y/M/D is the chosen day + minutes-from-midnight) into the
+// exact UTC instant for that time IN THE SHOP'S TIMEZONE. Correct across daylight-saving. On a
+// device already in SHOP_TZ this returns the identical instant as `d.setHours(h,m,0,0)`, so it
+// changes nothing for the shop's own Pacific devices — it only corrects off-tz bookers.
+function shopWallToInstant(dateObj, minutes) {
+  const y = dateObj.getFullYear(), mo = dateObj.getMonth(), d = dateObj.getDate();
+  const utcGuess = Date.UTC(y, mo, d, Math.floor(minutes / 60), minutes % 60, 0, 0);
+  const p = {};
+  for (const part of new Intl.DateTimeFormat("en-US", { timeZone: SHOP_TZ, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(utcGuess)) p[part.type] = part.value;
+  const hh = p.hour === "24" ? 0 : +p.hour;
+  const zoneWallAsUtc = Date.UTC(+p.year, +p.month - 1, +p.day, hh, +p.minute, +p.second);
+  return new Date(utcGuess - (zoneWallAsUtc - utcGuess));
+}
 const relativeDate = (date) => { const today = new Date(); today.setHours(0,0,0,0); const d = new Date(date); d.setHours(0,0,0,0); const diff = Math.round((d - today) / 86400000); if (diff === 0) return "Today"; if (diff === 1) return "Tomorrow"; if (diff > 1 && diff < 7) return DAYS[d.getDay()]; if (diff >= 7 && diff < 14) return `Next ${DAYS[d.getDay()]}`; return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
 const daysFromNow = (date) => { const today = new Date(); today.setHours(0,0,0,0); const d = new Date(date); d.setHours(0,0,0,0); const diff = Math.round((d - today) / 86400000); if (diff === 0) return "Today"; if (diff === 1) return "Tomorrow"; if (diff < 7) return `in ${diff} days`; if (diff === 7) return "1 week away — next " + DAYS[d.getDay()]; if (diff < 14) return `${diff} days away — next week`; const wks = Math.round(diff / 7); return `about ${wks} weeks away`; };
 // "Client since" anchor — the earliest of a client's appointments (covers both booked and
@@ -5488,7 +5506,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     let cursor = slot;
     people.forEach((person, pi) => {
       const startMin = isMultiPerson ? (isSame ? slot : cursor) : slot;
-      const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
+      const bookedFor = shopWallToInstant(selectedDate, startMin); // anchor to the shop's tz, not the booker's device
       const prov = person.prov;
       const title = person.items.map(describeEntry).join(", ");
       const serviceName = person.items.map((e) => e.service.name).join(", ");
@@ -8813,7 +8831,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
     if (busy || newDate == null || newSlot == null) return;
     if (!stillChangeable()) { setNewDate(null); setNewSlot(null); setPhase("view"); return; }
     setBusy(true);
-    const when = new Date(newDate); when.setHours(Math.floor(newSlot / 60), newSlot % 60, 0, 0);
+    const when = shopWallToInstant(newDate, newSlot); // anchor to the shop's tz, not the booker's device
     try {
       await supabase.rpc("manage_reschedule_by_token", { p_token: token, p_start: newSlot, p_date: when.toISOString() });
       const updated = { ...appt, start: newSlot, end: newSlot + dur, bookedFor: when.toISOString() };
@@ -9013,7 +9031,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
     // GUARD: cancel-window-lock — re-check at the moment of the write; a page left open across
     // the deadline must be refused (the render flips to the locked notice on the next tick).
     if (!canChange(a.bookedFor)) { setReschedId(null); setNewDate(null); setNewSlot(null); if (showToast) showToast("Too close to the appointment to change online — give us a call and we'll help."); return; }
-    const when = new Date(newDate); when.setHours(Math.floor(newSlot / 60), newSlot % 60, 0, 0);
+    const when = shopWallToInstant(newDate, newSlot); // anchor to the shop's tz, not the booker's device
     const losesDiscount = a.rebookDiscount > 0;
     setAppts(appts.map((x) => x.id === a.id ? { ...x, start: newSlot, bookedFor: when.toISOString(), rebookDiscount: 0, discountForfeited: losesDiscount || x.discountForfeited } : x));
     setReschedId(null); setNewDate(null); setNewSlot(null);
