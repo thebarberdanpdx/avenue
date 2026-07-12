@@ -22,7 +22,17 @@ export const LAUNCH_ARGS = [
   '--disable-features=Translate,OptimizationHints',
 ];
 
-export async function launch({ device = 'iphone', headless = true, onConsoleError } = {}) {
+// Hosts we must NEVER let the test browser reach — telemetry that would pollute
+// Dan's production monitoring or email him. Sentry is the critical one: the live
+// app reports errors to it (src/main.jsx), so a test-induced error would fire a
+// real "New issue" alert to his inbox. Blocked at the network layer so it can't.
+export function isTelemetryHost(hostname) {
+  return /(^|\.)sentry\.io$/.test(hostname)
+    || hostname.includes('.ingest.')
+    || /(^|\.)(google-analytics|googletagmanager|segment\.(io|com)|amplitude|mixpanel|posthog|fullstory|datadoghq)\.com$/.test(hostname);
+}
+
+export async function launch({ device = 'iphone', headless = true, blockTelemetry = true, onConsoleError } = {}) {
   const browser = await chromium.launch({
     executablePath: CHROMIUM,
     headless,
@@ -37,9 +47,14 @@ export async function launch({ device = 'iphone', headless = true, onConsoleErro
       ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
       : undefined,
   });
+  const blockedTelemetry = [];
+  if (blockTelemetry) {
+    await context.route((url) => { try { return isTelemetryHost(new URL(url).hostname); } catch (e) { return false; } },
+      (route) => { blockedTelemetry.push(route.request().url()); route.abort(); });
+  }
   const page = await context.newPage();
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') { errors.push(m.text()); onConsoleError && onConsoleError(m.text()); } });
   page.on('pageerror', (e) => { errors.push('[pageerror] ' + e.message); onConsoleError && onConsoleError(e.message); });
-  return { browser, context, page, errors };
+  return { browser, context, page, errors, blockedTelemetry };
 }
