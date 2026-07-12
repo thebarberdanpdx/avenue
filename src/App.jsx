@@ -2612,8 +2612,19 @@ function App() {
         return;
       }
       const local = localTableState(table);
+      const serverObjs = data ? data.map((r) => r.data) : [];
       list = mergeLocalOverServer(list, local, table);
-      if (table === 'services') list.sort(byServiceOrder);
+      if (table === 'services') {
+        // [service-order-dataloss] ORDER IS SERVER-AUTHORITATIVE ON REFETCH TOO. mergeLocalOverServer
+        // prefers the LOCAL row for fields that differ — which would let a stale/drifted local `order`
+        // override the server on a background refresh and re-show the wrong menu order seconds after a
+        // correct load ("it flips back after some time"). Force each service's order to the server's
+        // value (the merge still wins for real content edits); a genuine reorder persisted its order to
+        // the server via the save backstop, so the server copy is always the correct position.
+        const srvOrder = new Map(serverObjs.map((s) => [String(s && s.id), s && s.order]));
+        list = list.map((s) => { const o = srvOrder.get(String(s.id)); return (typeof o === 'number') ? { ...s, order: o } : s; });
+        list.sort(byServiceOrder);
+      }
       if (table === 'providers') list = sortProviders(list);
       lastRemoteRef.current[table] = data ? data.map((r) => r.data) : [];
       const set = tableSetters[table]; if (set) set(list);
