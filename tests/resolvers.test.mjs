@@ -67,8 +67,11 @@ function grab(name) {
   if (src[i] === ";") i++;
   return src.slice(m.index, i);
 }
-const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName"];
-const extraSrc = EXTRA.map(grab).join("\n");
+// The consolidation migration references one string constant — pull it in first (no braces → line grab).
+const CUT_DESC_LINE = (src.match(/const CONSOLIDATE_CUT_DESC = "[^"]*";/) || [])[0];
+if (!CUT_DESC_LINE) throw new Error("resolvers.test: CONSOLIDATE_CUT_DESC not found in src/App.jsx — refusing to pass");
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu"];
+const extraSrc = CUT_DESC_LINE + "\n" + EXTRA.map(grab).join("\n");
 const ALL = [...NAMES, ...EXTRA];
 const moduleSrc = block + "\n" + block2 + "\n" + extraSrc + `\nexport { ${ALL.join(", ")} };`;
 const R = await import("data:text/javascript," + encodeURIComponent(moduleSrc));
@@ -220,4 +223,41 @@ test("apptDisplayName: resolves 'Me'/blank + family member through the client", 
   assert.equal(R.apptDisplayName({ name: "", clientId: "c1" }, clients), "Dan Smith");     // blank → client
   assert.equal(R.apptDisplayName({ name: "Me", clientId: "c1", familyMemberId: "f1" }, clients), "Junior Smith"); // family member
   assert.equal(R.apptDisplayName({ name: "Walk-in", clientId: "x" }, clients), "Walk-in"); // unknown client, real name
+});
+
+// ─── splitCutStyleServices: the retired cut-styles → standalone-services migration ─────────
+test("splitCutStyleServices: one service per style + the original kept (archived)", () => {
+  const svc = { id: "cut", name: "Haircut", price: 40, duration: 30, usesCutStyles: true, staff: { dan: { on: true } },
+    cutTypes: [{ id: "std", label: "Standard", price: 40, min: 0 }, { id: "fade", label: "Skin fade", price: 45, min: 10 }] };
+  const out = R.splitCutStyleServices([svc]);
+  const active = out.filter((s) => !s.archived);
+  const archived = out.filter((s) => s.archived);
+  assert.equal(active.length, 2);                 // one standalone service per style
+  assert.equal(archived.length, 1);               // original retained, archived (old bookings still resolve)
+  assert.equal(archived[0].id, "cut");
+  assert.deepEqual(active.map((s) => s.name).sort(), ["Skin fade", "Standard"]);
+  assert.ok(active.every((s) => s.usesCutStyles === false && !s.cutTypes)); // new ones are flat services
+});
+test("splitCutStyleServices: nothing to split → returns the SAME array (idempotent, no churn)", () => {
+  const list = [{ id: "shave", name: "Shave", cutTypes: [] }, { id: "beard", name: "Beard" }];
+  assert.equal(R.splitCutStyleServices(list), list); // same reference
+});
+
+// ─── consolidateHaircutMenu: the "Choose your cut" question model ───────────────────────────
+test("consolidateHaircutMenu: already on the new model → unchanged (idempotent)", () => {
+  const list = [{ id: "cut", name: "Haircut" }, { id: "shave", name: "Shave" }]; // no cutTypes, no split children
+  assert.equal(R.consolidateHaircutMenu(list), list); // same reference — never touches a hand-edited menu
+});
+test("consolidateHaircutMenu: a cut with cutTypes → rebuilt clean Haircut + Haircut+Beard, cutTypes gone", () => {
+  const list = [{ id: "cut", name: "Haircut", price: 42, cutTypes: [{ id: "std", label: "Standard" }] }, { id: "beard", name: "Beard Trim" }];
+  const out = R.consolidateHaircutMenu(list);
+  const cut = out.find((s) => s.id === "cut");
+  assert.ok(cut && !cut.cutTypes && cut.usesCutStyles === false); // rebuilt, cut styles removed
+  assert.ok(out.find((s) => s.id === "cutbeard"));                // Haircut + Beard created
+  assert.ok(out.find((s) => s.id === "beard"));                  // unrelated service preserved
+});
+test("consolidateHaircutMenu: drops the leftover split-child junk services", () => {
+  const list = [{ id: "cut", name: "Haircut", cutTypes: [{ id: "std", label: "Standard" }] }, { id: "cut_skinfade_ab12", name: "junk" }];
+  const out = R.consolidateHaircutMenu(list);
+  assert.ok(!out.find((s) => s.id === "cut_skinfade_ab12")); // split-created child removed
 });
