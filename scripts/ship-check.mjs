@@ -40,6 +40,17 @@ try {
   record(false, "Build compiles", "vite build FAILED:\n" + tail);
 }
 
+// 1b) Unit tests pass — the money/logic resolver safety net (pricing, duration, order, cancel-window).
+//     Runs the real resolver code extracted live from src/App.jsx; a regression here blocks the deploy.
+try {
+  execSync("node --test tests/*.test.mjs", { cwd: ROOT, stdio: "pipe" });
+  record(true, "Unit tests pass", "resolver safety net green");
+} catch (e) {
+  const out = ((e.stdout?.toString() || "") + (e.stderr?.toString() || "")).trim();
+  const fails = out.split("\n").filter((l) => l.trim().startsWith("not ok")).slice(0, 10).join("\n");
+  record(false, "Unit tests pass", "node --test FAILED:\n" + (fails || out.split("\n").slice(-10).join("\n")));
+}
+
 // 2) Consent phrase appears exactly N times.
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");

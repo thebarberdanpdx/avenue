@@ -152,8 +152,12 @@ const sortProviders = (list) => {
     .sort((a, b) => {
       if (a.p.id === "anyone") return -1;
       if (b.p.id === "anyone") return 1;
-      const ao = a.p.order ?? (1000 + a.i), bo = b.p.order ?? (1000 + b.i);
-      return ao === bo ? a.i - b.i : ao - bo;
+      // DETERMINISTIC like byServiceOrder: primary key `order`, tiebreak on stable `id` — NOT the array
+      // index. Staff with a missing/equal order (e.g. Dan+Heather, both order:undefined) used to fall back
+      // to array position = the arbitrary DB return order, so their calendar columns/list could reshuffle
+      // across loads (same class of bug as the menu-order one). The id tiebreak makes it stable.
+      const ao = a.p.order ?? 1e9, bo = b.p.order ?? 1e9;
+      return (ao - bo) || String(a.p.id ?? "").localeCompare(String(b.p.id ?? ""));
     })
     .map(({ p }) => p);
 };
