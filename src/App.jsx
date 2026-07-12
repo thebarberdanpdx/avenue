@@ -1881,13 +1881,7 @@ function App() {
           const body = await r.json();
           version = body.version;
         }
-        if (cancelled || !version || version === LOCAL) {
-          pendingVersionReloadRef.current = null;
-          let dirty = [];
-          try { dirty = (syncGuardRef.current.dirtyTables ? syncGuardRef.current.dirtyTables() : []); } catch (e) {}
-          setUpd("up to date" + (dirty.length ? "  · always-dirty: " + dirty.join(",") : "  · clean"), version, LOCAL);
-          return;
-        }
+        if (cancelled || !version || version === LOCAL) { pendingVersionReloadRef.current = null; setUpd("up to date", version, LOCAL); return; }
         const guard = syncGuardRef.current;
         // Fire every pending save NOW, then wait ONLY for real in-flight network writes — not the broad
         // local-vs-server structural diff (a migration can keep that permanently true, which used to wedge
