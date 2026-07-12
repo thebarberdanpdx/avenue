@@ -55,6 +55,7 @@ const { data: tSvcs } = await sb.from('services').select('data').eq('shop_id', T
 // 5) shop row (Test mode, relabeled, no real payment linkage) ----------------
 const settings = { ...(tShop?.settings || {}), name: 'Vero Test (automated)', payments: { live: false }, __test: true };
 delete settings.phone; delete settings.email; // don't carry the real business contact
+delete settings.sales; delete settings.transactions; // never duplicate the real shop's money ledger into the test shop
 // Test shop: don't gate bookings on a card (keeps the automated end-to-end flow simple + deterministic).
 settings.booking = { ...(settings.booking || {}), requireCard: false };
 {
