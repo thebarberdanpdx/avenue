@@ -30,15 +30,30 @@ if (end === -1) throw new Error("resolvers.test: could not find end of answerPri
 const block = src.slice(s, end + 2);
 
 // Sanity: the block must actually contain the functions we test, or a rename slipped past us.
+// Second block: the time-of-day price resolver + the booking-locked price (both depend on getPrice,
+// which the first block already defines, so this block is appended AFTER it in the module).
+const P_START = "const priceWithTimeRules = (service, providerId, dateObj, startMin) => {";
+const P_END_ANCHOR = "const lockedApptPrice = (appt, service) =>";
+const ps = src.indexOf(P_START);
+const pe = src.indexOf(P_END_ANCHOR);
+if (ps === -1 || pe === -1 || pe < ps) {
+  throw new Error("resolvers.test: could not locate the price-time-rules block in src/App.jsx — refusing to pass");
+}
+const pEnd = src.indexOf("\n", pe); // lockedApptPrice is a one-liner
+if (pEnd === -1) throw new Error("resolvers.test: could not find end of lockedApptPrice — refusing to pass");
+const block2 = src.slice(ps, pEnd);
+
 const NAMES = ["cancelWindowMinutes","getStaffEntry","getDuration","overdueBufferMin","getPrice",
   "byServiceOrder","cutStylePrice","cutStyleDuration","addonDuration","addonPriceFor",
-  "cleanServiceLabel","answerDuration","answerPriceFor"];
+  "cleanServiceLabel","answerDuration","answerPriceFor","priceWithTimeRules","lockedApptPrice"];
 for (const n of NAMES) {
-  if (!new RegExp(`(const|function)\\s+${n}\\b`).test(block)) {
-    throw new Error(`resolvers.test: resolver '${n}' not found in the extracted block — refusing to pass`);
+  const inBlock1 = new RegExp(`(const|function)\\s+${n}\\b`).test(block);
+  const inBlock2 = new RegExp(`(const|function)\\s+${n}\\b`).test(block2);
+  if (!inBlock1 && !inBlock2) {
+    throw new Error(`resolvers.test: resolver '${n}' not found in the extracted source — refusing to pass`);
   }
 }
-const moduleSrc = block + `\nexport { ${NAMES.join(", ")} };`;
+const moduleSrc = block + "\n" + block2 + `\nexport { ${NAMES.join(", ")} };`;
 const R = await import("data:text/javascript," + encodeURIComponent(moduleSrc));
 
 // ─── getPrice: per-staff price → service default ───────────────────────────
@@ -124,6 +139,32 @@ test("overdueBufferMin: adds minutes only once past threshold, 0 otherwise", () 
   assert.equal(R.overdueBufferMin({ lastVisit: recent }, biz), 0);
   assert.equal(R.overdueBufferMin({ lastVisit: long }, { overdueBuffer: { enabled: false } }), 0);
   assert.equal(R.overdueBufferMin(null, biz), 0);
+});
+
+// ─── priceWithTimeRules: time-of-day pricing ───────────────────────────────
+test("priceWithTimeRules: no rules → base price", () => {
+  const svc = { id: "cut", price: 40, staff: {} };
+  assert.equal(R.priceWithTimeRules(svc, "dan", new Date("2026-07-13T10:00:00"), 600), 40);
+});
+test("priceWithTimeRules: a matching 'more' rule raises the price; outside the window it doesn't", () => {
+  // Monday 10:00 (minute 600). Rule: +$10 flat, all staff, minutes 540–660.
+  const svc = { id: "cut", price: 40, staff: {}, timeRules: [{ priceMode: "more", amountType: "flat", amount: 10, start: 540, end: 660 }] };
+  const mon = new Date("2026-07-13T10:00:00"); // a Monday
+  assert.equal(R.priceWithTimeRules(svc, "dan", mon, 600), 50); // inside window → +10
+  assert.equal(R.priceWithTimeRules(svc, "dan", mon, 700), 40); // outside window → base
+});
+test("priceWithTimeRules: a 'less' percent rule discounts and never goes negative", () => {
+  const svc = { id: "cut", price: 40, staff: {}, timeRules: [{ priceMode: "less", amountType: "percent", amount: 25, start: 0, end: 1440 }] };
+  assert.equal(R.priceWithTimeRules(svc, "dan", new Date("2026-07-13T10:00:00"), 600), 30); // 40 - 25%
+});
+
+// ─── lockedApptPrice: the price frozen at booking ──────────────────────────
+test("lockedApptPrice: uses the appt's locked price, else falls back to current service price", () => {
+  const svc = { id: "cut", price: 40, staff: { dan: { price: 55 } } };
+  assert.equal(R.lockedApptPrice({ price: 33, providerId: "dan" }, svc), 33); // frozen price wins
+  assert.equal(R.lockedApptPrice({ price: 0, providerId: "dan" }, svc), 0);   // a locked 0 is honored
+  assert.equal(R.lockedApptPrice({ providerId: "dan" }, svc), 55);            // no locked price → current
+  assert.equal(R.lockedApptPrice({}, null), 0);                               // nothing → 0
 });
 
 // ─── cleanServiceLabel ─────────────────────────────────────────────────────
