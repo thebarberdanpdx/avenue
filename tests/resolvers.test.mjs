@@ -53,7 +53,24 @@ for (const n of NAMES) {
     throw new Error(`resolvers.test: resolver '${n}' not found in the extracted source — refusing to pass`);
   }
 }
-const moduleSrc = block + "\n" + block2 + `\nexport { ${NAMES.join(", ")} };`;
+// Per-function extractor (brace-matched) for standalone pure helpers elsewhere in the file.
+function grab(name) {
+  const m = src.match(new RegExp(`(?:const|function)\\s+${name}\\b`));
+  if (!m) throw new Error(`resolvers.test: '${name}' not found in src/App.jsx — refusing to pass`);
+  let i = src.indexOf("{", m.index);
+  if (i === -1) throw new Error(`resolvers.test: no body found for '${name}' — refusing to pass`);
+  let depth = 0;
+  for (; i < src.length; i++) {
+    if (src[i] === "{") depth++;
+    else if (src[i] === "}") { depth--; if (depth === 0) { i++; break; } }
+  }
+  if (src[i] === ";") i++;
+  return src.slice(m.index, i);
+}
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName"];
+const extraSrc = EXTRA.map(grab).join("\n");
+const ALL = [...NAMES, ...EXTRA];
+const moduleSrc = block + "\n" + block2 + "\n" + extraSrc + `\nexport { ${ALL.join(", ")} };`;
 const R = await import("data:text/javascript," + encodeURIComponent(moduleSrc));
 
 // ─── getPrice: per-staff price → service default ───────────────────────────
@@ -173,4 +190,34 @@ test("cleanServiceLabel: prompt→thing, drop article, first two words", () => {
   assert.equal(R.cleanServiceLabel("The Gentleman's Facial"), "Gentleman's Facial");
   assert.equal(R.cleanServiceLabel("Hot Towel & Straight Razor"), "Hot Towel");
   assert.equal(R.cleanServiceLabel("Skin fade or specialty style"), "Skin fade");
+});
+
+// ─── resolveDiscount: what actually comes off the bill at checkout ─────────
+test("resolveDiscount: percent and flat, clamped to [0, gross]", () => {
+  assert.equal(R.resolveDiscount({ type: "percent", value: 25 }, 80), 20);   // 25% of 80
+  assert.equal(R.resolveDiscount({ type: "amount", value: 15 }, 80), 15);     // flat $15
+  assert.equal(R.resolveDiscount({ type: "amount", value: 500 }, 80), 80);    // never more than the gross
+  assert.equal(R.resolveDiscount({ type: "percent", value: -10 }, 80), 0);    // negative → 0, never adds money
+  assert.equal(R.resolveDiscount(null, 80), 0);                               // no discount → 0
+  assert.equal(R.resolveDiscount({ type: "percent", value: 10 }, 0), 0);      // nothing to discount
+});
+
+// ─── apptHoldsSlot: which appts occupy the chair (double-book rule) ────────
+test("apptHoldsSlot: cancelled/done free the slot; everything else holds it", () => {
+  assert.equal(R.apptHoldsSlot({ status: "confirmed" }), true);
+  assert.equal(R.apptHoldsSlot({ status: "in-service" }), true);
+  assert.equal(R.apptHoldsSlot({ status: "block" }), true);
+  assert.equal(R.apptHoldsSlot({ status: "cancelled" }), false);
+  assert.equal(R.apptHoldsSlot({ status: "done" }), false);
+  assert.equal(R.apptHoldsSlot(null), false);
+});
+
+// ─── apptDisplayName: always resolve the real person, never a placeholder ──
+test("apptDisplayName: resolves 'Me'/blank + family member through the client", () => {
+  const clients = [{ id: "c1", name: "Dan Smith", family: [{ id: "f1", name: "Junior Smith" }] }];
+  assert.equal(R.apptDisplayName({ name: "Alex", clientId: "c1" }, clients), "Alex");      // real name kept
+  assert.equal(R.apptDisplayName({ name: "Me", clientId: "c1" }, clients), "Dan Smith");   // placeholder → client
+  assert.equal(R.apptDisplayName({ name: "", clientId: "c1" }, clients), "Dan Smith");     // blank → client
+  assert.equal(R.apptDisplayName({ name: "Me", clientId: "c1", familyMemberId: "f1" }, clients), "Junior Smith"); // family member
+  assert.equal(R.apptDisplayName({ name: "Walk-in", clientId: "x" }, clients), "Walk-in"); // unknown client, real name
 });
