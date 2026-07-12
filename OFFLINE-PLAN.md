@@ -1,4 +1,23 @@
-# Offline-first build plan — PowerSync on the existing Supabase (Route A)
+> # ⛔ SUPERSEDED / STALE — DO NOT FOLLOW THIS PLAN AS WRITTEN (stamped 2026-07-12)
+> **PowerSync was TRIED and DROPPED.** Its WASM (`@powersync/web` + `wa-sqlite`) crashed the
+> iOS app on launch in Capacitor/WKWebView (commits `3770d66` → `fa8d9fd` → `caf4b7b`, ~12 min of
+> production life). The fallback — native `@capacitor-community/sqlite` — then broke the iOS UI
+> (viewport zoom, stale Xcode bundles) and was fully reverted (`31046c7` → pre-offline `f0f19d4`).
+> **There is NO working offline feature in production.** Nothing offline is in `main`.
+>
+> The authoritative account + the "never repeat this" rules live in **`NATIVE-OFFLINE-ROLLBACK-HANDOFF.md`** — read that FIRST.
+>
+> **Do NOT re-add PowerSync (or any device-DB sync engine) without first proving it renders and runs
+> in Capacitor iOS on a real device.** Offline-first is a NATIVE problem that cannot be built or
+> verified from a cloud agent — it needs Dan on the phone with Xcode at every stage.
+>
+> Keep **Supabase Realtime** (the 5-table publication = cross-device calendar sync). That is NOT
+> PowerSync and must stay. The risk analysis + policy questions below are still useful reference, but
+> the engine choice and stages are void.
+
+---
+
+# Offline-first build plan — PowerSync on the existing Supabase (Route A)  ⟨HISTORICAL — see banner above⟩
 
 _Decision locked 2026-07-08 with Dan, after the second Supabase outage in two days (root cause of today's: NANO compute exhausted — upgraded to Micro the same morning). This file is the working plan; update it as stages land. Read `RELIABILITY-PLAN.md` §2 for the original route comparison._
 
