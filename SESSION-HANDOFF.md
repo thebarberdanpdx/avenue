@@ -8,7 +8,37 @@
 
 ---
 
-## 🆕 LATEST SESSION — 2026-07-12: reliability hardening + the auto-update fix (the big one). Branch `claude/app-reliability-qa-audit-qdabvv`
+## 🆕 LATEST SESSION — 2026-07-12 (live-testing rig + readiness push). Branch `claude/live-testing-setup-w0hfet`
+
+**Headline: built a cloud LIVE-TESTING RIG so changes are verified WITHOUT Dan's phone, then used it to harden the money/booking paths. Dan reframed Phase 2 → "get it READY for real clients" (the finish line, on me) — NOT running real clients before it's safe.**
+
+**⭐ LIVE-TESTING RIG (`tests/live/`, see its README):** drives the real app (gotvero.com) headless from the cloud.
+- Blocker solved: the agent proxy resets Chromium's TLS 1.3 → launch with `--ssl-version-max=tls1.2` (`driver.mjs`). Browser pinned to `America/Los_Angeles`; **Sentry/analytics blocked** (a test-induced error once emailed Dan a real Sentry alert — now can't).
+- **Login without a phone:** mint a Supabase session with the service-role key (`auth.admin.generateLink`) + set `vero_login_intent=staff`; the app consumes it. Membership = server-side RLS via `accounts`/`memberships` tables + `shops.account_id`.
+- **Isolated test shop `vero-test`** (`seed-test-shop.mjs`): own account + login **`vero-livetest@vero.test`** + membership, Test-payment mode, cloned services/providers (PII stripped), fake client. Scoped to `shop_id='vero-test'`; row PK is composite `(shop_id,id)` so it can never touch Sanctuary.
+- Scripts: `driver`, `seed-test-shop`, `authed-smoke`, `public-smoke`, `appt-flow` (check-in→checkout via the deep-link), `booking-guards`.
+- **Proven live:** full public booking end-to-end (persisted); authed dashboard; **check-in → checkout** ($42 + $2.10 tip = $44.10, Test mode); the server booking guards.
+- **Rig limits:** NO realtime/WebSockets from the cloud (proxy blocks WS) → realtime freshness is device-only; a fresh service-key insert needs a `page.reload()` (load-race). Native (Tap to Pay, reader, push, haptics) always needs Dan's device.
+
+**⭐ SHIPPED + VERIFIED this session:**
+- **`?appt=<id>` deep-link** (PR #322): opens an appointment's sheet directly (calendar tiles are virtualized/unstyled → tile-clicking was hopeless); reuses the push-notification deep-link path. Additive, inert without the param.
+- **Timezone fix** (PR #327): appointments were built in the BOOKER's device tz → off-tz clients landed at the wrong hour. New `shopWallToInstant()` anchors to `SHOP_TZ="America/Los_Angeles"` (DST-correct); applied to `ClientFlow` booking + `ManageByToken`/`ManageAppointment` reschedule/rebook. Identical on a Pacific device; **verified live** (booked from New York → sat at 9 AM Pacific). Staff-side entry (Dan's own Pacific device) left as-is — could harden later.
+- **Money math extracted + unit-tested** (VERBATIM, no amounts change): **`computeCheckoutMoney`** (PR #326, verified live — real checkout still $44.10) + **`computeRegisterSale`** (PR #329). Both near `resolveDiscount`.
+- **Booking-engine tests** (PR #325): `computeFreeSlots` covers no-double-book, closed day, lead-time, provider/online caps. Test net now **42 tests**, gated in ship-check (`node --test tests/*.test.mjs`).
+
+**🔎 READINESS FINDINGS:**
+- ✅ Server booking guards hold — double-book/blocked-client/insert-only — verified live via `book_public` (`booking-guards.mjs`).
+- ✅ A client CAN'T cancel/reschedule directly via the API — RLS blocks it (update hit 0 rows).
+- ⚠️ The client cancel/reschedule **window** is enforced by trigger `enforce_cancel_window` (`db/cancel-window-guard-2026-07-08.sql`) whose **deployment is UNCONFIRMED** (couldn't test from here — needs a manage token). If it was never run in Supabase, a client with their manage link could cancel/move inside the window. **Dan: confirm this SQL is deployed.**
+- ✅ SMS is DONE for launch (carrier-level STOP on the toll-free + `smsOptOut` honored server-side + STOP/HELP copy everywhere; the STOP/HELP reply messages live in Dan's Vonage settings). The old "STOP handler to build" note is obsolete.
+
+**📋 NEEDS DAN (can't close from the cloud):** (1) **card-reader double-charge test** — his physical reader; fix parked on `claude/checkout-double-charge`; Tap to Pay still Apple dev-tier only. (2) **one dry-run day** on fake data before a real client. (3) **confirm the cancel-window-guard SQL is deployed**. (4) rotate the service-role key (it was in this session's chat); PowerSync cloud cleanup; schema-in-git; confirm Sentry free tier.
+
+Test-rig login: **`vero-livetest@vero.test`** (shop `vero-test`, Test mode).
+
+---
+
+## 🆕 2026-07-12 (earlier): reliability hardening + the auto-update fix (the big one). Branch `claude/app-reliability-qa-audit-qdabvv`
 
 > **META — Dan's live feedback this session: BE FAST. Stop the tool-call ping-pong, batch, keep replies short (he has a short attention span and got frustrated at how long each little thing took). Decisive > exhaustive.** Don't ask "what's next?" — just keep moving on the highest-value safe work.
 
