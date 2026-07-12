@@ -1826,6 +1826,8 @@ function App() {
     hasUnsavedWork: () => false,
     flushAll: () => {},
     waitForSavesIdle: async () => true,
+    writesPending: () => false,
+    waitForWritesIdle: async () => true,
   });
   const [shopUnlocked, setShopUnlocked] = useState(true);
   const [shopPwPrompt, setShopPwPrompt] = useState(false);
@@ -1881,11 +1883,15 @@ function App() {
         }
         if (cancelled || !version || version === LOCAL) { pendingVersionReloadRef.current = null; setUpd("up to date", version, LOCAL); return; }
         const guard = syncGuardRef.current;
-        if (guard.hasUnsavedWork()) { pendingVersionReloadRef.current = version; setUpd("update ready — waiting on unsaved work", version, LOCAL); return; }
+        // Fire every pending save NOW, then wait ONLY for real in-flight network writes — not the broad
+        // local-vs-server structural diff (a migration can keep that permanently true, which used to wedge
+        // the updater forever). After flush + wait it's safe to reload; a phantom diff re-fetches on load.
         guard.flushAll();
-        const idle = await guard.waitForSavesIdle(10000);
-        if (cancelled || !idle || guard.hasUnsavedWork()) { pendingVersionReloadRef.current = version; setUpd("update ready — saves still pending", version, LOCAL); return; }
+        const idle = guard.waitForWritesIdle ? await guard.waitForWritesIdle(10000) : await guard.waitForSavesIdle(10000);
+        if (cancelled) return;
+        if (!idle) { pendingVersionReloadRef.current = version; setUpd("update ready — a save is taking long, will retry", version, LOCAL); return; }
         pendingVersionReloadRef.current = null;
+        setUpd("updating now → " + short(version), version, LOCAL);
         doReload(version);
       } catch (e) { setUpd("check error: " + ((e && e.message) || String(e)).slice(0, 60), null, LOCAL); }
     };
@@ -3065,6 +3071,28 @@ function App() {
     };
     tick();
   });
+  // NARROW "is a real write in flight" check — ONLY actual queued/running network saves + a pending
+  // shops save. Deliberately does NOT include the broad local-vs-server structural diff that
+  // hasUnsavedWork() uses: a load-time migration can keep that diff permanently true, which wedged the
+  // auto-updater on "waiting on unsaved work" and stopped the app from ever updating itself. For the
+  // reload decision we flushAll() first (fires every pending save) then wait out these real writes; a
+  // lingering phantom diff is re-fetched from the server on reload, so nothing is lost.
+  const writesPending = () => {
+    if (shopsPendingRef.current) return true;
+    return ["appointments", "clients", "waitlist", "services", "providers", "reviews"].some((t) => {
+      const sv = savingRef.current[t];
+      return !!(sv && (sv.running || sv.queued)) || pendingSaveRef.current[t] !== undefined;
+    });
+  };
+  const waitForWritesIdle = (timeoutMs = 10000) => new Promise((resolve) => {
+    const start = Date.now();
+    const tick = () => {
+      if (!writesPending()) return resolve(true);
+      if (Date.now() - start > timeoutMs) return resolve(false);
+      setTimeout(tick, 150);
+    };
+    tick();
+  });
   useEffect(() => { if (!loadedRef.current || !session || !staffClientsLoadedRef.current) return; if (clients === lastRemoteRef.current.clients) return; lastSaveAt.current.clients = Date.now(); pendingSaveRef.current.clients = clients; const t = setTimeout(() => firePending('clients'), 800); return () => clearTimeout(t); }, [clients]);
   useEffect(() => { if (!loadedRef.current || !session || !staffApptsLoadedRef.current) return; if (appts === lastRemoteRef.current.appointments) return; lastSaveAt.current.appointments = Date.now(); pendingSaveRef.current.appointments = appts; const t = setTimeout(() => firePending('appointments'), 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; lastSaveAt.current.waitlist = Date.now(); pendingSaveRef.current.waitlist = waitlist; const t = setTimeout(() => firePending('waitlist'), 800); return () => clearTimeout(t); }, [waitlist]);
@@ -3076,7 +3104,7 @@ function App() {
   // can never double-write or send stale data.
   useEffect(() => {
     const flushAll = () => { Object.keys(pendingSaveRef.current).forEach(firePending); fireShopsSave(); };
-    syncGuardRef.current = { hasUnsavedWork, flushAll, waitForSavesIdle };
+    syncGuardRef.current = { hasUnsavedWork, flushAll, waitForSavesIdle, writesPending, waitForWritesIdle };
     const onVis = () => { if (document.visibilityState === "hidden") flushAll(); };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("pagehide", flushAll);
@@ -20681,7 +20709,7 @@ function NativeDiagnostics() {
   useEffect(() => { run(); }, []);
   return (
     <div style={{ marginTop: 18, padding: "14px 16px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--panel2)" }}>
-      <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-5</div>
+      <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-6</div>
       <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, color: "var(--text2)", lineHeight: 1.75, wordBreak: "break-all" }}>
         <div>app code: <b style={{ color: "var(--gold)" }}>{(typeof __BUILD_VERSION__ !== "undefined" ? String(__BUILD_VERSION__) : "dev").slice(0, 7)}</b> <span style={{ color: "var(--faint)" }}>(if this changes without a force-quit, auto-update works)</span></div>
         {(() => { let u = null; try { u = JSON.parse(localStorage.getItem("vero_update_status") || "null"); } catch (e) {} return u
