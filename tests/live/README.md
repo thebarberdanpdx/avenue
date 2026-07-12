@@ -84,9 +84,17 @@ RLS**, not a client gate.
 - **Timezone:** the sandbox is UTC; the shop is Pacific. `driver.mjs` pins the
   context to `America/Los_Angeles`. Without it, a booked "9 AM" stores as 9 AM
   UTC (2 AM Pacific) — the known off-tz-booker issue.
-- **Initial-load race:** a row inserted via the service key may not appear in
-  the staff UI on first paint; a `page.reload()` (or the app's ~60s refetch)
-  surfaces it. Wait for the row's text before interacting.
+- **No realtime / WebSockets from the cloud.** The agent proxy blocks WebSocket
+  upgrades, and Supabase realtime runs over WS — so headless sessions here
+  **never receive realtime pushes**. They fall back to the HTTP refetch, which
+  is why a fresh insert only shows after a `page.reload()`. This means realtime
+  freshness (a new booking popping onto an open calendar in ~1s) **cannot be
+  tested from this rig** — it's a device-only check. Don't mistake the
+  reload-to-see behavior for an app bug; on a real device (no proxy) realtime
+  works.
+- **Initial-load race:** because of the above, a row inserted via the service
+  key only appears after a `page.reload()` (or the app's ~60s heartbeat). Wait
+  for the row's text, and reload if needed, before interacting.
 - **Calendar tiles are virtualized, unstyled divs** (no test IDs), so
   tile-clicking is flaky. **Solved by the `?appt=<id>` deep-link** (shipped in
   `src/App.jsx`): it opens the appointment sheet directly, no tile-clicking.
