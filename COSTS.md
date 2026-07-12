@@ -12,7 +12,7 @@ _Every service the app needs, what it does, and what it costs. Update this whene
 | Domain gotvero.com | The address. | ⚠️ ~$15–20/yr | KEEP. |
 | GitHub | Code, history, the deploy robot (Actions), regression guards. | free tier | KEEP — free. |
 | Sentry | Server error alarms (wired into api/). | ⚠️ believed free tier — CONFIRM on the Sentry dashboard | KEEP if free; revisit if it's billing. |
-| **PowerSync** | The offline-sync engine (OFFLINE-PLAN.md). | **$0 during the build** (Free: 500 MB synced, 50 concurrent connections). Pro ⚠️ ~$49/mo only if usage outgrows Free. | NEW 2026-07-08. Design goal: stay on Free at launch — only STAFF devices hold sync connections; the public booking page stays on ordinary reads. Watch synced-data size (base64 photos are the bloat risk — moving photos to object storage is the fix, audit item #5). |
+| ~~PowerSync~~ **DROPPED** | ~~The offline-sync engine.~~ **NOT IN USE.** Tried 2026-07-10, crashed the iOS app (WASM in WKWebView), fully reverted. No offline feature ships today. | **$0 — not subscribed.** No paid tier was ever confirmed. | STALE line kept for history. **Action for Dan:** if a PowerSync cloud project/account was created pointing at prod Supabase, delete it; remove `VITE_POWERSYNC_URL` from Vercel env if set; drop any `powersync_*` Postgres replication slots (but KEEP `supabase_realtime`). See NATIVE-OFFLINE-ROLLBACK-HANDOFF.md. |
 
 **Total believed run-rate today: ≈ $55/mo** + per-use pennies (SMS) + per-swipe (Stripe).
 Reference point: Mangomint alone starts ≈ $165/mo — the whole independent stack is about a third of that, owned outright.
