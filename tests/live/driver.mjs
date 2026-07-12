@@ -43,6 +43,11 @@ export async function launch({ device = 'iphone', headless = true, blockTelemetr
   const context = await browser.newContext({
     viewport,
     deviceScaleFactor: 2,
+    // Match the shop's real timezone/locale — the sandbox defaults to UTC, which
+    // skews every time-based flow (booking slots, calendar position, "today",
+    // reminders) by the offset and reproduces the known off-tz-booker bug.
+    timezoneId: process.env.TEST_TZ || 'America/Los_Angeles',
+    locale: 'en-US',
     userAgent: device === 'iphone'
       ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
       : undefined,
