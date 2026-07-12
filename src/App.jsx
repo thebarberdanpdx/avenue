@@ -2175,7 +2175,12 @@ function App() {
   const SHOP_ID = resolveShopId();
   _stripeShop = SHOP_ID; // let stripeApi name this shop on money-out calls (server verifies membership)
 
-  const [pendingApptId, setPendingApptId] = useState(null); // notification tap → open this appointment on the calendar
+  // notification tap → open this appointment on the calendar. Also seeded from a
+  // ?appt=<id> URL param so an appointment can be deep-linked directly (used by
+  // the live-testing harness, and works for any staff deep-link URL).
+  const [pendingApptId, setPendingApptId] = useState(() => {
+    try { return new URL(window.location.href).searchParams.get("appt") || null; } catch (e) { return null; }
+  });
   // ---- PUSH NOTIFICATIONS (native app only): register this device for booking
   // alerts and save its token against the signed-in staff user + shop. Silent in
   // the UI; each step logs to the console ("[vero push] ...") so a Mac-tethered
