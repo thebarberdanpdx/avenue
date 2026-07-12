@@ -1881,7 +1881,13 @@ function App() {
           const body = await r.json();
           version = body.version;
         }
-        if (cancelled || !version || version === LOCAL) { pendingVersionReloadRef.current = null; setUpd("up to date", version, LOCAL); return; }
+        if (cancelled || !version || version === LOCAL) {
+          pendingVersionReloadRef.current = null;
+          let dirty = [];
+          try { dirty = (syncGuardRef.current.dirtyTables ? syncGuardRef.current.dirtyTables() : []); } catch (e) {}
+          setUpd("up to date" + (dirty.length ? "  · always-dirty: " + dirty.join(",") : "  · clean"), version, LOCAL);
+          return;
+        }
         const guard = syncGuardRef.current;
         // Fire every pending save NOW, then wait ONLY for real in-flight network writes — not the broad
         // local-vs-server structural diff (a migration can keep that permanently true, which used to wedge
@@ -3093,6 +3099,15 @@ function App() {
     };
     tick();
   });
+  // Diagnostic: WHICH tables read as "unsaved" (structural diff vs the saved server baseline). Used only
+  // to pinpoint the phantom-dirty (a load-time reshape that never byte-matches what's stored) — read it
+  // in Settings → Diagnostics. Not used for any save/reload decision.
+  const dirtyTables = () => {
+    const out = [];
+    if (shopsPendingRef.current) out.push("shop");
+    for (const t of ["appointments", "clients", "waitlist", "services", "providers", "reviews"]) { try { if (tableHasUnsavedWork(t)) out.push(t); } catch (e) {} }
+    return out;
+  };
   useEffect(() => { if (!loadedRef.current || !session || !staffClientsLoadedRef.current) return; if (clients === lastRemoteRef.current.clients) return; lastSaveAt.current.clients = Date.now(); pendingSaveRef.current.clients = clients; const t = setTimeout(() => firePending('clients'), 800); return () => clearTimeout(t); }, [clients]);
   useEffect(() => { if (!loadedRef.current || !session || !staffApptsLoadedRef.current) return; if (appts === lastRemoteRef.current.appointments) return; lastSaveAt.current.appointments = Date.now(); pendingSaveRef.current.appointments = appts; const t = setTimeout(() => firePending('appointments'), 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; lastSaveAt.current.waitlist = Date.now(); pendingSaveRef.current.waitlist = waitlist; const t = setTimeout(() => firePending('waitlist'), 800); return () => clearTimeout(t); }, [waitlist]);
@@ -3104,7 +3119,7 @@ function App() {
   // can never double-write or send stale data.
   useEffect(() => {
     const flushAll = () => { Object.keys(pendingSaveRef.current).forEach(firePending); fireShopsSave(); };
-    syncGuardRef.current = { hasUnsavedWork, flushAll, waitForSavesIdle, writesPending, waitForWritesIdle };
+    syncGuardRef.current = { hasUnsavedWork, flushAll, waitForSavesIdle, writesPending, waitForWritesIdle, dirtyTables };
     const onVis = () => { if (document.visibilityState === "hidden") flushAll(); };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("pagehide", flushAll);
@@ -20709,7 +20724,7 @@ function NativeDiagnostics() {
   useEffect(() => { run(); }, []);
   return (
     <div style={{ marginTop: 18, padding: "14px 16px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--panel2)" }}>
-      <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-7</div>
+      <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-8</div>
       <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, color: "var(--text2)", lineHeight: 1.75, wordBreak: "break-all" }}>
         <div>app code: <b style={{ color: "var(--gold)" }}>{(typeof __BUILD_VERSION__ !== "undefined" ? String(__BUILD_VERSION__) : "dev").slice(0, 7)}</b> <span style={{ color: "var(--faint)" }}>(if this changes without a force-quit, auto-update works)</span></div>
         {(() => { let u = null; try { u = JSON.parse(localStorage.getItem("vero_update_status") || "null"); } catch (e) {} return u
