@@ -49,12 +49,22 @@ source <scratchpad>/.vero-secret
 | `seed-test-shop.mjs` | Stands up / refreshes the isolated `vero-test` shop (account + login + membership + shop in Test mode + cloned services/providers + a fake client). Idempotent. |
 | `authed-smoke.mjs [email] [shop]` | Logs into the dashboard headlessly and reports whether writes succeed (no RLS 403 / "couldn't save" banner). Screenshots. |
 | `appt-flow.mjs` | Full staff-side flow: open an appointment by deep-link, **CHECK-IN → CHECKOUT (Cash, Test mode)**, verifying each step in the DB. Prints PASS/FAIL. |
+| `booking-guards.mjs` | Server-side backstops in `book_public` via the ANON key: double-book rejected, blocked client rejected, insert-only (can't overwrite an existing appt). The guards that protect real bookings even if the UI is bypassed. Prints PASS/FAIL per guard. |
+| `public-book-e2e.mjs` | **THE core customer journey**, driven entirely through the real UI: storefront → first-time → pick service → barber → day → time → details → **BOOK**. Verifies the row persisted AND that `bookedFor` is the picked wall-clock time **in Pacific** (the tz-correctness backstop). Handles both the plain and guided-"Choose your cut" service paths. Cleans up after itself. `SVC_NAME`/`SVC_ID` env pick the service (default Beard Trim). |
 
 ```bash
 node tests/live/seed-test-shop.mjs                          # create/refresh vero-test
 node tests/live/authed-smoke.mjs vero-livetest@vero.test vero-test
 node tests/live/public-smoke.mjs https://gotvero.com vero-test
+node tests/live/booking-guards.mjs                          # server guards (book_public)
+node tests/live/public-book-e2e.mjs                         # full customer booking, UI → DB
+SVC_NAME=Haircut SVC_ID=cut node tests/live/public-book-e2e.mjs   # guided-choice variant
 ```
+
+**Entry URL matters:** `gotvero.com/<slug>` is the real **client** booking entry
+(resolves the shop *and* lands on the booking flow). `?shop=<slug>` is the
+**staff/dashboard** entry (shows staff sign-in). `public-book-e2e.mjs` uses the
+pretty-slug URL so it drives exactly what a real customer sees.
 
 Screenshots go to `$SHOTS` (defaults to the session scratchpad `shots/`).
 
