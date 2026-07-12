@@ -6,6 +6,45 @@
 > 3. **CONTEXT — 2026-07-08 ended mid-Supabase-outage.** Supabase (the DB host) had a real outage (their auth service down; confirmed by direct probes). Dan's calendar + booking flow went blank and he (rightly) lost trust. **His data was never lost** — Pro daily backups + the app's write-guard (a failed load blocks all saves) + the new offline read-cache. If the outage is still active when you start, re-probe `https://iufgznminbujcabqeesk.supabase.co` (REST `/rest/v1/` expect 401=up; AUTH `/auth/v1/health` expect 200=up) and tell Dan when it's back. Do NOT ship code blind during an outage (can't verify) — verify each change once it's stable.
 > 4. Emotional read: Dan is at the end of his rope after 6 weeks. Be honest, proactive, verify everything, never over-promise. The reliability work is what rebuilds trust.
 
+---
+
+## 🆕 LATEST SESSION — 2026-07-12: reliability hardening + the auto-update fix (the big one). Branch `claude/app-reliability-qa-audit-qdabvv`
+
+> **META — Dan's live feedback this session: BE FAST. Stop the tool-call ping-pong, batch, keep replies short (he has a short attention span and got frustrated at how long each little thing took). Decisive > exhaustive.** Don't ask "what's next?" — just keep moving on the highest-value safe work.
+
+**Environment note (CHANGED from older blocks below): this session's sandbox is NOT firewalled** — I can `curl https://gotvero.com`, hit `/api/version`, AND reach Supabase directly. Older blocks say "firewalled, verify via GitHub Actions" — that's STALE for this env.
+
+**⭐ I have DIRECT DB ACCESS this session.** Supabase URL `https://iufgznminbujcabqeesk.supabase.co`; the **service-role (`sb_secret_…`) key is in the session chat — ASK DAN for it, do NOT commit it anywhere** (GitHub push-protection will block it, correctly). Verify/repair live data with a node `createClient(URL, SECRET)` script **run from the repo root** (needs `node_modules`; write `_tmp_x.mjs`, run, `rm`). This is how the order bug was root-caused and the menu data repaired.
+
+**Deploy flow:** branch → PR → **squash-merge** (`mcp__github__merge_pull_request`) → poll `curl -s https://gotvero.com/api/version` for the merge SHA. **Auto-update now reaches Dan's phone on its own in ~1–2 min** (see below) — no more "force-quit to see it." Stop-hook nags about "Unverified" commits are the GitHub squash-merge commits on `main`; benign, do NOT rewrite merged history.
+
+### ✅ Shipped this session (all live + verified)
+- **⭐ AUTO-UPDATE FIXED (the headline).** The native app kept running stale code — every fix needed a manual force-quit, which doubled every debug loop for weeks. Root cause (proven on Dan's device, NOT a cache issue — the CDN served fresh code): the in-app updater gated its reload on `hasUnsavedWork()`, which is **permanently true** (see phantom-dirty below), so it deferred forever on "waiting on unsaved work". Fix: gate the reload on **actual in-flight writes** (`writesPending` / `waitForWritesIdle`) after `flushAll()`, not the broad structural diff. Verified live: Dan watched it self-update with zero taps. Also added a visible **"app code: <sha>"** + **"Update now"** button + auto-update status in **Settings → Diagnostics** (`NativeDiagnostics`).
+- **Menu/staff order — ROOT-FIXED (the recurring "order reshuffles / won't stick" bug, 5+ rounds).** Order is now **server-authoritative** on load, save AND refetch. `byServiceOrder` (order + id tiebreak → total/deterministic sort, no reshuffle on tie); `[service-order-dataloss]` backstop in `syncList` (a save can't blank an `order` the server has; only a real reorder writes order, via `flushServicesNow(list, true)` / `orderWrite`); `refetchTable` forces server order over stale local; `sortProviders` made deterministic. Root cause was undefined `order` on legacy rows + a stale-device clobber. Data was repaired server-side.
+- **Money durability:** every sale (`Checkout.recordSale` + `RegisterView`) and refund (`ApptRefundSheet` + `PaymentsView`) now **flushes to the server instantly** (`flushClientsNow`/`flushShopsNow`), so a swipe-away/crash can't drop a sale/refund from the reports (reports read Vero's own ledger, not Stripe). Booking **double-submit guard** (`commitInFlightRef`). **Per-tab crash containment** (an ErrorBoundary per dashboard tab — one screen crashing no longer white-screens the app; still reports to Sentry).
+- **⭐ AUTOMATED TEST SAFETY NET (new):** `tests/resolvers.test.mjs` — **25 tests, `node --test`, zero deps**. It EXTRACTS the live pure resolvers out of `src/App.jsx` at runtime (like `gesture.test.js`) so it tracks real code with **no App.jsx changes**. Covers pricing/duration cascades, `byServiceOrder`, cut-style/add-on/answer overrides, time-of-day pricing, locked price, `cancelWindowMinutes`, `resolveDiscount`, `apptHoldsSlot`, `apptDisplayName`, and the reshaping migrations. **Wired into `ship-check`** (verified it actually fails on a real regression). `npm test` runs it.
+- Earlier in the session: **payments Test/Live toggle** (test mode charges nothing — every card path honors it), Sentry on the inner `ErrorBoundary`, outage-recovery re-enables saves, 4 latent crash fixes, honest-load gate for the public booking providers, no-undef ship-check gate.
+
+**ship-check now runs:** build · **unit tests** · consent ×4 · ≤12 fns · no secrets · **39 GUARDS** (added `service-order-dataloss`, `byServiceOrder`) · calendar-sync · no-undef.
+
+### 🅿️ Offline-first — SHELVED (do NOT solo-pursue)
+Attempted twice, both crashed Dan's iPhone, both fully reverted — it's a NATIVE problem a cloud agent can't build/verify. See the READ-FIRST box + `NATIVE-OFFLINE-ROLLBACK-HANDOFF.md`. PowerSync docs (`OFFLINE-PLAN.md`, `COSTS.md`, `RELIABILITY-PLAN.md §2`) are stamped stale this session. Needs a Dan+device+Xcode session or nothing.
+
+### 🔎 Phantom-dirty (understood, BENIGN — don't chase)
+`services` + `providers` always read "dirty" (local ≠ saved baseline) because some server rows are missing default fields (`photos`/`booking`/`usesCutStyles`; "anyone" is a stub) that the app fills in memory. **Verified harmless** — the only functional consumer of the dirty check gates appts/clients sync only; the updater now uses the narrow write-check. **Do NOT write to the services/providers tables to "fix" a cosmetic flag** (they're money-critical/protected). Fold normalization in only when legitimately touching that load path.
+
+### 📋 Dan's action list (needs him — I can't from the cloud)
+1. **Run real days on the app** (alongside his current system, don't rely yet) — only he generates real-use bugs. This is the #1 trust-builder.
+2. **Offline-first:** a device session with Xcode, if/when he wants it.
+3. **PowerSync cleanup:** delete any PowerSync cloud project, remove `VITE_POWERSYNC_URL` from Vercel, drop any `powersync_*` replication slot — **KEEP `supabase_realtime`**.
+4. **Card-reader double-charge test** — fix parked on branch `claude/checkout-double-charge`; needs his physical reader + one ~$1 real charge → "try again" → confirm single → refund.
+5. **Schema-in-git** (audit #3) — needs his Supabase creds/CLI.
+6. Confirm **Sentry** is on the free tier (`COSTS.md` flags it unconfirmed).
+
+Test client: **"Test Golden"** (503-840-2389).
+
+---
+
 _Last updated: 2026-07-08 (**🛡️ RELIABILITY RECKONING — a live Supabase outage blanked the calendar + booking flow; Dan lost trust and demanded the app be made bulletproof.** This session's build work (PRs #218–#251): checkout accuracy, rebook redesign, deletes, cross-device freshness, portal editing, calendar contrast, and — critically — the **offline read-cache** (#248: staff calendar shows last-synced data during an outage instead of blank) and the **reliability plan + senior-dev audit** (`RELIABILITY-PLAN.md`, #251). Root-caused the booking-flow degradation: the app falls back to the hardcoded `DEFAULT_SERVICES` **demo menu** when the real menu can't load (`src/App.jsx:550`) — a real flaw (shows fake data to real clients); cut images are Unsplash, not Supabase. **NEXT PRIORITY = offline-first (make the shop survive any outage). See the `🚨 NEW SESSION` box above + `RELIABILITY-PLAN.md`.** Data safety confirmed: Supabase **Pro** = daily backups (the old "free tier has none" note was stale and corrected in `DATABASE.md`). **⚠️ PENDING SQL Dan still owes:** `db/visit-extras-2026-07-08.sql` · `db/cancel-window-guard-2026-07-08.sql` (server-side wall for the client change/cancel window — the app-side 12h lock works without it, but until this runs the window is only browser-enforced). **Dan's action list:** Vonage Toll-Free Verification (instant SMS). Test client: **"Test Golden"** (503-840-2389).)_
 
 <details><summary>_Prior 2026-07-08 (earlier): live run-through — PRs #218–#245_</summary>
