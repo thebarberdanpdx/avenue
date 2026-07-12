@@ -1842,41 +1842,52 @@ function App() {
     const LOCAL = (typeof __BUILD_VERSION__ !== "undefined") ? __BUILD_VERSION__ : "dev";
     if (LOCAL === "dev") return; // skip in local dev
     let cancelled = false;
+    // Diagnostic breadcrumb — the updater writes WHY it did/didn't reload to localStorage so
+    // NativeDiagnostics (Settings) can show it. This is how we see, on a real device, whether the
+    // updater is stuck before the reload (unsaved work / fetch fail) or the reload itself isn't
+    // taking (web-view HTTP cache). key: vero_update_status.
+    const short = (v) => (v ? String(v).slice(0, 7) : "—");
+    const setUpd = (state, sv, lv) => { try { localStorage.setItem("vero_update_status", JSON.stringify({ state, sv: short(sv), lv: short(lv), at: Date.now() })); } catch (e) {} };
+    // Strongest cache-bust a WKWebView will honor: clear any Cache-API entries, then navigate to a
+    // brand-NEW url (origin + fresh ?u=timestamp) so the web view can't serve the stale document from
+    // its HTTP cache. window.location.replace to a NEW query key, not the same href.
+    const hardReload = (version) => {
+      try { if (window.caches && caches.keys) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {}); } catch (e) {}
+      const origin = (window.location && window.location.origin) ? window.location.origin : "https://gotvero.com";
+      const path = (window.location && window.location.pathname) ? window.location.pathname : "/";
+      window.location.replace(origin + path + "?u=" + Date.now() + (version ? "&v=" + String(version).slice(0, 8) : ""));
+    };
     const doReload = (version) => {
+      // Bounded auto-retry: try a few times, then STOP (surface the manual "Update now" button) — never
+      // loop, but also don't get permanently wedged on a first cached reload that silently didn't update.
       const KEY = "vero_reloaded_for";
-      if (sessionStorage.getItem(KEY) === version) return;
-      sessionStorage.setItem(KEY, version);
-      const u = new URL(window.location.href);
-      u.searchParams.set("v", String(version).slice(0, 8));
-      if (IS_NATIVE) u.searchParams.set("_", String(Date.now()));
-      window.location.replace(u.toString());
+      const parts = String(sessionStorage.getItem(KEY) || "").split("#");
+      const n = (parts[0] === version) ? (parseInt(parts[1], 10) || 0) : 0;
+      if (n >= 3) { setUpd("BEHIND — auto-reload didn't take after 3 tries (web-view cache). Use 'Update now'.", version, LOCAL); return; }
+      try { sessionStorage.setItem(KEY, version + "#" + (n + 1)); } catch (e) {}
+      setUpd("behind — reloading (try " + (n + 1) + ")", version, LOCAL);
+      hardReload(version);
     };
     const check = async () => {
-      if (holdReloadRef.current) return;
+      if (holdReloadRef.current) { setUpd("paused (mid-action)", null, LOCAL); return; }
       try {
         const targetVersion = pendingVersionReloadRef.current;
         let version = targetVersion;
         if (!version) {
           const r = await fetch(API_BASE + "/api/version", { cache: "no-store" });
-          if (!r.ok) return;
+          if (!r.ok) { setUpd("version check failed (HTTP " + r.status + ")", null, LOCAL); return; }
           const body = await r.json();
           version = body.version;
         }
-        if (cancelled || !version || version === LOCAL) { pendingVersionReloadRef.current = null; return; }
+        if (cancelled || !version || version === LOCAL) { pendingVersionReloadRef.current = null; setUpd("up to date", version, LOCAL); return; }
         const guard = syncGuardRef.current;
-        if (guard.hasUnsavedWork()) {
-          pendingVersionReloadRef.current = version;
-          return;
-        }
+        if (guard.hasUnsavedWork()) { pendingVersionReloadRef.current = version; setUpd("update ready — waiting on unsaved work", version, LOCAL); return; }
         guard.flushAll();
         const idle = await guard.waitForSavesIdle(10000);
-        if (cancelled || !idle || guard.hasUnsavedWork()) {
-          pendingVersionReloadRef.current = version;
-          return;
-        }
+        if (cancelled || !idle || guard.hasUnsavedWork()) { pendingVersionReloadRef.current = version; setUpd("update ready — saves still pending", version, LOCAL); return; }
         pendingVersionReloadRef.current = null;
         doReload(version);
-      } catch (e) {}
+      } catch (e) { setUpd("check error: " + ((e && e.message) || String(e)).slice(0, 60), null, LOCAL); }
     };
     check();
     const onVis = () => { if (document.visibilityState === "visible") check(); };
@@ -20673,12 +20684,16 @@ function NativeDiagnostics() {
       <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-4</div>
       <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, color: "var(--text2)", lineHeight: 1.75, wordBreak: "break-all" }}>
         <div>app code: <b style={{ color: "var(--gold)" }}>{(typeof __BUILD_VERSION__ !== "undefined" ? String(__BUILD_VERSION__) : "dev").slice(0, 7)}</b> <span style={{ color: "var(--faint)" }}>(if this changes without a force-quit, auto-update works)</span></div>
+        {(() => { let u = null; try { u = JSON.parse(localStorage.getItem("vero_update_status") || "null"); } catch (e) {} return u
+          ? <div>auto-update: <b style={{ color: /BEHIND/.test(u.state) ? "#C2563F" : "var(--text)" }}>{u.state}</b> <span style={{ color: "var(--faint)" }}>(server {u.sv} · this app {u.lv})</span></div>
+          : <div>auto-update: <span style={{ color: "var(--faint)" }}>no check recorded yet</span></div>; })()}
         <div>auth.uid(): <b style={{ color: "var(--text)" }}>{info.uid}</b></div>
         {info.push ? <div>push: {info.push}</div> : null}
         {info.err ? <div style={{ color: "var(--text)" }}>error: {info.err}</div> : null}
         {info.claims ? <div style={{ color: "var(--sub)", fontSize: 12.5 }}>claims: {info.claims}</div> : null}
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
+        <button onClick={() => { try { if (window.caches && caches.keys) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {}); } catch (e) {} const o = (window.location && window.location.origin) ? window.location.origin : "https://gotvero.com"; const p = (window.location && window.location.pathname) ? window.location.pathname : "/"; window.location.replace(o + p + "?u=" + Date.now()); }} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY }}>Update now</button>
         <button onClick={run} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY }}>Re-check</button>
         <button onClick={forcePush} disabled={pushBusy} style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--text)", borderRadius: 10, padding: "9px 16px", fontSize: 13.5, fontWeight: 600, cursor: pushBusy ? "default" : "pointer", fontFamily: FONT_BODY }}>{pushBusy ? "Registering…" : "Register push"}</button>
       </div>
