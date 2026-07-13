@@ -5646,7 +5646,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     // Public booking: the slot is never held while saving, and the client is only told they're booked
     // once the server actually has it — so a failed save can never become a ghost booking.
     setBooking(true); setBookErr(false);
-    supabase.rpc('book_public', { p_shop: shopId, p_client: newClientRow ? newClientRow.data : null, p_appts: newAppts })
+    // [outage-honest-menu] The booking SUBMIT must never hang forever. A compute-exhausted backend
+    // makes book_public HANG (never resolves, never rejects) — without this the "CONFIRMING…" spinner
+    // would spin for the entire outage and the client would be stuck with no way forward. Race the RPC
+    // against a generous timeout so a hang surfaces the honest "couldn't confirm — tap again" error
+    // (setBookErr) instead. book_public is insert-only + server slot-guarded, so a timed-out write that
+    // actually landed can't become a double-booking: a retry for the same slot is rejected (slot_taken).
+    const bookTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('book_public timed out — backend unreachable')), 25000));
+    Promise.race([supabase.rpc('book_public', { p_shop: shopId, p_client: newClientRow ? newClientRow.data : null, p_appts: newAppts }), bookTimeout])
       .then(({ error }) => {
         setBooking(false);
         if (error) {
