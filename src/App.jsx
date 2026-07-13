@@ -12360,43 +12360,13 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   };
   const backLabel = navStack.length ? screenLabel(navStack[navStack.length - 1]) : null;
 
-  // One-time "test day" seed: replace TODAY's schedule for the primary barber with a sample day
-  // so the owner can practice check-in / timer / checkout. Runs once ever per device (localStorage
-  // guard) and persists via the normal appts save. Temporary testing aid — safe to remove later.
-  useEffect(() => {
-    if (!dataLoaded) return;
-    try {
-      if (typeof localStorage !== "undefined" && localStorage.getItem("vero_testday_v1")) return;
-      const prov = (providers || []).find((p) => p.id !== "anyone" && /dan/i.test(p.name || "")) || (providers || []).find((p) => p.id !== "anyone");
-      if (!prov || !(services || []).length) return;
-      const beardSvc = services.find((s) => /beard/i.test(s.name || ""));
-      const cutSvc = services.find((s) => /hair|cut/i.test(s.name || "")) || services[0];
-      const pick = (title) => (/beard/i.test(title) ? (beardSvc || cutSvc) : cutSvc);
-      const day0 = new Date(); day0.setHours(0, 0, 0, 0);
-      const isoAt = (min) => { const d = new Date(day0); d.setMinutes(min); return d.toISOString(); };
-      const rows = [
-        [540, 590, "Haircut + Beard", "Juan Bautista"],
-        [600, 630, "Rebooked Haircut", "Sam K"],
-        [630, 665, "Haircut", "Ren Miller"],
-        [665, 690, "Haircut", "Rahmath Mohammed"],
-        [690, 720, "Rebooked Haircut", "Edward Ochs"],
-        [720, 780, "First Haircut (Overgrown)", "Sebastian Dudek"],
-        [780, 820, "Haircut (No Skinfades)", "Christian Ruiz"],
-        [820, 895, "Haircut + Beard", "David Ceja"],
-        [900, 960, "Haircut & Beard w/ Hot Towel", "Alejandro Reyes"],
-        [960, 1020, "Haircut & Beard w/ Hot Towel", "Vishal Sinha"],
-      ];
-      const seeded = rows.map(([start, end, title, name], i) => { const svc = pick(title); return {
-        id: "testday_" + Date.now().toString(36) + "_" + i, providerId: prov.id, clientId: null,
-        serviceId: svc ? svc.id : null, serviceName: svc ? svc.name : title, title, name,
-        start, end, bookedFor: isoAt(start), status: "confirmed", price: svc ? (Number(svc.price) || 0) : 0,
-      }; });
-      const isToday = (a) => { const d = a.bookedFor ? new Date(a.bookedFor) : null; return !!d && d.getFullYear() === day0.getFullYear() && d.getMonth() === day0.getMonth() && d.getDate() === day0.getDate(); };
-      setAppts((cur) => [...(cur || []).filter((a) => !(a.providerId === prov.id && isToday(a))), ...seeded]);
-      if (typeof localStorage !== "undefined") localStorage.setItem("vero_testday_v1", "1");
-      showToast("Test day loaded — try the check-in & timer.");
-    } catch (e) {}
-  }, [dataLoaded, providers, services]);
+  // [no-fake-data] REMOVED — the one-time "test day" seed injected 10 FAKE appointments ("Ren Miller",
+  // "Edward Ochs", …) into TODAY's schedule for the primary barber on first load per device (guarded
+  // only by localStorage.vero_testday_v1) and persisted them via the normal appts save. On a real or
+  // freshly-migrated shop that meant a new/cleared device would show — and could write — fake clients
+  // into the live calendar (violates "never show fake data as real"). Deleted, not gated: a practice
+  // mode must be explicit opt-in, never automatic on a shop that holds real bookings. Do NOT re-add a
+  // seed that runs on load. (vero_testday_v1 in seed/test scripts is now a harmless vestigial no-op.)
 
   // --- Pulse 2.0: "signed in as" picker. Until real auth, each device remembers which
   // barber is using it (localStorage). Owners can also pick "All shop" for a combined view.
