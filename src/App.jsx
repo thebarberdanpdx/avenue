@@ -947,6 +947,11 @@ const idemSig = (p) => {
 // "loading"/"confirming". 20s is far longer than any healthy call, short enough to fail
 // honestly during an outage. Root-cause fix for the whole no-timeout hang class.
 const RPC_TIMEOUT_MS = 20000;
+// Best-effort pre-booking RPCs (dedup lookups + the belt-and-suspanders client save that
+// runs BEFORE book_public) get a tighter budget: they're not the durable write (book_public
+// is), so a hang here must fail FAST and let the booking proceed to its own honest-error
+// timeout — otherwise the submit stalls on the earliest hang and never reaches book_public.
+const PREBOOK_RPC_TIMEOUT_MS = 8000;
 function withRpcTimeout(promise, ms = RPC_TIMEOUT_MS) {
   return Promise.race([
     promise,
@@ -5531,9 +5536,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       // Don't create a second profile for a phone or email that already exists — reuse it.
       // (The public app has no client list, so we ask the server.)
       let existing = null;
-      try { const { data } = await supabase.rpc("lookup_client_by_phone", { p_shop: shopId, p_phone: finalPhone }); if (data && data.id) existing = data; } catch (e) {}
+      // [outage-honest-menu] withRpcTimeout: a compute-exhausted backend makes this lookup HANG
+      // (never resolves/rejects). Without the timeout the whole booking submit stalls here — before
+      // the book_public honest-error timeout is ever reached. On timeout we fall through to the local
+      // dedup check and proceed; the only cost is a possible duplicate profile, which book_public's
+      // own server-side keying still collapses. Best-effort, so the tighter PREBOOK budget.
+      try { const { data } = await withRpcTimeout(supabase.rpc("lookup_client_by_phone", { p_shop: shopId, p_phone: finalPhone }), PREBOOK_RPC_TIMEOUT_MS); if (data && data.id) existing = data; } catch (e) {}
       if (!existing && (finalEmail || "").trim()) {
-        try { const { data } = await supabase.rpc("lookup_client_by_email", { p_shop: shopId, p_email: finalEmail.trim().toLowerCase() }); if (data && data.id) existing = data; } catch (e) {}
+        try { const { data } = await withRpcTimeout(supabase.rpc("lookup_client_by_email", { p_shop: shopId, p_email: finalEmail.trim().toLowerCase() }), PREBOOK_RPC_TIMEOUT_MS); if (data && data.id) existing = data; } catch (e) {}
       }
       if (!existing && Array.isArray(clients)) {
         const dg = (finalPhone || "").replace(/\D/g, "");
@@ -5655,7 +5665,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           : (matched?.savedCard || undefined),
       };
       try {
-        const { error: cErr } = await supabase.rpc("save_booking_client", { p_shop: shopId, p_client: clientRecord });
+        // [outage-honest-menu] withRpcTimeout: this pre-book client save runs on EVERY booking and is
+        // awaited BEFORE book_public. On a hanging backend it would freeze the submit here forever, so
+        // the book_public honest-error timeout below could never fire. Time it out fast: for a NEW client
+        // book_public re-persists them (newClientRow) so nothing is lost; a returning client already
+        // exists, so a skipped best-effort profile refresh is safe. Then the booking proceeds to its own
+        // timeout and an honest error, instead of a dead "Confirm" button for the whole outage.
+        const { error: cErr } = await withRpcTimeout(supabase.rpc("save_booking_client", { p_shop: shopId, p_client: clientRecord }), PREBOOK_RPC_TIMEOUT_MS);
         if (cErr) console.error("[vero] save_booking_client failed:", cErr.message || cErr);
       } catch (e) { console.error("[vero] save_booking_client threw:", e); }
       setClients((cur) => { const exists = (cur || []).some((c) => c.id === persistId); return exists ? cur.map((c) => c.id === persistId ? { ...c, ...clientRecord } : c) : [clientRecord, ...(cur || [])]; });
