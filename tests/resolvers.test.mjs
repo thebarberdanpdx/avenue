@@ -72,7 +72,7 @@ const CUT_DESC_LINE = (src.match(/const CONSOLIDATE_CUT_DESC = "[^"]*";/) || [])
 if (!CUT_DESC_LINE) throw new Error("resolvers.test: CONSOLIDATE_CUT_DESC not found in src/App.jsx — refusing to pass");
 const SHOP_TZ_LINE = (src.match(/const SHOP_TZ = "[^"]*";/) || [])[0];
 if (!SHOP_TZ_LINE) throw new Error("resolvers.test: SHOP_TZ not found in src/App.jsx — refusing to pass");
-const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale"];
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig"];
 const extraSrc = CUT_DESC_LINE + "\n" + SHOP_TZ_LINE + "\n" + EXTRA.map(grab).join("\n");
 // computeFreeSlots has a destructuring parameter ({...}), which grab()'s brace-matcher
 // mistakes for the body — extract it by anchors instead. It depends on hoursForDate +
@@ -429,4 +429,35 @@ test("computeRegisterSale: discount never exceeds the gross; custom tip override
   assert.equal(R.computeRegisterSale({ items: [{ price: 40, qty: 1 }], tipPct: 20, customTip: 5 }).tipAmt, 5); // custom wins
   assert.equal(R.computeRegisterSale({ items: [{ price: 40, qty: 1 }], tipPct: 20, tipEnabled: false }).tipAmt, 0); // tipping off
   assert.equal(R.computeRegisterSale({ items: [{ price: 40, qty: 1 }] }).changeDue, 0); // nothing tendered → no change
+});
+
+// ─── idemSig: the double-charge / double-refund idempotency KEY-SCOPE contract ─
+// This is the money-safety hinge: stripeApi reuses one Stripe idempotency key per
+// idemSig, so Stripe collapses a retried charge/refund instead of moving money twice.
+// The contract that must never regress:
+//   • a retry of the SAME charge (same card + same cents) → SAME sig → deduped (no double charge)
+//   • two genuinely DIFFERENT amounts / cards / clients → DIFFERENT sig → both go through (no swallowed sale)
+//   • setup / sale_intent / terminal_intent → null → no server-side dedup key (correct: those confirm
+//     client-side; a duplicate *unconfirmed* intent charges nobody, and null avoids a false collision)
+test("idemSig: an identical charge retry shares a key (so Stripe dedupes → no double charge)", () => {
+  const p = { action: "charge", customerId: "cus_1", paymentMethodId: "pm_1", amount: 42 };
+  assert.equal(R.idemSig(p), R.idemSig({ ...p }));            // same inputs → same sig
+  assert.equal(R.idemSig(p), "charge:cus_1:pm_1:4200");        // cents, not dollars
+});
+test("idemSig: different amount / card / client never collide (a distinct sale is never swallowed)", () => {
+  const base = { action: "charge", customerId: "cus_1", paymentMethodId: "pm_1", amount: 42 };
+  assert.notEqual(R.idemSig(base), R.idemSig({ ...base, amount: 42.01 })); // 1¢ apart → distinct
+  assert.notEqual(R.idemSig(base), R.idemSig({ ...base, paymentMethodId: "pm_2" }));
+  assert.notEqual(R.idemSig(base), R.idemSig({ ...base, customerId: "cus_2" }));
+});
+test("idemSig: refunds key on the payment-intent + amount; a distinct partial refund is not deduped", () => {
+  assert.equal(R.idemSig({ action: "refund", paymentIntentId: "pi_9", amount: 10 }), "refund:pi_9:1000");
+  assert.notEqual(
+    R.idemSig({ action: "refund", paymentIntentId: "pi_9", amount: 10 }),
+    R.idemSig({ action: "refund", paymentIntentId: "pi_9", amount: 5 }));  // two different partials both go through
+});
+test("idemSig: setup / sale_intent / terminal_intent get NO dedup key (null) — they confirm client-side", () => {
+  for (const action of ["setup", "sale_intent", "terminal_intent", "card_status", undefined]) {
+    assert.equal(R.idemSig({ action, amount: 30 }), null);
+  }
 });
