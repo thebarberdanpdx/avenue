@@ -33,6 +33,18 @@ await page.evaluate(() => { localStorage.setItem('vero_login_intent', 'staff'); 
 await page.goto(link.properties.action_link, { waitUntil: 'networkidle', timeout: 45000 });
 await page.waitForTimeout(9000); // let the calendar fully load + write its offline cache before we cut the cord
 
+// DIAGNOSTIC: are we actually on the intended build, did the first load show the appts, is the cache written?
+const afterLoginUrl = page.url();
+const preText = (await page.evaluate(() => document.body.innerText || '')).replace(/\s+/g, ' ').slice(0, 160);
+const cacheInfo = await page.evaluate(() => {
+  const out = {};
+  for (const k of Object.keys(localStorage)) if (/vero_cache_.*appointments/.test(k)) { try { out[k] = (JSON.parse(localStorage.getItem(k)) || []).length; } catch (e) { out[k] = 'parse-err'; } }
+  return out;
+});
+console.log('after-login URL   :', afterLoginUrl);
+console.log('first-load text   :', preText);
+console.log('appt cache written:', JSON.stringify(cacheInfo));
+
 // 2) now HANG the backend (compute-exhausted): sync-pull + supabase never respond.
 let hung = 0;
 await context.route((url) => { try { const h = new URL(url).hostname; return h.includes('supabase') || /\/api\/sync-pull/.test(url); } catch (e) { return false; } },
