@@ -15790,6 +15790,8 @@ function impGuessMap(headers) {
     status: impGuess(headers, ["status", "state"]),
     price: impGuess(headers, ["price", "total", "amount", "paid", "cost"]),
     birthday: impGuess(headers, ["birthday", "birth date", "date of birth", "dob", "born"]),
+    // Private notes / color formulas — real data loss if they don't come over, so map them too.
+    notes: impGuess(headers, ["notes", "note", "comment", "memo", "formula", "remarks"]),
   };
 }
 // A birthday may arrive with or without a year — keep an ISO date when parseable, else the raw text.
@@ -15890,8 +15892,8 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       const email = get(row, "email");
       const key = pd.length >= 7 ? pd : (name ? "n:" + name.toLowerCase() : null);
       if (!key) return;
-      if (!people.has(key)) people.set(key, { name: name || "Client", firstName: first, lastName: last, email, phone, key, birthday: get(row, "birthday") });
-      else { const ex = people.get(key); if (!ex.email && email) ex.email = email; if (!ex.name && name) ex.name = name; if (!ex.phone && phone) ex.phone = phone; if (!ex.birthday) ex.birthday = get(row, "birthday"); }
+      if (!people.has(key)) people.set(key, { name: name || "Client", firstName: first, lastName: last, email, phone, key, birthday: get(row, "birthday"), notes: get(row, "notes") });
+      else { const ex = people.get(key); if (!ex.email && email) ex.email = email; if (!ex.name && name) ex.name = name; if (!ex.phone && phone) ex.phone = phone; if (!ex.birthday) ex.birthday = get(row, "birthday"); if (!ex.notes && get(row, "notes")) ex.notes = get(row, "notes"); }
       // appointment for this row?
       const dateStr = get(row, "date");
       if (dateStr) {
@@ -15937,6 +15939,8 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
         if (!String(ex.email || "").trim() && p.email) patch.email = p.email;
         const ibd = impBirthday(p.birthday);
         if (!ex.birthday && ibd) patch.birthday = ibd;
+        // Fill blank notes only — never overwrite notes the shop already has on this card.
+        if (!String(ex.notes || "").trim() && p.notes) patch.notes = p.notes;
         if (Object.keys(patch).length) clientPatches[mid] = { ...(clientPatches[mid] || {}), ...patch };
         merges.push({ id: mid, name: ex.name || p.name, basis, filled: Object.keys(patch) });
         return;
@@ -15944,7 +15948,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       // No confident match. If an existing client shares this name, flag it (don't merge).
       if (pn && existingByName[pn]) possibleDupes.push({ name: byId[existingByName[pn]].name || p.name });
       p.id = `imp_${bId}_c${newIdx++}`;
-      newClients.push({ id: p.id, name: p.name, firstName: p.firstName || "", lastName: p.lastName || "", email: p.email || "", phone: p.phone || "", birthday: impBirthday(p.birthday), provider: defProv, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], _import: bId });
+      newClients.push({ id: p.id, name: p.name, firstName: p.firstName || "", lastName: p.lastName || "", email: p.email || "", phone: p.phone || "", birthday: impBirthday(p.birthday), provider: defProv, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: p.notes || "", messages: [], gallery: [], timeline: [], family: [], _import: bId });
     });
     // 3. resolve appointments
     const matchProv = (txt) => { const t = (txt || "").toLowerCase(); const hit = realProviders.find((p) => t && p.name.toLowerCase().includes(t.split(" ")[0]) || (t && t.includes(p.name.toLowerCase().split(" ")[0]))); return hit ? hit.id : defProv; };
@@ -15959,6 +15963,19 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       const bf = new Date(d.dt); if (!d.hasTime) bf.setHours(9, 0, 0, 0);
       const price = d.price ? Number(impDigits(d.price.replace(/[.,]\d{2}$/, (m) => m)).replace(/\D/g, "")) || (parseFloat(d.price.replace(/[^0-9.]/g, "")) || 0) : (svc ? svc.price : 0);
       return { id: `imp_${bId}_a${aIdx++}`, providerId: matchProv(d.staff), clientId: person.id, serviceId: svc ? svc.id : null, price: parseFloat(String(d.price).replace(/[^0-9.]/g, "")) || (svc ? svc.price : 0) || 0, start: startMin, end: startMin + dur, status: impStatus(d.status, d.isPast), name: person.name, title: d.service || (svc ? svc.name : "Appointment"), phone: person.phone || "", bookedFor: bf.toISOString(), _import: bId };
+    });
+    // Home barber from history: a new client's card defaults to the picked Default staff, but if
+    // their imported appointments show they saw one barber most, make THAT their home barber (ties
+    // break to their most recent visit). Per-appointment barbers are untouched — the visit history
+    // still shows the correct barber for each appt; this only sets the card's default "provider".
+    newClients.forEach((c) => {
+      const mineAll = newAppts.filter((a) => a.clientId === c.id && a.providerId);
+      if (!mineAll.length) return; // no imported history → keep the Default staff member
+      const tally = {}, lastSeen = {};
+      mineAll.forEach((a) => { tally[a.providerId] = (tally[a.providerId] || 0) + 1; const t = new Date(a.bookedFor).getTime(); if (!(a.providerId in lastSeen) || t > lastSeen[a.providerId]) lastSeen[a.providerId] = t; });
+      let best = null, bestN = -1, bestT = -1;
+      for (const pid in tally) { if (tally[pid] > bestN || (tally[pid] === bestN && lastSeen[pid] > bestT)) { best = pid; bestN = tally[pid]; bestT = lastSeen[pid]; } }
+      if (best) c.provider = best;
     });
     // Plug imported clients into the retention engine: derive visit count, last visit, and
     // cadence from their imported PAST appointments — otherwise they're invisible to the
@@ -16029,7 +16046,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
 
   const FIELD_LABELS = [
     ["full", "Full name"], ["first", "First name"], ["last", "Last name"], ["email", "Email"], ["phone", "Phone"],
-    ["date", "Appointment date"], ["time", "Appointment time"], ["service", "Service"], ["staff", "Staff"], ["status", "Status"], ["price", "Price"], ["birthday", "Birthday"],
+    ["date", "Appointment date"], ["time", "Appointment time"], ["service", "Service"], ["staff", "Staff"], ["status", "Status"], ["price", "Price"], ["birthday", "Birthday"], ["notes", "Notes / formula"],
   ];
   const canPreview = !!(map.phone || map.full || map.first || map.email);
 

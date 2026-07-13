@@ -494,3 +494,9 @@ test("impGuessMap: a lone name column maps to full; birthday/price synonyms", ()
   assert.equal(m.price, "Total");
   assert.equal(m.birthday, "DOB");
 });
+test("impGuessMap: maps notes / formula / comment synonyms so client notes carry over", () => {
+  assert.equal(R.impGuessMap(["Client Name", "Notes"]).notes, "Notes");
+  assert.equal(R.impGuessMap(["Full Name", "Color Formula"]).notes, "Color Formula");
+  assert.equal(R.impGuessMap(["Name", "Comments"]).notes, "Comments");
+  assert.equal(R.impGuessMap(["Name", "Phone", "Email"]).notes, "");  // nothing notes-like → left unmapped
+});
