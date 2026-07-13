@@ -993,9 +993,13 @@ async function stripeApi(payload) {
   const body = sig ? { ...withShop, idempotencyKey: idemKeyFor(sig) } : withShop;
   let r;
   try {
-    r = await fetch(API_BASE + "/api/stripe", { method: "POST", headers, body: JSON.stringify(body) });
+    // [outage-honest-menu] Timeout the payment call so a HANGING backend (compute-exhausted: never
+    // resolves or rejects) surfaces the honest "couldn't reach the payment server" error instead of a
+    // charge spinner that never ends. The idempotency key is KEPT on this path (outcome unknown), so a
+    // retry of a charge that actually landed reuses the same key → Stripe dedupes → never a double charge.
+    r = await withRpcTimeout(fetch(API_BASE + "/api/stripe", { method: "POST", headers, body: JSON.stringify(body) }));
   } catch (netErr) {
-    // No response at all — outcome unknown. Keep the key so a retry is idempotent.
+    // No response at all (or timed out) — outcome unknown. Keep the key so a retry is idempotent.
     throw new Error("Couldn't reach the payment server — check your connection and try again.");
   }
   let data = {};
@@ -8714,7 +8718,7 @@ function ReviewByToken({ token, shopId, business, onExit }) {
     let alive = true;
     (async () => {
       try {
-        const { data, error } = await supabase.rpc("review_lookup_by_token", { p_token: token });
+        const { data, error } = await withRpcTimeout(supabase.rpc("review_lookup_by_token", { p_token: token }));
         if (!alive) return;
         if (error || !data || !data.ok) { setPhase("error"); return; }
         setInfo(data); setGoogle(data.google || "");
@@ -8728,7 +8732,7 @@ function ReviewByToken({ token, shopId, business, onExit }) {
     if (!rating || busy) return;
     setBusy(true); setErr("");
     try {
-      const { data, error } = await supabase.rpc("submit_review_by_token", { p_token: token, p_rating: rating, p_comment: comment.trim(), p_name: name.trim() });
+      const { data, error } = await withRpcTimeout(supabase.rpc("submit_review_by_token", { p_token: token, p_rating: rating, p_comment: comment.trim(), p_name: name.trim() }));
       if (error || !data || !data.ok) {
         if (data && data.already) { setPhase("already"); return; }
         setErr("Sorry, we couldn't save that — please try again."); setBusy(false); return;
