@@ -15882,7 +15882,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
     // 1. collapse rows into unique people (keyed by phone, else by name)
     const people = new Map();
     const apptDrafts = [];
-    let past = 0, future = 0;
+    let past = 0, future = 0, skipped = 0; // skipped = rows that HAD a date but it couldn't be parsed (silent loss if not surfaced)
     rows.forEach((row) => {
       const phone = get(row, "phone");
       const pd = impDigits(phone);
@@ -15903,6 +15903,10 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
           const isPast = dt.getTime() < now;
           if (isPast) past++; else future++;
           apptDrafts.push({ key, dt, hasTime: !!timeStr, service: get(row, "service"), staff: get(row, "staff"), status: get(row, "status"), price: get(row, "price"), isPast });
+        } else {
+          // A date was present but unreadable → this appointment would vanish silently. Count it so
+          // the preview can WARN before import, instead of quietly dropping visits during a migration.
+          skipped++;
         }
       }
     });
@@ -15997,7 +16001,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       }
     });
     setBatchId(bId);
-    setBuilt({ newClients, reused: merges.length, merges, possibleDupes, clientPatches, newAppts, past, future, peopleCount: people.size });
+    setBuilt({ newClients, reused: merges.length, merges, possibleDupes, clientPatches, newAppts, past, future, skipped, peopleCount: people.size });
     setStage("preview");
   };
 
@@ -16026,7 +16030,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
         const { error } = await supabase.from("appointments").insert(a); if (error) failed++;
       }
     } catch (x) { failed++; }
-    setResult({ clients: built.newClients.length, reused: built.reused, appts: built.newAppts.length, past: built.past, future: built.future, failed });
+    setResult({ clients: built.newClients.length, reused: built.reused, appts: built.newAppts.length, past: built.past, future: built.future, skipped: built.skipped, failed });
     setStage("done");
     showToast(failed ? "Imported — but some rows didn't save to the server." : `Imported ${built.newClients.length} clients and ${built.newAppts.length} appointments.`);
   };
@@ -16104,6 +16108,12 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
             </div>
           ))}
         </div>
+        {built.skipped > 0 && (
+          <div style={{ marginBottom: 16, background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 32%, var(--border))", borderRadius: 16, padding: "13px 15px" }}>
+            <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 600, marginBottom: 5 }}>{built.skipped} row{built.skipped === 1 ? "" : "s"} couldn't be read</div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>These rows have an appointment date Vero didn't recognize, so <b style={{ color: "var(--text)", fontWeight: 600 }}>those appointments won't import</b>. Check that the Appointment date (and time) columns are mapped and look like <b style={{ color: "var(--text)", fontWeight: 600 }}>MM/DD/YYYY</b>. Clients and their readable visits still import.</div>
+          </div>
+        )}
         {built.merges && built.merges.length > 0 && (() => {
           const chip = (basis) => { const m = { phone: ["Phone", "var(--sub)", "var(--panel2)"], email: ["Email", "var(--sub)", "var(--panel2)"] }[basis] || ["Match", "var(--sub)", "var(--panel2)"]; return <span style={{ fontSize: 12.5, fontWeight: 600, letterSpacing: 0.3, color: m[1], background: m[2], borderRadius: 7, padding: "3px 8px", flexShrink: 0 }}>{m[0]}</span>; };
           return (
@@ -16162,7 +16172,10 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
         <div style={{ textAlign: "center", padding: "10px 0" }}>
           <CheckCircle2 size={40} style={{ color: "#5E8C61", marginBottom: 12 }} />
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>Import complete</div>
-          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>{result.clients} new clients{result.reused ? ` (${result.reused} merged into existing)` : ""} and {result.appts} appointments are in your book{result.failed ? " — some rows didn't save, see toast." : "."}</div>
+          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: result.skipped ? 12 : 18 }}>{result.clients} new clients{result.reused ? ` (${result.reused} merged into existing)` : ""} and {result.appts} appointments are in your book{result.failed ? " — some rows didn't save, see toast." : "."}</div>
+          {result.skipped > 0 && (
+            <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.5, marginBottom: 18, background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 32%, var(--border))", borderRadius: 12, padding: "11px 14px", textAlign: "left" }}>{result.skipped} row{result.skipped === 1 ? "'s appointment" : "s' appointments"} weren't imported — their date wasn't recognized. Undo, fix the date format (MM/DD/YYYY), and re-import to capture them.</div>
+          )}
           <button onClick={undo} style={{ width: "100%", background: "transparent", border: "1px solid color-mix(in srgb, #c0392b 40%, var(--border))", color: "var(--text)", padding: 13, fontSize: 14, borderRadius: 10, marginBottom: 10 }}>Undo this import</button>
           <button className="lift" onClick={reset} style={{ width: "100%", background: "transparent", boxShadow: "none", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 14.5, fontWeight: 500, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><RefreshCw size={16} /> Import another file</button>
         </div>
