@@ -2794,12 +2794,16 @@ function App() {
       let apiErr = null;
       try {
         const headers = await authedHeaders();
-        const r = await fetch(API_BASE + "/api/sync-pull", {
+        // [outage-honest-menu] Timeout the pull so a HANGING backend (compute-exhausted: the fetch
+        // never resolves or rejects) can't strand the staff calendar mid-load. On a hang this rejects
+        // into the catch below → the direct path → hydrateFromCache, so staff see the last-synced
+        // calendar + an honest banner instead of a blank/spinning screen (the original July symptom).
+        const r = await withRpcTimeout(fetch(API_BASE + "/api/sync-pull", {
           method: "POST",
           headers,
           body: JSON.stringify({ shop: SHOP_ID }),
           cache: "no-store",
-        });
+        }));
         const body = await r.json().catch(() => ({}));
         if (r.ok && (body.ok || Array.isArray(body.clients) || Array.isArray(body.appointments))) {
           applyServerMirror({ ...body, ok: true, via: "api" });
@@ -2815,10 +2819,17 @@ function App() {
       if (apiErr) {
         console.warn("[vero] mirrorFromServer api failed, trying direct:", apiErr);
       }
-      const [clRes, apRes] = await Promise.all([
-        fetchStaffTable("clients", SHOP_ID),
-        fetchStaffTable("appointments", SHOP_ID),
-      ]);
+      let clRes, apRes;
+      try {
+        // [outage-honest-menu] Timeout the direct reads too — if they hang (same compute-exhausted
+        // outage) we must still reach the cache fallback below rather than strand the calendar.
+        [clRes, apRes] = await withRpcTimeout(Promise.all([
+          fetchStaffTable("clients", SHOP_ID),
+          fetchStaffTable("appointments", SHOP_ID),
+        ]));
+      } catch (e) {
+        clRes = { error: e }; apRes = { error: e }; // hang/timeout → treat as failed → hydrateFromCache
+      }
       if (clRes.error || apRes.error) {
         const err = clRes.error || apRes.error;
         const msg = apiErr ? `${apiErr}; direct: ${String((err && err.message) || err)}` : String((err && err.message) || err);
