@@ -10,7 +10,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { launch } from './driver.mjs';
 
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
+const sb = createClient(process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co", process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
 const SHOP = 'vero-test';
 // Service to book. Default = Beard Trim (a plain no-card, no-choice service) so the core
 // booking → persist → tz path is tested cleanly. Pass a name+id to exercise another.

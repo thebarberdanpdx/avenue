@@ -34,10 +34,13 @@ changes can be verified without Dan on his iPhone. Built during the
 ```bash
 npm install --ignore-scripts          # sharp's postinstall is blocked by the proxy; it isn't needed
 npm install --no-save --ignore-scripts playwright-core
-# put the service key in a file OUTSIDE the repo, e.g. the session scratchpad:
-#   export SUPABASE_URL=https://iufgznminbujcabqeesk.supabase.co
-#   export SUPABASE_SERVICE_KEY=sb_secret_...
-source <scratchpad>/.vero-secret
+# The scripts read the service key from SUPABASE_SERVICE_ROLE_KEY (falling back to
+# SUPABASE_SERVICE_KEY), and default SUPABASE_URL to the project URL — so if the
+# key is set as a SECRET ENV VAR in this environment's config (the right place —
+# never chat, never committed), the rig just works with nothing to source.
+# Otherwise put it in a file OUTSIDE the repo and source it:
+#   export SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
+source <scratchpad>/.vero-secret   # only if not already in the environment
 ```
 
 ## Scripts

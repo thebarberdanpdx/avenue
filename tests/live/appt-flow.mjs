@@ -8,7 +8,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { launch } from './driver.mjs';
 
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
+const sb = createClient(process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co", process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
 const SHOP = 'vero-test', APPT = 'vt_appt_today', EMAIL = 'vero-livetest@vero.test';
 const DL = `https://gotvero.com/?shop=${SHOP}&appt=${APPT}`;
 

@@ -11,7 +11,7 @@ const SHOP = process.argv[3] || 'vero-test';
 const OUT = process.env.SHOTS || '/tmp/claude-0/-home-user-avenue/ddfa0049-b5f9-51e2-b568-16ceb8cfaebf/scratchpad/shots';
 const REDIRECT = `https://gotvero.com/?shop=${SHOP}`;
 
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
+const sb = createClient(process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co", process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
 const { data, error } = await sb.auth.admin.generateLink({ type: 'magiclink', email: EMAIL, options: { redirectTo: REDIRECT } });
 if (error) { console.error('generateLink:', error.message); process.exit(1); }
 
