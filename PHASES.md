@@ -9,9 +9,9 @@ Dan's rule: **not going live until all 4 phases are done.**
 | **1 · Foundation/reliability** | crash-hardening, payment security, key rotation, sales-can't-vanish | ✅ **Done** |
 | **2 · Prove it** | live-testing rig + Dan's on-device book→checkout dry run | ✅ **Done** |
 | **3 · Offline-first** | shop keeps working through a backend outage / bad wifi | 🔄 **~85%** (all hang/timeout coverage done + verified live; only native airplane-mode left, needs Dan) |
-| **4 · Migration off Mangomint** | export → import night → 2-week overlap (`MIGRATION-GUIDE.md`) | 🔄 **~40%** (importer built + verified end-to-end on realistic data; real migration needs Dan's export) |
+| **4 · Migration off Mangomint** | export → import night → 2-week overlap (`MIGRATION-GUIDE.md`) | 🔄 **~50%** (importer feature-complete + verified end-to-end: dedup, quoted-comma, retention, notes, home-barber; real migration needs Dan's export) |
 
-**Overall ≈ 75%.** The remaining ~25% is weighted toward things that need **Dan + real calendar time** (the real migration with his Mangomint export, airplane-mode on his device), not solo code.
+**Overall ≈ 78%.** The remaining ~22% is weighted toward things that need **Dan + real calendar time** (the real migration with his Mangomint export, airplane-mode on his device), not solo code.
 
 ---
 
@@ -41,12 +41,14 @@ The real outage mode is a **HANGING backend** (Supabase compute exhausted: reque
 - **Migration PLAN**: `MIGRATION-GUIDE.md` is thorough (Phases 0–5, edge cases, rollback).
 - **Importer**: **built + de-risked** — `ImportDataEditor` (src/App.jsx ~15823), via Reports → Data → Import data (3 stages: upload → map → preview, direct DB inserts of `imp_<batch>_*` rows, clean **Undo this import** by id prefix). Does phone→email dedup, service/staff name matching, and populates the retention engine (visits/lastVisit/cadence) from imported history. Its CSV foundation (`impParseCSV`, `impGuessMap`, `impDigits`) is now **unit-tested** in `tests/resolvers.test.mjs`. Not yet driven end-to-end through the UI, but the logic is read + the parser is locked.
 - **Fixed during this assessment**: removed the automatic "test day" fake-appointment seed (shipped) — it showed/could-write 10 fake clients into any shop's live calendar. An explicit opt-in **"Test data"** tool (Reports → Data) remains for practice.
-- Guide's 2 optional importer tweaks before import night (not done): derive home barber from visit history; add a Notes column.
+- **Guide's 2 optional importer tweaks — DONE + verified live** (both shipped): (1) client **notes / color formulas** carry over (new "Notes / formula" column in the mapper; merges fill blank notes only, never overwrite); (2) each client's **home barber is derived from their imported visit history** (most-seen barber, ties→most recent) instead of everyone defaulting to one staff member. End-to-end drill on vero-mig: a client seen 2× Heather / 1× Dan → home barber Heather (overrode Default=Dan); notes carried; retention populated. Now the importer does dedup + quoted-comma + retention + notes + home-barber, all verified.
 
 ### ⚠️ The real Phase-4 gate = a dry-run with REAL data (Dan)
 Phase 4 completes only with the actual migration — Dan's Mangomint CSV export, a clean throwaway shop, one import, and confirming the calendar displays it (Phase-0 dry-run in the guide). Solo verification can't substitute for real-data edge cases.
 
 Note on test shops: a staff sync-pull capture on `vero-test`/`vero-mig` showed **no `/api/sync-pull` calls** and empty calendars — but these test shops are polluted / the test login isn't a real provider, and the real Sanctuary shop syncs fine daily, so this is almost certainly test-account-specific, not a general bug. Confirm on the clean dry-run shop.
+
+**Phantom-appts mystery — SOLVED (2026-07-13):** vero-mig showed 255 appointments when only 2 were seeded. Investigated: **253 of them share one id prefix `sync_fe73vnl_*`** — they are events from a single **iCal calendar feed** connected to the shop during earlier testing, synced in exactly per the `"sync_" + feedId + "_" + hash(uid)` pattern (`api/calendar-run.js`). NOT phantom data, NOT the importer spawning garbage. A fresh migration shop with no calendar feed connected will not have them. The importer only ever writes `imp_<batch>_*` rows (cleanly undoable by prefix).
 
 ---
 
