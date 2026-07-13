@@ -31,7 +31,19 @@ const { browser, context, page, errors } = await launch();
 await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
 await page.evaluate(() => { localStorage.setItem('vero_login_intent', 'staff'); localStorage.setItem('vero_testday_v1', '1'); });
 await page.goto(link.properties.action_link, { waitUntil: 'networkidle', timeout: 45000 });
-await page.waitForTimeout(6000); // let the calendar load and write its offline cache
+await page.waitForTimeout(9000); // let the calendar fully load + write its offline cache before we cut the cord
+
+// DIAGNOSTIC: are we actually on the intended build, did the first load show the appts, is the cache written?
+const afterLoginUrl = page.url();
+const preText = (await page.evaluate(() => document.body.innerText || '')).replace(/\s+/g, ' ').slice(0, 160);
+const cacheInfo = await page.evaluate(() => {
+  const out = {};
+  for (const k of Object.keys(localStorage)) if (/vero_cache_.*appointments/.test(k)) { try { out[k] = (JSON.parse(localStorage.getItem(k)) || []).length; } catch (e) { out[k] = 'parse-err'; } }
+  return out;
+});
+console.log('after-login URL   :', afterLoginUrl);
+console.log('first-load text   :', preText);
+console.log('appt cache written:', JSON.stringify(cacheInfo));
 
 // 2) now HANG the backend (compute-exhausted): sync-pull + supabase never respond.
 let hung = 0;
@@ -40,27 +52,35 @@ await context.route((url) => { try { const h = new URL(url).hostname; return h.i
 
 // 3) force a fresh mirror (reload) under the hang and watch what the calendar does.
 await page.reload({ waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
-const honestBannerRe = /offline|showing.*local|can'?t reach|sync problem|last synced/i;
+// Honest banner = any of the app's real outage messages (incl. the load-incomplete "Reload" one).
+const honestBannerRe = /didn'?t load|saving is paused|Reload|offline|showing.*local|sync problem|last synced/i;
 let settledAt = null, sawCalendar = false;
-for (let s = 3; s <= 30 && settledAt === null; s += 3) {
+for (let s = 3; s <= 42; s += 3) {
   await page.waitForTimeout(3000);
   const t = await page.evaluate(() => document.body.innerText || '');
   if (/PULSE|CALENDAR|CLIENTS/i.test(t)) sawCalendar = true;         // dashboard chrome rendered (not blank/spinner)
-  if (honestBannerRe.test(t)) settledAt = s;
+  if (settledAt === null && honestBannerRe.test(t)) settledAt = s;
+  // stop once the cache has clearly hydrated (the false-empty state is gone) and the banner is up
+  if (sawCalendar && settledAt !== null && !/Nothing booked today yet/i.test(t)) break;
 }
 const text = (await page.evaluate(() => document.body.innerText || '')).replace(/\s+/g, ' ');
 await page.screenshot({ path: `${OUT}/outage-staff.png` });
 
+// THE fix signal: the last-synced appointments show from cache instead of a false "nothing booked".
+// We seeded 2 real appts today, so "Nothing booked today yet" must NOT be the state during the outage.
+const falselyEmpty = /Nothing booked today yet/i.test(text);
+const cachedApptsShown = !falselyEmpty;
+
 console.log('\n=== STAFF OUTAGE RESULT (backend hanging) ===');
 console.log('requests hung             :', hung);
 console.log('dashboard rendered (not blank/spinner):', sawCalendar ? 'YES ✅' : 'NO ❌');
-console.log('honest offline banner at  :', settledAt === null ? 'NEVER (within 30s) ❌' : `~${settledAt}s ✅`);
+console.log('honest banner shown       :', settledAt === null ? 'NO ❌' : `~${settledAt}s ✅`);
+console.log('cached appts shown (not falsely empty):', cachedApptsShown ? 'YES ✅' : 'NO ❌ (shows "Nothing booked" despite 2 real appts)');
 console.log('screen text[0:220]        :', text.slice(0, 220));
-console.log('js errors                 :', errors.length ? errors.slice(0, 4) : 'none');
 
-const pass = sawCalendar && settledAt !== null && !/^\s*$/.test(text);
+const pass = sawCalendar && settledAt !== null && cachedApptsShown;
 console.log('\n' + (pass
-  ? '✅ PASS: staff calendar survives a hanging backend (cached data + honest banner, no blank).'
-  : '❌ FAIL: staff calendar hang gap — the sync-pull-timeout fix is needed (see header).'));
+  ? '✅ PASS: staff calendar survives a hanging backend (cached appts shown + honest banner, no false-empty).'
+  : '❌ FAIL: staff calendar hang gap — cached appts not shown / no honest banner (see header).'));
 await browser.close();
 process.exit(pass ? 0 : 1);

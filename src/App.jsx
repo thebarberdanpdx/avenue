@@ -2788,6 +2788,21 @@ function App() {
     if (tableHasUnsavedWork("appointments") || tableHasUnsavedWork("clients")) return false;
     if (mirrorInFlightRef.current) return mirrorInFlightRef.current;
     const run = (async () => {
+      let mirrorSettled = false;
+      // [outage-honest-menu] Whole-mirror hang watchdog. A compute-exhausted backend hangs ANY call in
+      // here — the auth refresh (ensureFreshSession), the sync-pull fetch, OR the direct reads — never
+      // resolving or rejecting. A per-call timeout on the fetch alone misses the auth hang (which comes
+      // first). This fires if the whole mirror hasn't settled in time, showing the last-synced calendar
+      // from cache + an honest banner instead of stranding staff on a false "nothing booked". Fails safe:
+      // if the mirror later completes (backend recovers), applyServerMirror overwrites cache with fresh data.
+      const mirrorWatchdog = setTimeout(() => {
+        if (mirrorSettled) return;
+        console.error("[vero] mirror hang watchdog — backend unreachable; showing last-synced calendar from cache");
+        setSyncHealth((h) => ({ ...h, err: "backend unreachable — showing last synced", at: Date.now(), pulling: false, via: "hang" }));
+        hydrateFromCache("clients", clientsRef.current, setClients);
+        hydrateFromCache("appointments", apptsRef.current, setAppts);
+      }, 9000);
+      try {
       setSyncHealth((h) => ({ ...h, pulling: true }));
       await ensureFreshSession();
       try { await supabase.auth.refreshSession(); } catch (e) {}
@@ -2833,6 +2848,7 @@ function App() {
         via: "direct",
       });
       return true;
+      } finally { mirrorSettled = true; clearTimeout(mirrorWatchdog); }
     })();
     mirrorInFlightRef.current = run;
     try { return await run; } finally { mirrorInFlightRef.current = null; }

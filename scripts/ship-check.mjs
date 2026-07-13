@@ -137,6 +137,7 @@ const GUARDS = [
   { needle: "loadWatchdog", label: "initial-load hang watchdog — a HANGING backend (compute-exhausted outage: requests never resolve OR reject) still forces a terminal state so the honest-menu gate fires, instead of sitting on the demo menu forever" },
   { needle: "bookTimeout", label: "booking-submit hang timeout — book_public is raced against a timeout so a hanging backend surfaces the honest 'couldn't confirm — tap again' error instead of a 'CONFIRMING…' spinner that never ends" },
   { needle: "withRpcTimeout", label: "shared RPC hang timeout — the manage-your-appointment link (lookup/cancel/reschedule/check-in) races Supabase against a timeout, so a hanging backend surfaces the honest error instead of an endless spinner (root-cause fix for the no-timeout hang class)" },
+  { needle: "mirrorWatchdog", label: "staff-calendar mirror hang watchdog — a hanging backend (auth refresh / sync-pull / direct reads all hang) still reaches hydrateFromCache so staff see the last-synced calendar + an honest 'showing last synced' banner instead of being stranded mid-load" },
   { needle: "cross-device-sync", label: "staff cold-start never seeds demo appts / block the first server pull (iPad must see iPhone bookings)" },
   { needle: "fetchStaffTable", label: "staff table reads refresh stale iOS JWT before pull (iPad empty calendar/clients)" },
   { needle: "Sync problem on this device", label: "sync-gap banner when cloud has data but device shows empty" },
