@@ -135,6 +135,7 @@ const GUARDS = [
   { needle: "GUARD: conflict-next-slot-from-start", label: "conflict popup suggests the TRUE next opening — scan from the attempted start with the moved appt excluded (9:20-instead-of-9:10 bug)" },
   { needle: "outage-honest-menu", label: "public booking shows an honest 'can't load — call us' state on a failed menu load, never the DEFAULT_SERVICES demo menu masquerading as the shop's real one" },
   { needle: "loadWatchdog", label: "initial-load hang watchdog — a HANGING backend (compute-exhausted outage: requests never resolve OR reject) still forces a terminal state so the honest-menu gate fires, instead of sitting on the demo menu forever" },
+  { needle: "bookTimeout", label: "booking-submit hang timeout — book_public is raced against a timeout so a hanging backend surfaces the honest 'couldn't confirm — tap again' error instead of a 'CONFIRMING…' spinner that never ends" },
   { needle: "cross-device-sync", label: "staff cold-start never seeds demo appts / block the first server pull (iPad must see iPhone bookings)" },
   { needle: "fetchStaffTable", label: "staff table reads refresh stale iOS JWT before pull (iPad empty calendar/clients)" },
   { needle: "Sync problem on this device", label: "sync-gap banner when cloud has data but device shows empty" },
