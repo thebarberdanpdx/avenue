@@ -32,12 +32,15 @@ The real outage mode is a **HANGING backend** (Supabase compute exhausted: reque
 
 ## Phase 4 readiness (assessed 2026-07-13)
 
-- **Migration PLAN**: `MIGRATION-GUIDE.md` is thorough (Phases 0–5, edge cases, rollback). Written against the live code.
-- **Importer**: **built** — `ImportDataEditor` (src/App.jsx ~15853), reached via Reports → Data → Import data. Has column-mapping, Default-staff, Preview, Undo. **Not yet end-to-end verified** (drive a real CSV → DB → calendar).
-- Guide flags 2 tiny importer tweaks to consider before import night: derive a client's home barber from their visit history, and add a Notes column.
+- **Migration PLAN**: `MIGRATION-GUIDE.md` is thorough (Phases 0–5, edge cases, rollback).
+- **Importer**: **built + de-risked** — `ImportDataEditor` (src/App.jsx ~15823), via Reports → Data → Import data (3 stages: upload → map → preview, direct DB inserts of `imp_<batch>_*` rows, clean **Undo this import** by id prefix). Does phone→email dedup, service/staff name matching, and populates the retention engine (visits/lastVisit/cadence) from imported history. Its CSV foundation (`impParseCSV`, `impGuessMap`, `impDigits`) is now **unit-tested** in `tests/resolvers.test.mjs`. Not yet driven end-to-end through the UI, but the logic is read + the parser is locked.
+- **Fixed during this assessment**: removed the automatic "test day" fake-appointment seed (shipped) — it showed/could-write 10 fake clients into any shop's live calendar. An explicit opt-in **"Test data"** tool (Reports → Data) remains for practice.
+- Guide's 2 optional importer tweaks before import night (not done): derive home barber from visit history; add a Notes column.
 
-### ⚠️ Pre-migration investigation (do on a CLEAN shop, not vero-test)
-On `vero-test` the STAFF calendar loads **empty even on a healthy load**; a sync-pull capture showed **no `/api/sync-pull` calls** for the staff session. BUT vero-test is polluted — 250+ phantom `sync_*` appts, and the test login `vero-livetest` isn't a real barber with appts assigned, so PulseView's personal view being empty may be expected. **Conclusion: inconclusive on vero-test — it's too messy to trust.** Before migrating, stand up a CLEAN shop, import a small CSV, and confirm the staff calendar actually displays the imported appts. This is the Phase-0 dry-run and it's the real gate for Phase 4.
+### ⚠️ The real Phase-4 gate = a dry-run with REAL data (Dan)
+Phase 4 completes only with the actual migration — Dan's Mangomint CSV export, a clean throwaway shop, one import, and confirming the calendar displays it (Phase-0 dry-run in the guide). Solo verification can't substitute for real-data edge cases.
+
+Note on test shops: a staff sync-pull capture on `vero-test`/`vero-mig` showed **no `/api/sync-pull` calls** and empty calendars — but these test shops are polluted / the test login isn't a real provider, and the real Sanctuary shop syncs fine daily, so this is almost certainly test-account-specific, not a general bug. Confirm on the clean dry-run shop.
 
 ---
 

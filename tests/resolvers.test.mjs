@@ -72,7 +72,7 @@ const CUT_DESC_LINE = (src.match(/const CONSOLIDATE_CUT_DESC = "[^"]*";/) || [])
 if (!CUT_DESC_LINE) throw new Error("resolvers.test: CONSOLIDATE_CUT_DESC not found in src/App.jsx — refusing to pass");
 const SHOP_TZ_LINE = (src.match(/const SHOP_TZ = "[^"]*";/) || [])[0];
 if (!SHOP_TZ_LINE) throw new Error("resolvers.test: SHOP_TZ not found in src/App.jsx — refusing to pass");
-const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig"];
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig", "impParseCSV", "impDigits", "impGuess", "impGuessMap"];
 const extraSrc = CUT_DESC_LINE + "\n" + SHOP_TZ_LINE + "\n" + EXTRA.map(grab).join("\n");
 // computeFreeSlots has a destructuring parameter ({...}), which grab()'s brace-matcher
 // mistakes for the body — extract it by anchors instead. It depends on hoursForDate +
@@ -460,4 +460,37 @@ test("idemSig: setup / sale_intent / terminal_intent get NO dedup key (null) —
   for (const action of ["setup", "sale_intent", "terminal_intent", "card_status", undefined]) {
     assert.equal(R.idemSig({ action, amount: 30 }), null);
   }
+});
+
+// ─── Migration importer foundation: CSV parse + column guessing (Phase 4 linchpin) ─────────
+test("impParseCSV: headers → row objects, trims, drops blank rows, strips BOM", () => {
+  const p = R.impParseCSV("﻿Name,Phone\n Alice , 5551234 \n\n");
+  assert.deepEqual(p.headers, ["Name", "Phone"]);
+  assert.deepEqual(p.rows, [{ Name: "Alice", Phone: "5551234" }]); // trimmed; blank line dropped
+});
+test("impParseCSV: quoted commas, escaped quotes, and newlines inside a field survive", () => {
+  const csv = 'name,note\n"Smith, John","he said ""hi"""\n"multi\nline","ok"';
+  const p = R.impParseCSV(csv);
+  assert.equal(p.rows[0].name, "Smith, John");         // embedded comma kept
+  assert.equal(p.rows[0].note, 'he said "hi"');         // "" → " and outer quotes stripped
+  assert.equal(p.rows[1].name, "multi\nline");          // embedded newline kept
+});
+test("impDigits: strips everything but digits (phone key)", () => {
+  assert.equal(R.impDigits("(503) 555-1234"), "5035551234");
+});
+test("impGuessMap: prefers first/last over full; matches phone/date synonyms", () => {
+  const m = R.impGuessMap(["First Name", "Last Name", "Mobile", "Appointment Date", "Service", "Stylist"]);
+  assert.equal(m.first, "First Name");
+  assert.equal(m.last, "Last Name");
+  assert.equal(m.full, "");                  // first/last present → don't also map a full-name column
+  assert.equal(m.phone, "Mobile");
+  assert.equal(m.date, "Appointment Date");
+  assert.equal(m.staff, "Stylist");
+});
+test("impGuessMap: a lone name column maps to full; birthday/price synonyms", () => {
+  const m = R.impGuessMap(["Client Name", "Email", "Total", "DOB"]);
+  assert.equal(m.full, "Client Name");
+  assert.equal(m.first, "");
+  assert.equal(m.price, "Total");
+  assert.equal(m.birthday, "DOB");
 });
