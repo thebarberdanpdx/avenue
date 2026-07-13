@@ -940,6 +940,20 @@ const idemSig = (p) => {
   return null; // setup / sale_intent: no server-side double-charge to guard
 };
 
+// [outage-honest-menu] Race any Supabase/async call against a timeout so a HANGING backend
+// (compute-exhausted outage: the request never resolves OR rejects) rejects like a normal
+// failure instead of leaving a spinner spinning forever. Callers' existing try/catch then
+// treats a hang exactly like a clean error → the honest error state — never an endless
+// "loading"/"confirming". 20s is far longer than any healthy call, short enough to fail
+// honestly during an outage. Root-cause fix for the whole no-timeout hang class.
+const RPC_TIMEOUT_MS = 20000;
+function withRpcTimeout(promise, ms = RPC_TIMEOUT_MS) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("timed out — backend unreachable")), ms)),
+  ]);
+}
+
 // Build JSON request headers with the signed-in user's token attached, for
 // owner-only server endpoints (e.g. /api/calendar-pull) that must reject
 // anonymous callers. When there's no session the Authorization header is simply
@@ -8785,7 +8799,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
     let alive = true;
     (async () => {
       try {
-        const { data, error } = await supabase.rpc("manage_lookup_by_token", { p_token: token });
+        const { data, error } = await withRpcTimeout(supabase.rpc("manage_lookup_by_token", { p_token: token }));
         if (!alive) return;
         if (error || !data || !data.id) { setPhase("error"); return; }
         setAppt(data);
@@ -8859,7 +8873,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
     if (busy) return;
     if (!stillChangeable()) { setPhase("view"); return; }
     setBusy(true);
-    try { await supabase.rpc("manage_cancel_by_token", { p_token: token }); fireNotify("canceled", appt); setPhase("cancelled"); if (onChanged) onChanged({ type: "cancel" }); }
+    try { await withRpcTimeout(supabase.rpc("manage_cancel_by_token", { p_token: token })); fireNotify("canceled", appt); setPhase("cancelled"); if (onChanged) onChanged({ type: "cancel" }); }
     catch (e) { setPhase("error"); } finally { setBusy(false); }
   };
   const submitReschedule = async () => {
@@ -8868,7 +8882,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
     setBusy(true);
     const when = shopWallToInstant(newDate, newSlot); // anchor to the shop's tz, not the booker's device
     try {
-      await supabase.rpc("manage_reschedule_by_token", { p_token: token, p_start: newSlot, p_date: when.toISOString() });
+      await withRpcTimeout(supabase.rpc("manage_reschedule_by_token", { p_token: token, p_start: newSlot, p_date: when.toISOString() }));
       const updated = { ...appt, start: newSlot, end: newSlot + dur, bookedFor: when.toISOString() };
       setAppt(updated); fireNotify("rescheduled", updated); fireStaffPush({ shopId, title: "Appointment rescheduled", appt: updated, prevAppt: appt, event: "rescheduled", business }); setPhase("rescheduled"); if (onChanged) onChanged({ type: "reschedule", start: newSlot, end: newSlot + dur, bookedFor: when.toISOString() });
     } catch (e) { setPhase("error"); } finally { setBusy(false); }
@@ -8877,7 +8891,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
   // fires even if the RPC isn't deployed yet, so the barber is always notified they've arrived.
   const submitArrive = async () => {
     if (busy) return; setBusy(true);
-    try { await supabase.rpc("manage_checkin_by_token", { p_token: token }); } catch (e) {}
+    try { await withRpcTimeout(supabase.rpc("manage_checkin_by_token", { p_token: token })); } catch (e) {}
     try { fireStaffPush({ shopId, title: "Client arrived", appt: { ...appt, status: "checked-in" }, event: "checkedIn", business }); } catch (e) {}
     setBusy(false); setPhase("arrived");
   };
