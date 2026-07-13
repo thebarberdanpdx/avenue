@@ -5,9 +5,9 @@
 //   source <scratchpad>/.vero-secret && node tests/live/booking-guards.mjs
 import { createClient } from '@supabase/supabase-js';
 
-const URL = process.env.SUPABASE_URL;
+const URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const ANON = 'sb_publishable_aGX3akW7VfHO6Lm-FsZmEA_sf95Nu2i';
-const svc = createClient(URL, process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
+const svc = createClient(URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
 const anon = createClient(URL, ANON, { auth: { persistSession: false } });
 const SHOP = 'vero-test';
 

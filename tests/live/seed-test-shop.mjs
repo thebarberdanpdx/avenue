@@ -9,7 +9,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
 
-const URL = process.env.SUPABASE_URL, KEY = process.env.SUPABASE_SERVICE_KEY;
+const URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co", KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 if (!KEY) { console.error('SUPABASE_SERVICE_KEY not set'); process.exit(1); }
 const sb = createClient(URL, KEY, { auth: { persistSession: false } });
 
