@@ -2826,6 +2826,20 @@ function App() {
   mirrorFromServerRef.current = mirrorFromServer;
 
   useEffect(() => {
+    // [outage-honest-menu] Load watchdog. The catch/finally below only reaches a terminal state if the
+    // supabase calls REJECT. In the real July-2026 outage the backend was compute-exhausted: requests
+    // HUNG — never resolved, never rejected — so the loader's finally never ran, dataLoaded sat false
+    // forever, and the public page kept showing a bookable (DEFAULT_SERVICES demo) menu the whole outage.
+    // This watchdog forces a terminal state so the honest "can't load — call us" gate can fire on a hang.
+    // Fails safe: on a merely-slow load it may briefly show the honest state, then the completed load
+    // replaces it with the real menu. Saves stay blocked (loadIncomplete) until a genuine load succeeds.
+    let loadFinished = false;
+    const loadWatchdog = setTimeout(() => {
+      if (loadFinished) return;
+      console.error('[vero] initial load timed out (backend unreachable/hanging) — showing honest offline state');
+      setLoadIncomplete(true);
+      setDataLoaded(true);
+    }, 12000);
     (async () => {
       let allLoaded = true; // flipped to false on ANY real error — blocks saves so seeds can't overwrite real data
       let savedCutLibrary = null; // captured from shops.settings below; if absent we seed it from services
@@ -2933,6 +2947,7 @@ function App() {
         allLoaded = false;
         console.error('[vero] load routine threw — treating as incomplete; saves stay blocked:', e);
       } finally {
+        loadFinished = true; clearTimeout(loadWatchdog); // [outage-honest-menu] load reached a terminal state — cancel the hang watchdog
         // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
         if (allLoaded) { loadedRef.current = true; initialLoadOkRef.current = true; setLoadIncomplete(false); setUsingCache(false); }
         else { console.error('[vero] one or more loads failed — saves are blocked until reload to protect existing data'); setLoadIncomplete(true); }
