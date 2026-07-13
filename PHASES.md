@@ -30,9 +30,14 @@ The real outage mode is a **HANGING backend** (Supabase compute exhausted: reque
 - Low-impact public paths (reviews, waitlist) — no timeout. Minor.
 - **True airplane-mode** (zero signal) — **DEFERRED**, needs Dan's iPhone + Xcode. This is what broke the app before — read `NATIVE-OFFLINE-ROLLBACK-HANDOFF.md` first, never ship native offline from the cloud unverified.
 
-## ⚠️ Pre-migration investigation (before Phase 4)
+## Phase 4 readiness (assessed 2026-07-13)
 
-On `vero-test`, the **STAFF calendar loads EMPTY even on a healthy load** (appts never reach state; offline cache stays empty), and **250+ phantom appts** (Sanctuary's, `sync_*` ids) reappeared after a purge. Could be a real **new-shop sync bug** (would bite the Mangomint import) or just test-shop contamination. **Investigate on a clean shop before migrating** — don't assume it's only test mess.
+- **Migration PLAN**: `MIGRATION-GUIDE.md` is thorough (Phases 0–5, edge cases, rollback). Written against the live code.
+- **Importer**: **built** — `ImportDataEditor` (src/App.jsx ~15853), reached via Reports → Data → Import data. Has column-mapping, Default-staff, Preview, Undo. **Not yet end-to-end verified** (drive a real CSV → DB → calendar).
+- Guide flags 2 tiny importer tweaks to consider before import night: derive a client's home barber from their visit history, and add a Notes column.
+
+### ⚠️ Pre-migration investigation (do on a CLEAN shop, not vero-test)
+On `vero-test` the STAFF calendar loads **empty even on a healthy load**; a sync-pull capture showed **no `/api/sync-pull` calls** for the staff session. BUT vero-test is polluted — 250+ phantom `sync_*` appts, and the test login `vero-livetest` isn't a real barber with appts assigned, so PulseView's personal view being empty may be expected. **Conclusion: inconclusive on vero-test — it's too messy to trust.** Before migrating, stand up a CLEAN shop, import a small CSV, and confirm the staff calendar actually displays the imported appts. This is the Phase-0 dry-run and it's the real gate for Phase 4.
 
 ---
 
