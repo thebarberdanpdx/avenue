@@ -31,7 +31,7 @@ const { browser, context, page, errors } = await launch();
 await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
 await page.evaluate(() => { localStorage.setItem('vero_login_intent', 'staff'); localStorage.setItem('vero_testday_v1', '1'); });
 await page.goto(link.properties.action_link, { waitUntil: 'networkidle', timeout: 45000 });
-await page.waitForTimeout(6000); // let the calendar load and write its offline cache
+await page.waitForTimeout(9000); // let the calendar fully load + write its offline cache before we cut the cord
 
 // 2) now HANG the backend (compute-exhausted): sync-pull + supabase never respond.
 let hung = 0;
@@ -43,13 +43,14 @@ await page.reload({ waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() =>
 // Honest banner = any of the app's real outage messages (incl. the load-incomplete "Reload" one).
 const honestBannerRe = /didn'?t load|saving is paused|Reload|offline|showing.*local|sync problem|last synced/i;
 let settledAt = null, sawCalendar = false;
-for (let s = 3; s <= 30 && settledAt === null; s += 3) {
+for (let s = 3; s <= 42; s += 3) {
   await page.waitForTimeout(3000);
   const t = await page.evaluate(() => document.body.innerText || '');
   if (/PULSE|CALENDAR|CLIENTS/i.test(t)) sawCalendar = true;         // dashboard chrome rendered (not blank/spinner)
-  if (honestBannerRe.test(t)) settledAt = s;
+  if (settledAt === null && honestBannerRe.test(t)) settledAt = s;
+  // stop once the cache has clearly hydrated (the false-empty state is gone) and the banner is up
+  if (sawCalendar && settledAt !== null && !/Nothing booked today yet/i.test(t)) break;
 }
-await page.waitForTimeout(2000);
 const text = (await page.evaluate(() => document.body.innerText || '')).replace(/\s+/g, ' ');
 await page.screenshot({ path: `${OUT}/outage-staff.png` });
 
