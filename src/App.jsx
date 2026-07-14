@@ -26921,6 +26921,31 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
   );
 }
 
+// Pure comparator factory for the Clients-tab sort control (unit-tested in resolvers.test.mjs).
+// `paidByClient` maps clientId → real payments collected in Vero, so "Top spenders" = imported
+// lifetime + real Vero revenue. Every mode falls back to most-recent-activity for a stable order.
+function clientListComparator(mode, paidByClient) {
+  paidByClient = paidByClient || {};
+  const lastTouch = (c) => { const t = c.lastActivity || c.lastVisit; return t ? new Date(t).getTime() : 0; };
+  const visitTime = (c) => c.lastVisit ? new Date(c.lastVisit).getTime() : 0;
+  const sinceTime = (c) => c.clientSince ? new Date(c.clientSince).getTime() : 0;
+  const firstOf = (c) => (c.firstName || (c.name || "").trim().split(/\s+/)[0] || "").toLowerCase();
+  const lastOf = (c) => (c.lastName || (c.name || "").trim().split(/\s+/).slice(-1)[0] || "").toLowerCase();
+  const spendOf = (c) => (Number(c.importedSpent) || 0) + (paidByClient[c.id] || 0);
+  const overOf = (c) => { if (!c.cadenceDays || !c.lastVisit) return -1; return Math.round((Date.now() - new Date(c.lastVisit)) / 86400000) - c.cadenceDays; };
+  const byRecent = (a, b) => lastTouch(b) - lastTouch(a);
+  const S = {
+    recent: byRecent,
+    first: (a, b) => firstOf(a).localeCompare(firstOf(b)) || byRecent(a, b),
+    last: (a, b) => lastOf(a).localeCompare(lastOf(b)) || firstOf(a).localeCompare(firstOf(b)),
+    lastvisit: (a, b) => visitTime(b) - visitTime(a) || byRecent(a, b),
+    spend: (a, b) => spendOf(b) - spendOf(a) || byRecent(a, b),
+    newest: (a, b) => sinceTime(b) - sinceTime(a) || byRecent(a, b),
+    due: (a, b) => overOf(b) - overOf(a) || byRecent(a, b),
+    blocked: (a, b) => (b.blocked ? 1 : 0) - (a.blocked ? 1 : 0) || byRecent(a, b),
+  };
+  return S[mode] || S.recent;
+}
 function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner, shopId, appts, setAppts, waitlist, setWaitlist }) {
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState("recent"); // recent | first | last | lastvisit | spend | newest | due | blocked
@@ -26937,29 +26962,13 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
   // server-side action, not a tap in the clients tab. Do not reintroduce it. [nuke-all-removed]
 
   const q = query.trim().toLowerCase();
-  // Most-recent activity first. Falls back to lastVisit, then to 0 for older records with neither stamp.
-  const lastTouch = (c) => { const t = c.lastActivity || c.lastVisit; return t ? new Date(t).getTime() : 0; };
-  const visitTime = (c) => c.lastVisit ? new Date(c.lastVisit).getTime() : 0;
-  const sinceTime = (c) => c.clientSince ? new Date(c.clientSince).getTime() : 0;
-  const firstOf = (c) => (c.firstName || (c.name || "").trim().split(/\s+/)[0] || "").toLowerCase();
-  const lastOf = (c) => (c.lastName || (c.name || "").trim().split(/\s+/).slice(-1)[0] || "").toLowerCase();
   // Lifetime value = imported spend + any real payments actually collected in Vero (one pass over appts).
   const paidByClient = {};
   for (const a of (appts || [])) { const t = a && a.paid && Number(a.paid.total); if (a && a.clientId && t > 0) paidByClient[a.clientId] = (paidByClient[a.clientId] || 0) + t; }
   const spendOf = (c) => (Number(c.importedSpent) || 0) + (paidByClient[c.id] || 0);
   const overOf = (c) => { if (!c.cadenceDays || !c.lastVisit) return -1; return Math.round((Date.now() - new Date(c.lastVisit)) / 86400000) - c.cadenceDays; };
-  const byRecent = (a, b) => lastTouch(b) - lastTouch(a);
-  const SORTS = {
-    recent: byRecent,
-    first: (a, b) => firstOf(a).localeCompare(firstOf(b)) || byRecent(a, b),
-    last: (a, b) => lastOf(a).localeCompare(lastOf(b)) || firstOf(a).localeCompare(firstOf(b)),
-    lastvisit: (a, b) => visitTime(b) - visitTime(a) || byRecent(a, b),
-    spend: (a, b) => spendOf(b) - spendOf(a) || byRecent(a, b),
-    newest: (a, b) => sinceTime(b) - sinceTime(a) || byRecent(a, b),
-    due: (a, b) => overOf(b) - overOf(a) || byRecent(a, b),
-    blocked: (a, b) => (b.blocked ? 1 : 0) - (a.blocked ? 1 : 0) || byRecent(a, b),
-  };
-  const shown = (q ? clients.filter((c) => (c.name + " " + (c.phone || "") + " " + (c.email || "")).toLowerCase().includes(q)) : clients).slice().sort(SORTS[sortMode] || byRecent);
+  // Ordering is a pure, unit-tested function (clientListComparator) — see resolvers.test.mjs.
+  const shown = (q ? clients.filter((c) => (c.name + " " + (c.phone || "") + " " + (c.email || "")).toLowerCase().includes(q)) : clients).slice().sort(clientListComparator(sortMode, paidByClient));
   // Row subtitle reflects the active sort, so you can SEE what you sorted by (the value is right there).
   const fmtShort = (iso) => { if (!iso) return "—"; const d = new Date(iso); if (isNaN(d)) return "—"; return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${String(d.getFullYear()).slice(2)}`; };
   const subFor = (c, provider) => {
