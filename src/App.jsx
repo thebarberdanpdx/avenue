@@ -15769,8 +15769,9 @@ function impParseCSV(text) {
 function impDigits(s) { return (s || "").replace(/\D/g, ""); }
 function impGuess(headers, keys, exclude = []) {
   const low = headers.map((h) => h.toLowerCase());
+  const exLow = exclude.map((e) => String(e).toLowerCase()); // exclude whole headers by name, case-insensitively
   for (const k of keys) {
-    const idx = low.findIndex((h, n) => h.includes(k) && !exclude.includes(headers[n]));
+    const idx = low.findIndex((h) => h.includes(k) && !exLow.includes(h));
     if (idx >= 0) return headers[idx];
   }
   return "";
@@ -15779,21 +15780,47 @@ function impGuessMap(headers) {
   const first = impGuess(headers, ["first name", "firstname", "given name", "first"]);
   const last = impGuess(headers, ["last name", "lastname", "surname", "family name", "last"]);
   const full = (first || last) ? "" : impGuess(headers, ["full name", "client name", "customer name", "contact name", "name"]);
+  const email = impGuess(headers, ["email", "e-mail"]);
+  const phone = impGuess(headers, ["mobile", "cell", "phone", "tel", "contact number"]);
+  const birthday = impGuess(headers, ["birthday", "birth date", "date of birth", "dob", "born"]);
+  // Private notes / color formulas — real data loss if they don't come over, so map them too.
+  const notes = impGuess(headers, ["notes", "note", "comment", "memo", "formula", "remarks"]);
+  // Client-summary fields (Mangomint clients export). Claimed BEFORE the generic appointment fields
+  // below so a "Last appointment date" / "Total amount spent" column can never be misread as an
+  // appointment date or price. These land on the CARD, not as appointments.
+  const lastVisit = impGuess(headers, ["last appointment date", "last appointment", "last visit", "last seen"]);
+  const spent = impGuess(headers, ["total amount spent", "total spent", "lifetime spend", "lifetime value"]);
+  const clientSince = impGuess(headers, ["created at", "client since", "customer since", "member since", "date added", "date created"]);
+  const blocked = impGuess(headers, ["blocked from online booking", "blocked", "banned", "do not book"]);
+  // Every header already claimed above (plus other spend/summary columns we intentionally ignore, e.g.
+  // "Total amount spent YTD") is off-limits to the generic appointment fields — so date/price/staff/
+  // status match only genuine appointment columns and can't reuse a client-summary column.
+  const summaryIgnore = headers.filter((h) => /amount spent|lifetime|total spent|first appointment/i.test(String(h)));
+  const claimed = [first, last, full, email, phone, birthday, notes, lastVisit, spent, clientSince, blocked, ...summaryIgnore].filter(Boolean);
   return {
-    full, first, last,
-    email: impGuess(headers, ["email", "e-mail"]),
-    phone: impGuess(headers, ["mobile", "cell", "phone", "tel", "contact number"]),
-    date: impGuess(headers, ["appointment date", "start date", "booking date", "date", "booked", "day", "scheduled"]),
-    time: impGuess(headers, ["start time", "appointment time", "time", "start"]),
-    service: impGuess(headers, ["service", "treatment", "appointment type", "item", "type"]),
-    staff: impGuess(headers, ["staff", "provider", "stylist", "barber", "employee", "team member", "served by", "with"]),
-    status: impGuess(headers, ["status", "state"]),
-    price: impGuess(headers, ["price", "total", "amount", "paid", "cost"]),
-    birthday: impGuess(headers, ["birthday", "birth date", "date of birth", "dob", "born"]),
-    // Private notes / color formulas — real data loss if they don't come over, so map them too.
-    notes: impGuess(headers, ["notes", "note", "comment", "memo", "formula", "remarks"]),
+    full, first, last, email, phone, birthday, notes, lastVisit, spent, clientSince, blocked,
+    date: impGuess(headers, ["appointment date", "start date", "booking date", "date", "booked", "scheduled"], claimed),
+    time: impGuess(headers, ["start time", "appointment time", "time", "start"], claimed),
+    service: impGuess(headers, ["service", "treatment", "appointment type", "item", "type"], claimed),
+    // NO bare "with" — it greedily grabbed "Phone (with country code)".
+    staff: impGuess(headers, ["staff member", "staff", "provider", "stylist", "barber", "employee", "team member", "served by"], claimed),
+    // NO bare "state" — it grabbed the address "State" column. Appointment status only.
+    status: impGuess(headers, ["appointment status", "appt status", "booking status", "status"], claimed),
+    price: impGuess(headers, ["appointment price", "service price", "price", "total", "amount", "paid", "cost"], claimed),
   };
 }
+// Normalize a phone to a clean US 10-digit display form so recognition (which matches on raw digits)
+// never breaks on a country-code prefix. "+1 (503) 555-1234" and "5035551234" both → "(503) 555-1234".
+function impPhone(raw) {
+  let d = String(raw || "").replace(/\D/g, "");
+  if (d.length === 11 && d[0] === "1") d = d.slice(1);
+  if (d.length !== 10) return String(raw || "").trim(); // non-US / odd length → keep as-is, don't mangle
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+}
+// Parse a money string ("$1,234.56") to a rounded dollar number; blank/none → 0.
+function impMoney(s) { const n = parseFloat(String(s || "").replace(/[^0-9.]/g, "")); return isNaN(n) ? 0 : Math.round(n); }
+// A blocked-from-booking cell is truthy on yes/true/1/y (Mangomint exports "Yes").
+function impBlocked(s) { return /^(yes|true|1|y)$/i.test(String(s || "").trim()); }
 // A birthday may arrive with or without a year — keep an ISO date when parseable, else the raw text.
 function impBirthday(s) {
   if (!s || !String(s).trim()) return undefined;
@@ -15892,8 +15919,8 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       const email = get(row, "email");
       const key = pd.length >= 7 ? pd : (name ? "n:" + name.toLowerCase() : null);
       if (!key) return;
-      if (!people.has(key)) people.set(key, { name: name || "Client", firstName: first, lastName: last, email, phone, key, birthday: get(row, "birthday"), notes: get(row, "notes") });
-      else { const ex = people.get(key); if (!ex.email && email) ex.email = email; if (!ex.name && name) ex.name = name; if (!ex.phone && phone) ex.phone = phone; if (!ex.birthday) ex.birthday = get(row, "birthday"); if (!ex.notes && get(row, "notes")) ex.notes = get(row, "notes"); }
+      if (!people.has(key)) people.set(key, { name: name || "Client", firstName: first, lastName: last, email, phone, key, birthday: get(row, "birthday"), notes: get(row, "notes"), lastVisit: get(row, "lastVisit"), spent: get(row, "spent"), clientSince: get(row, "clientSince"), blocked: impBlocked(get(row, "blocked")) });
+      else { const ex = people.get(key); if (!ex.email && email) ex.email = email; if (!ex.name && name) ex.name = name; if (!ex.phone && phone) ex.phone = phone; if (!ex.birthday) ex.birthday = get(row, "birthday"); if (!ex.notes && get(row, "notes")) ex.notes = get(row, "notes"); if (!ex.lastVisit && get(row, "lastVisit")) ex.lastVisit = get(row, "lastVisit"); if (!ex.spent && get(row, "spent")) ex.spent = get(row, "spent"); if (!ex.clientSince && get(row, "clientSince")) ex.clientSince = get(row, "clientSince"); if (impBlocked(get(row, "blocked"))) ex.blocked = true; }
       // appointment for this row?
       const dateStr = get(row, "date");
       if (dateStr) {
@@ -15945,6 +15972,11 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
         if (!ex.birthday && ibd) patch.birthday = ibd;
         // Fill blank notes only — never overwrite notes the shop already has on this card.
         if (!String(ex.notes || "").trim() && p.notes) patch.notes = p.notes;
+        // Summary fields fill blanks only; blocked is applied (never un-blocks an existing client).
+        const _lvm = impParseDate(p.lastVisit); if (!ex.lastVisit && _lvm) patch.lastVisit = _lvm.toISOString();
+        const _spm = impMoney(p.spent); if (!ex.importedSpent && _spm > 0) patch.importedSpent = _spm;
+        const _csm = impParseDate(p.clientSince); if (!ex.clientSince && _csm) patch.clientSince = _csm.toISOString();
+        if (p.blocked && !ex.blocked) { patch.blocked = true; patch.blockReason = ex.blockReason || "Blocked from online booking (imported)"; }
         if (Object.keys(patch).length) clientPatches[mid] = { ...(clientPatches[mid] || {}), ...patch };
         merges.push({ id: mid, name: ex.name || p.name, basis, filled: Object.keys(patch) });
         return;
@@ -15952,7 +15984,21 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       // No confident match. If an existing client shares this name, flag it (don't merge).
       if (pn && existingByName[pn]) possibleDupes.push({ name: byId[existingByName[pn]].name || p.name });
       p.id = `imp_${bId}_c${newIdx++}`;
-      newClients.push({ id: p.id, name: p.name, firstName: p.firstName || "", lastName: p.lastName || "", email: p.email || "", phone: p.phone || "", birthday: impBirthday(p.birthday), provider: defProv, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: p.notes || "", messages: [], gallery: [], timeline: [], family: [], _import: bId });
+      const _lv = impParseDate(p.lastVisit); const _cs = impParseDate(p.clientSince); const _sp = impMoney(p.spent);
+      newClients.push({
+        id: p.id, name: p.name, firstName: p.firstName || "", lastName: p.lastName || "",
+        email: p.email || "", phone: impPhone(p.phone), // normalized 10-digit → returning-client recognition matches
+        birthday: impBirthday(p.birthday),
+        provider: defProv, visits: 0,
+        lastVisit: _lv ? _lv.toISOString() : undefined,       // from "Last appointment date" — drives rebooking nudges
+        importedSpent: _sp > 0 ? _sp : undefined,             // lifetime value on the card (kept off revenue reports)
+        clientSince: _cs ? _cs.toISOString() : undefined,     // from "Created at"
+        blocked: p.blocked ? true : undefined,                // blocked-from-online-booking → can't get a login code
+        blockReason: p.blocked ? "Blocked from online booking (imported)" : undefined,
+        smsConsent: true, smsConsentAt: new Date().toISOString(), // owner default: everyone consented on import
+        lastActivity: new Date().toISOString(), customDurations: {}, notes: p.notes || "",
+        messages: [], gallery: [], timeline: [], family: [], _import: bId,
+      });
     });
     // 3. resolve appointments
     const matchProv = (txt) => { const t = (txt || "").toLowerCase(); const hit = realProviders.find((p) => t && p.name.toLowerCase().includes(t.split(" ")[0]) || (t && t.includes(p.name.toLowerCase().split(" ")[0]))); return hit ? hit.id : defProv; };
@@ -16000,8 +16046,9 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
         c.cadenceDays = Math.max(1, Math.round(g / (mine.length - 1)));
       }
     });
+    const blockedCount = newClients.filter((c) => c.blocked).length + Object.values(clientPatches).filter((p) => p.blocked).length;
     setBatchId(bId);
-    setBuilt({ newClients, reused: merges.length, merges, possibleDupes, clientPatches, newAppts, past, future, skipped, peopleCount: people.size });
+    setBuilt({ newClients, reused: merges.length, merges, possibleDupes, clientPatches, newAppts, past, future, skipped, blocked: blockedCount, peopleCount: people.size });
     setStage("preview");
   };
 
@@ -16051,6 +16098,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
   const FIELD_LABELS = [
     ["full", "Full name"], ["first", "First name"], ["last", "Last name"], ["email", "Email"], ["phone", "Phone"],
     ["date", "Appointment date"], ["time", "Appointment time"], ["service", "Service"], ["staff", "Staff"], ["status", "Status"], ["price", "Price"], ["birthday", "Birthday"], ["notes", "Notes / formula"],
+    ["lastVisit", "Last visit date"], ["spent", "Total spent"], ["clientSince", "Client since"], ["blocked", "Blocked from booking"],
   ];
   const canPreview = !!(map.phone || map.full || map.first || map.email);
 
@@ -16102,7 +16150,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       {stage === "preview" && built && (<>
         <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 12 }}>Ready to import</div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden", marginBottom: 16 }}>
-          {[["New clients", built.newClients.length, false], ["Matched to existing", built.reused, false], ["Appointments", built.newAppts.length, false], ["past", built.past, true], ["upcoming", built.future, true]].map(([label, n, sub], i) => (
+          {[["New clients", built.newClients.length, false], ["Matched to existing", built.reused, false], ...(built.blocked ? [["Blocked from booking", built.blocked, false]] : []), ["Appointments", built.newAppts.length, false], ["past", built.past, true], ["upcoming", built.future, true]].map(([label, n, sub], i) => (
             <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
               <span style={{ fontSize: 14.5, color: "var(--sub)", paddingLeft: sub ? 14 : 0 }}>{label}</span><span style={{ fontSize: sub ? 15 : 16, fontWeight: sub ? 500 : 600, color: sub ? "var(--sub)" : "var(--text)" }}>{n}</span>
             </div>
