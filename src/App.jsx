@@ -27389,6 +27389,19 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const visitCount = Math.max(live.visits || 0, historyAppts.length);
   const sinceLabel = clientSinceLabel(live, appts) || "—";
   const cadenceShort = cadenceAvg == null ? "—" : (cadenceAvg < 11 ? `${cadenceAvg}d` : `${Math.round(cadenceAvg / 7)} wk`);
+  // --- redesigned card (Onyx-Ivory) helpers ---
+  const initials = (((live.name || "?").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("")) || "?").toUpperCase();
+  const pillLabel = isBlocked ? "Blocked from booking"
+    : cadenceAvg != null ? (cadenceAvg < 11 ? `Regular · every ${cadenceAvg} days` : `Regular · every ${Math.round(cadenceAvg / 7)} wks`)
+    : (visitCount === 0 ? "New client" : null);
+  const lastSeenLabel = (() => { const a = historyAppts[0]; if (!a || !a.bookedFor) return "—"; const d = Math.round((now - new Date(a.bookedFor).getTime()) / 86400000); if (d <= 0) return "Today"; if (d < 14) return `${d}d`; if (d < 60) return `${Math.round(d / 7)} wk`; return `${Math.round(d / 30)} mo`; })();
+  const phoneDigits = String(live.phone || "").replace(/[^0-9+]/g, "");
+  const cpSec = { display: "flex", alignItems: "center", gap: 9, margin: "24px 2px 12px" };
+  const cpSecBar = { width: 16, height: 2, background: "#161616", borderRadius: 2, display: "inline-block", flexShrink: 0 };
+  const cpSecTx = { fontSize: 11, letterSpacing: 2.2, textTransform: "uppercase", color: "#2A2A2A", fontWeight: 800 };
+  const cpField = { marginTop: 16 };
+  const cpFieldL = { fontSize: 12, color: "#8C8B87", fontWeight: 600 };
+  const cpFieldV = { fontSize: 16.5, color: "#161616", fontWeight: 500, marginTop: 4 };
 
   // ---- detail / transaction / reschedule / money sheets ----
   const [detail, setDetail] = useState(null);   // { appt, mode: "past" | "up" }
@@ -27474,50 +27487,73 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   );
 
   return (
-    <div className="fade-up">
-      {/* top bar: back · shop · kebab */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <div />
-        <button onClick={() => setMenuOpen(true)} style={{ background: "none", border: "none", color: "var(--faint)", cursor: "pointer", padding: 4 }}><MoreHorizontal size={20} /></button>
+    <div className="cp-onyx fade-up" style={{
+      "--bg": "#FFFFFF", "--panel": "#FFFFFF", "--panel2": "#F5F5F3", "--line": "#F0F0EE", "--border": "#E7E6E3", "--border2": "#D7D6D2",
+      "--text": "#161616", "--text2": "#33322F", "--sub": "#8C8B87", "--faint": "#B4B3AE",
+      "--gold": "#161616", "--on-gold": "#FFFFFF", "--font-disp": "'Hanken Grotesk', sans-serif", "--font-body": "'Hanken Grotesk', sans-serif",
+      background: "#FFFFFF", color: "#161616", fontFamily: "'Hanken Grotesk', sans-serif", borderRadius: 18, padding: "6px 16px 24px",
+    }}>
+      {/* Onyx-Ivory redesign (bite #1): palette overridden on the vars above so the whole subtree
+          recolors; this rule forces Hanken everywhere so no hardcoded serif (Fraunces/Bodoni) leaks in. */}
+      <style>{".cp-onyx,.cp-onyx *{font-family:'Hanken Grotesk',sans-serif !important}.cp-onyx ::selection{background:#e9e9e7}"}</style>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button onClick={() => setMenuOpen(true)} style={{ background: "none", border: "none", color: "#B4B3AE", cursor: "pointer", padding: 4 }}><MoreHorizontal size={20} /></button>
       </div>
 
-      {/* header: avatar · name · contact line · action pills */}
-      <div style={{ textAlign: "center", marginBottom: 18 }}>
-        <button onClick={() => setPicker(true)} style={{ position: "relative", width: 84, height: 84, borderRadius: "50%", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-          <Avatar size={84} photo={clientPhoto(live)} initial={(live.name || "?").charAt(0)} color="var(--text)" fontSize={34} />
-          <span style={{ position: "absolute", bottom: 0, right: 0, width: 24, height: 24, borderRadius: "50%", background: "var(--text)", color: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={12} /></span>
+      {/* header: ring monogram · name · pill · since */}
+      <div style={{ textAlign: "center", marginBottom: 4 }}>
+        <button onClick={() => setPicker(true)} style={{ position: "relative", width: 88, height: 88, margin: "0 auto", padding: 2.5, borderRadius: "50%", background: "linear-gradient(140deg,#DEDEDE,#9C9C9C 55%,#5E5E5E)", border: "none", cursor: "pointer", boxShadow: "0 8px 20px -12px rgba(0,0,0,.4)", display: "block" }}>
+          <span style={{ display: "block", borderRadius: "50%", border: "3px solid #FFFFFF", overflow: "hidden", lineHeight: 0 }}>
+            <Avatar size={77} photo={clientPhoto(live)} initial={initials} color="#151515" fontSize={27} />
+          </span>
+          <span style={{ position: "absolute", bottom: 0, right: 2, width: 24, height: 24, borderRadius: "50%", background: "#161616", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #fff" }}><Camera size={12} /></span>
         </button>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 31, fontWeight: 500, letterSpacing: "-0.5px", marginTop: 14 }}>{live.name}</h2>
-        {(() => { const sl = clientSinceLabel(live, appts); return sl ? <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 6 }}>Client since {sl}</div> : null; })()}
-        <div style={{ color: "var(--sub)", fontSize: 14, marginTop: 9 }}>
-          {live.phone && <PhoneLink number={live.phone} />}
-          {live.phone && live.email && "  ·  "}
-          {live.email && <EmailLink email={live.email} />}
-          {!live.phone && !live.email && <span style={{ color: "var(--faint)", fontStyle: "italic" }}>No contact info on file</span>}
-        </div>
-        <div style={{ marginTop: 7 }}>
-          {editBday ? (
-            <input type="date" autoFocus value={live.birthday ? String(live.birthday).slice(0, 10) : ""} onChange={(e) => saveBirthday(e.target.value ? new Date(e.target.value + "T12:00:00").toISOString() : "")} onBlur={() => setEditBday(false)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "6px 10px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
-          ) : (
-            <button onClick={() => setEditBday(true)} style={{ background: "none", border: "none", color: live.birthday ? "var(--sub)" : "var(--faint)", fontSize: 14.5, cursor: "pointer", fontFamily: FONT_BODY }}>{live.birthday ? `Birthday · ${fmtBday(live.birthday)}` : "+ Add birthday"}</button>
-          )}
-        </div>
+        <div style={{ fontSize: 27, fontWeight: 800, letterSpacing: "-0.5px", marginTop: 14, color: "#161616" }}>{live.name}</div>
+        {pillLabel && <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 11, padding: "5px 12px", border: `1px solid ${isBlocked ? "rgba(155,35,35,0.4)" : "rgba(0,0,0,0.16)"}`, borderRadius: 20, color: isBlocked ? "#9B2323" : "#333", fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase" }}>{!isBlocked && "★ "}{pillLabel}</div>}
+        <div style={{ fontSize: 13.5, color: "#8C8B87", marginTop: 10 }}>{sinceLabel && sinceLabel !== "—" ? `Client since ${sinceLabel}` : "New client"}{provider && provider.name ? ` · with ${provider.name}` : ""}</div>
       </div>
 
-      {/* four-stat strip */}
-      <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden", marginBottom: 6 }}>
-        {[[visitCount, "Visits"], [sinceLabel, "Since"], [cadenceShort, "Cadence"], [money0(lifetime), "Lifetime"]].map(([n, l], i) => (
-          <div key={l} style={{ flex: 1, textAlign: "center", padding: "12px 4px", borderLeft: i === 0 ? "none" : "1px solid var(--line)" }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>{n}</div>
-            <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 3 }}>{l}</div>
+      {/* Book · Text · Call */}
+      <button onClick={() => onRebook && onRebook({ clientId: client.id, providerId: live.provider })} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", marginTop: 20, padding: 15, borderRadius: 13, background: "linear-gradient(180deg,#2A2A2A,#101010)", color: "#fff", fontSize: 15.5, fontWeight: 700, border: "none", cursor: "pointer", boxShadow: "0 10px 22px -10px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.16)" }}><Calendar size={17} /> Book appointment</button>
+      {live.phone && (
+        <div style={{ display: "flex", gap: 10, marginTop: 11 }}>
+          <a href={`sms:${phoneDigits}`} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 12, borderRadius: 13, border: "1.5px solid #E7E6E3", background: "#fff", color: "#161616", fontSize: 14.5, fontWeight: 600, textDecoration: "none" }}><MessageSquare size={16} /> Text</a>
+          <a href={`tel:${phoneDigits}`} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 12, borderRadius: 13, border: "1.5px solid #E7E6E3", background: "#fff", color: "#161616", fontSize: 14.5, fontWeight: 600, textDecoration: "none" }}><Phone size={16} /> Call</a>
+        </div>
+      )}
+
+      {/* CONTACT */}
+      <div style={cpSec}><span style={cpSecBar} /><span style={cpSecTx}>Contact</span></div>
+      <div style={cpField}><div style={cpFieldL}>Phone</div><div style={cpFieldV}>{live.phone ? <PhoneLink number={live.phone} /> : <span style={{ color: "#B4B3AE" }}>Not on file</span>}</div></div>
+      <div style={cpField}><div style={cpFieldL}>Email</div><div style={cpFieldV}>{live.email ? <EmailLink email={live.email} /> : <span style={{ color: "#B4B3AE" }}>Not on file</span>}</div></div>
+      <div style={cpField}><div style={cpFieldL}>Birthday</div><div style={cpFieldV}>{editBday ? (
+        <input type="date" autoFocus value={live.birthday ? String(live.birthday).slice(0, 10) : ""} onChange={(e) => saveBirthday(e.target.value ? new Date(e.target.value + "T12:00:00").toISOString() : "")} onBlur={() => setEditBday(false)} style={{ background: "#F5F5F3", border: "1px solid #E7E6E3", borderRadius: 9, padding: "6px 10px", color: "#161616", fontSize: 14 }} />
+      ) : (
+        <button onClick={() => setEditBday(true)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 16.5, fontWeight: 500, color: live.birthday ? "#161616" : "#2A2A2A", textDecoration: live.birthday ? "none" : "underline", textUnderlineOffset: 2 }}>{live.birthday ? fmtBday(live.birthday) : "Add birthday"}</button>
+      )}</div></div>
+      <div style={cpField}><div style={cpFieldL}>Preferences &amp; notes</div><div style={cpFieldV}><button onClick={() => { setPfTab("timeline"); setOpenMember(null); setEditingNote(true); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontSize: 16.5, fontWeight: 500, color: live.notes ? "#161616" : "#2A2A2A", textDecoration: live.notes ? "none" : "underline", textUnderlineOffset: 2, lineHeight: 1.4 }}>{live.notes ? (live.notes.length > 90 ? live.notes.slice(0, 90) + "…" : live.notes) : "Add client notes"}</button></div></div>
+
+      {/* LIFETIME — three clean stats */}
+      <div style={cpSec}><span style={cpSecBar} /><span style={cpSecTx}>Lifetime</span></div>
+      <div style={{ display: "flex", border: "1px solid #E7E6E3", borderTop: "2px solid #161616", borderRadius: "0 0 14px 14px", overflow: "hidden", background: "#fff", boxShadow: "0 6px 18px -14px rgba(0,0,0,.4)" }}>
+        {[[String(visitCount), "Visits"], [money0(lifetime), "Spent"], [lastSeenLabel, "Last seen"]].map(([n, l], i) => (
+          <div key={l} style={{ flex: 1, textAlign: "center", padding: "15px 5px", borderLeft: i === 0 ? "none" : "1px solid #F0F0EE" }}>
+            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.3px", color: "#161616" }}>{n}</div>
+            <div style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "#B4B3AE", fontWeight: 700, marginTop: 5 }}>{l}</div>
           </div>
         ))}
       </div>
 
-      {/* tab bar */}
-      <div style={{ display: "flex", gap: 20, borderBottom: "1px solid var(--line)", overflowX: "auto", overflowY: "hidden", touchAction: "pan-x", overscrollBehavior: "contain", padding: "18px 4px 0", marginBottom: 4 }}>
-        {[["timeline", "Timeline"], ["gallery", "Gallery"], ["pricing", "Pricing/Duration"], ["family", "Family"]].map(([id, label]) => { const on = pfTab === id; return (
-          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontFamily: "'Jost', sans-serif", fontWeight: on ? 600 : 500, fontSize: 16, paddingBottom: 12, marginBottom: -1, whiteSpace: "nowrap", cursor: "pointer" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
+      {/* DETAILS — tap-through rows (select the section shown below) */}
+      <div style={cpSec}><span style={cpSecBar} /><span style={cpSecTx}>Details</span></div>
+      <div>
+        {[["timeline", "Timeline", Clock, historyAppts.length ? `${historyAppts.length} visits` : ""], ["gallery", "Photos", ImageIcon, gallery.length ? String(gallery.length) : ""], ["pricing", "Pricing & duration", DollarSign, ""], ["family", "Family", Users, family.length ? String(family.length) : ""]].map(([id, label, Icon, badge]) => { const on = pfTab === id; return (
+          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ display: "flex", alignItems: "center", gap: 13, width: "100%", padding: "15px 2px", borderTop: "none", borderLeft: "none", borderRight: "none", borderBottom: "1px solid #F0F0EE", background: on ? "#FAFAF9" : "none", cursor: "pointer", textAlign: "left" }}>
+            <span style={{ width: 34, height: 34, borderRadius: 10, background: on ? "#161616" : "#F2F2F0", color: on ? "#fff" : "#333", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={17} /></span>
+            <span style={{ flex: 1, fontSize: 15.5, fontWeight: 600, color: "#161616" }}>{label}</span>
+            {badge && <span style={{ fontSize: 13, color: "#8C8B87" }}>{badge}</span>}
+            <ChevronRight size={17} style={{ color: "#B4B3AE" }} />
+          </button>
         ); })}
       </div>
 
