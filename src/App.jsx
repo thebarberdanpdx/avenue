@@ -26923,6 +26923,7 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
 
 function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner, shopId, appts, setAppts, waitlist, setWaitlist }) {
   const [query, setQuery] = useState("");
+  const [sortMode, setSortMode] = useState("recent"); // recent | first | last | lastvisit | spend | newest | due | blocked
   const [adding, setAdding] = useState(false);
   const staff = providers.filter((p) => p.id !== "anyone");
   const blank = { firstName: "", lastName: "", name: "", phone: "", email: "", provider: staff[0]?.id || "dan", notes: "" };
@@ -26938,7 +26939,37 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
   const q = query.trim().toLowerCase();
   // Most-recent activity first. Falls back to lastVisit, then to 0 for older records with neither stamp.
   const lastTouch = (c) => { const t = c.lastActivity || c.lastVisit; return t ? new Date(t).getTime() : 0; };
-  const shown = (q ? clients.filter((c) => (c.name + " " + (c.phone || "") + " " + (c.email || "")).toLowerCase().includes(q)) : clients).slice().sort((a, b) => lastTouch(b) - lastTouch(a));
+  const visitTime = (c) => c.lastVisit ? new Date(c.lastVisit).getTime() : 0;
+  const sinceTime = (c) => c.clientSince ? new Date(c.clientSince).getTime() : 0;
+  const firstOf = (c) => (c.firstName || (c.name || "").trim().split(/\s+/)[0] || "").toLowerCase();
+  const lastOf = (c) => (c.lastName || (c.name || "").trim().split(/\s+/).slice(-1)[0] || "").toLowerCase();
+  // Lifetime value = imported spend + any real payments actually collected in Vero (one pass over appts).
+  const paidByClient = {};
+  for (const a of (appts || [])) { const t = a && a.paid && Number(a.paid.total); if (a && a.clientId && t > 0) paidByClient[a.clientId] = (paidByClient[a.clientId] || 0) + t; }
+  const spendOf = (c) => (Number(c.importedSpent) || 0) + (paidByClient[c.id] || 0);
+  const overOf = (c) => { if (!c.cadenceDays || !c.lastVisit) return -1; return Math.round((Date.now() - new Date(c.lastVisit)) / 86400000) - c.cadenceDays; };
+  const byRecent = (a, b) => lastTouch(b) - lastTouch(a);
+  const SORTS = {
+    recent: byRecent,
+    first: (a, b) => firstOf(a).localeCompare(firstOf(b)) || byRecent(a, b),
+    last: (a, b) => lastOf(a).localeCompare(lastOf(b)) || firstOf(a).localeCompare(firstOf(b)),
+    lastvisit: (a, b) => visitTime(b) - visitTime(a) || byRecent(a, b),
+    spend: (a, b) => spendOf(b) - spendOf(a) || byRecent(a, b),
+    newest: (a, b) => sinceTime(b) - sinceTime(a) || byRecent(a, b),
+    due: (a, b) => overOf(b) - overOf(a) || byRecent(a, b),
+    blocked: (a, b) => (b.blocked ? 1 : 0) - (a.blocked ? 1 : 0) || byRecent(a, b),
+  };
+  const shown = (q ? clients.filter((c) => (c.name + " " + (c.phone || "") + " " + (c.email || "")).toLowerCase().includes(q)) : clients).slice().sort(SORTS[sortMode] || byRecent);
+  // Row subtitle reflects the active sort, so you can SEE what you sorted by (the value is right there).
+  const fmtShort = (iso) => { if (!iso) return "—"; const d = new Date(iso); if (isNaN(d)) return "—"; return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${String(d.getFullYear()).slice(2)}`; };
+  const subFor = (c, provider) => {
+    if (sortMode === "spend") return `$${spendOf(c)} lifetime · ${c.visits || 0} visits`;
+    if (sortMode === "lastvisit") return c.lastVisit ? `Last visit ${fmtShort(c.lastVisit)}` : "No visit on file";
+    if (sortMode === "newest") return c.clientSince ? `Client since ${fmtShort(c.clientSince)}` : `${c.visits || 0} visits`;
+    if (sortMode === "due") { const o = overOf(c); return o > 0 ? `${o} day${o === 1 ? "" : "s"} overdue` : `${c.visits || 0} visits · ${provider.name}`; }
+    if (sortMode === "blocked") return c.blocked ? "🚫 Blocked from booking" : `${c.visits || 0} visits · ${provider.name}`;
+    return `${c.visits || 0} visits · ${provider.name}`;
+  };
 
   // Rebooking-rhythm radar: clients past their usual interval, not already handled since their last visit.
   // A client gets a `nudgeDismissedAt` stamp when you either Nudge them or X them out. If that stamp is more
@@ -27022,7 +27053,23 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         <User size={17} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1] || providers[0] || {}; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
+        <span style={{ fontSize: 12.5, color: "var(--faint)", letterSpacing: 0.5, textTransform: "uppercase", flexShrink: 0 }}>Sort</span>
+        <div style={{ position: "relative", flex: 1 }}>
+          <select value={sortMode} onChange={(e) => setSortMode(e.target.value)} style={{ width: "100%", appearance: "none", WebkitAppearance: "none", MozAppearance: "none", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 38px 10px 14px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, cursor: "pointer" }}>
+            <option value="recent">Recent activity</option>
+            <option value="first">First name (A–Z)</option>
+            <option value="last">Last name (A–Z)</option>
+            <option value="lastvisit">Last visit</option>
+            <option value="spend">Top spenders</option>
+            <option value="newest">Newest clients</option>
+            <option value="due">Due to rebook</option>
+            <option value="blocked">Blocked from booking</option>
+          </select>
+          <ChevronDown size={16} style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
+        </div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1] || providers[0] || {}; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>{subFor(c, provider)}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}</div>
       {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : "No clients yet — tap + to add your first one."}</p>}
     </div>
 
