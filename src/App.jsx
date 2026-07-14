@@ -1239,9 +1239,11 @@ function PhoneLink({ number, style }) {
         onTouchEnd={(e) => { e.stopPropagation(); cancel(); }}
         onTouchMove={cancel}
         onClick={(e) => { e.stopPropagation(); if (lp.current.touch) { lp.current.touch = false; return; } setOpen(true); }}
-        style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", ...style }}>{disp}</button>
+        // userSelect/touchCallout none: the 450ms long-press that opens the sheet is also iOS's
+        // "select text" gesture — disabling selection here stops the tap from highlighting the number.
+        style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", ...style }}>{disp}</button>
       <Sheet open={open} onClose={() => setOpen(false)} align="bottom" maxWidth={420}>
-        <div style={{ padding: "6px 4px 8px" }}>
+        <div style={{ padding: "6px 4px 8px", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
           <div style={{ textAlign: "center", marginBottom: 18 }}>
             <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CONTACT</div>
             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{disp}</div>
@@ -1272,7 +1274,8 @@ function EmailLink({ email, style }) {
       onTouchEnd={(e) => { e.stopPropagation(); cancel(); }}
       onTouchMove={cancel}
       onClick={(e) => { e.stopPropagation(); if (lp.current.touch) { lp.current.touch = false; return; } go(); }}
-      style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", ...style }}>{email}</button>
+      // userSelect/touchCallout none: the long-press to open mail is also iOS's text-select gesture.
+      style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", ...style }}>{email}</button>
   );
 }
 
