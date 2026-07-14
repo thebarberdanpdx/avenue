@@ -177,6 +177,17 @@ const resolveAuthStaff = (authEmail, staff) => {
     return (n && loginHint.includes(n)) || (id && loginHint.includes(id));
   }) || staff.find((p) => p.pulseRole === "owner") || null;
 };
+// GUARD: owner-access-fail-safe. The Settings tab + owner powers hang off isOwner, which is read from
+// the providers list. The sanitized get_public_providers feed OMITS pulseRole, so if a signed-in owner
+// transiently loads that feed, the list contains NO owner and Settings silently disappears (the
+// "my Settings vanished" bug). Rule: a feed that DOES contain an owner is trustworthy — honor it exactly
+// (a barber still resolves to non-owner). A feed with NO owner at all is degraded, not proof the user
+// isn't one, so it must not REVOKE a previously-confirmed owner. Pure + unit-tested so it can't drift.
+function ownerAccessResilient(liveIsOwner, anyOwnerInFeed, wasConfirmedOwner) {
+  if (liveIsOwner) return true;                          // the load positively identifies an owner
+  if (!anyOwnerInFeed && wasConfirmedOwner) return true; // degraded feed can't strip a confirmed owner
+  return false;                                          // healthy feed + not an owner → not an owner
+}
 // Clients keep their colored initial unless a photo has been set explicitly.
 const clientPhoto = (c) => (c && c.photo) ? c.photo : null;
 // Reusable circular avatar — edge-to-edge photo or centered initial.
@@ -12422,7 +12433,15 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   const authStaff = useMemo(() => resolveAuthStaff(authEmail, realProviders), [authEmail, providers]);
   const me = providers.find((p) => p.id === signedInAs);
   // Owner powers (Settings tab, shop-wide Pulse) follow the LOGIN account — not a stale chair pick.
-  const isOwner = authStaff?.pulseRole === "owner" || me?.pulseRole === "owner";
+  const liveIsOwner = authStaff?.pulseRole === "owner" || me?.pulseRole === "owner";
+  // Once ownership is confirmed from a trustworthy load, remember it per login email so a later DEGRADED
+  // providers load (sanitized feed, no pulseRole) can never revoke Settings from the real owner.
+  const _authLc = String(authEmail || "").trim().toLowerCase();
+  useEffect(() => { if (liveIsOwner && _authLc) { try { localStorage.setItem("vero_confirmed_owner", _authLc); } catch (e) {} } }, [liveIsOwner, _authLc]);
+  const anyOwnerInFeed = realProviders.some((p) => p.pulseRole === "owner");
+  let wasConfirmedOwner = false;
+  try { wasConfirmedOwner = !!_authLc && localStorage.getItem("vero_confirmed_owner") === _authLc; } catch (e) {}
+  const isOwner = ownerAccessResilient(liveIsOwner, anyOwnerInFeed, wasConfirmedOwner);
 
   // ---- Restore & remember the current screen across app relaunches (see readSavedScreen) ----
   // activeClient is a live object, so we persist only its id and re-resolve from the loaded clients

@@ -72,7 +72,7 @@ const CUT_DESC_LINE = (src.match(/const CONSOLIDATE_CUT_DESC = "[^"]*";/) || [])
 if (!CUT_DESC_LINE) throw new Error("resolvers.test: CONSOLIDATE_CUT_DESC not found in src/App.jsx — refusing to pass");
 const SHOP_TZ_LINE = (src.match(/const SHOP_TZ = "[^"]*";/) || [])[0];
 if (!SHOP_TZ_LINE) throw new Error("resolvers.test: SHOP_TZ not found in src/App.jsx — refusing to pass");
-const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig", "impParseCSV", "impDigits", "impGuess", "impGuessMap", "impPhone", "impBlocked", "impMoney"];
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig", "impParseCSV", "impDigits", "impGuess", "impGuessMap", "impPhone", "impBlocked", "impMoney", "resolveAuthStaff", "ownerAccessResilient"];
 const extraSrc = CUT_DESC_LINE + "\n" + SHOP_TZ_LINE + "\n" + EXTRA.map(grab).join("\n");
 // computeFreeSlots has a destructuring parameter ({...}), which grab()'s brace-matcher
 // mistakes for the body — extract it by anchors instead. It depends on hoursForDate +
@@ -528,4 +528,28 @@ test("impPhone: normalizes to 10-digit US so returning-client recognition matche
 test("impBlocked: truthy only on yes/true/1/y (Mangomint exports 'Yes')", () => {
   for (const v of ["Yes", "yes", "TRUE", "1", "y"]) assert.equal(R.impBlocked(v), true);
   for (const v of ["", "No", "false", "0", "maybe", undefined]) assert.equal(R.impBlocked(v), false);
+});
+test("ownerAccessResilient: a degraded feed can't strip the owner's Settings, but never elevates a barber", () => {
+  // Live load positively identifies an owner → owner, always.
+  assert.equal(R.ownerAccessResilient(true, true, true), true);
+  assert.equal(R.ownerAccessResilient(true, false, false), true);
+  // Healthy feed (has an owner) + not identified as owner → NOT owner, even if this email was once
+  // confirmed. A real barber on a full load stays a barber; no false elevation.
+  assert.equal(R.ownerAccessResilient(false, true, false), false);
+  assert.equal(R.ownerAccessResilient(false, true, true), false);
+  // Degraded feed (NO owner in it = sanitized/incomplete) must NOT revoke a previously-confirmed owner.
+  assert.equal(R.ownerAccessResilient(false, false, true), true);   // ← the "my Settings vanished" fix
+  // Degraded feed + never confirmed → can't prove ownership → no owner powers.
+  assert.equal(R.ownerAccessResilient(false, false, false), false);
+});
+test("resolveAuthStaff: falls back to the first owner so a signed-in owner keeps owner powers", () => {
+  const staff = [{ id: "dan", name: "Dan", email: "sanctuarybarberco@gmail.com", pulseRole: "owner" },
+                 { id: "heather", name: "Heather", email: "barberinaphx@gmail.com", pulseRole: "barber" }];
+  assert.equal(R.resolveAuthStaff("sanctuarybarberco@gmail.com", staff).id, "dan"); // exact email match
+  assert.equal(R.resolveAuthStaff("barberinaphx@gmail.com", staff).id, "heather");
+  // Unknown email but the feed HAS an owner → fall back to the owner (never null out owner powers).
+  assert.equal(R.resolveAuthStaff("someoneelse@gmail.com", staff).id, "dan");
+  // A feed with pulseRole stripped (sanitized) → no owner to fall back to → null (handled by the fail-safe).
+  const stripped = [{ id: "dan", name: "Dan", role: "Master Barber" }, { id: "heather", name: "Heather", role: "Stylist" }];
+  assert.equal(R.resolveAuthStaff("someoneelse@gmail.com", stripped), null);
 });
