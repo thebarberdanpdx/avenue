@@ -11932,8 +11932,19 @@ function MasterCalendar({ shops, onEnter }) {
       setLoading(true);
       try {
         if (ids.length) {
-          const { data } = await supabase.from("appointments").select("data, shop_id").in("shop_id", ids);
-          if (alive && Array.isArray(data)) setRows(data);
+          // PGREST_PAGINATE_ALL: an unranged .select() caps at 1000 rows (PostgREST default), so a
+          // shop past 1,000 total appts would silently miss days here. Page through with .range()
+          // (stable .order("id")) until a short page. Only set on success so an error can't blank.
+          const acc = [];
+          let ok = true;
+          for (let from = 0; from < 100000; from += 1000) {
+            const { data, error } = await supabase.from("appointments").select("data, shop_id").in("shop_id", ids).order("id").range(from, from + 999);
+            if (error) { ok = false; break; }
+            const batch = Array.isArray(data) ? data : [];
+            for (const r of batch) acc.push(r);
+            if (batch.length < 1000) break;
+          }
+          if (alive && ok) setRows(acc);
         }
       } catch (e) {}
       if (alive) setLoading(false);

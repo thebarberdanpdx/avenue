@@ -16,6 +16,7 @@
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 import { getStaffUser, isShopMember } from "../lib/shop-auth.js";
+import { selectAllRows } from "../lib/paginate.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -63,8 +64,10 @@ export default async function handler(req, res) {
     const mode = ["clear", "config"].includes(body.mode) ? body.mode : "sync";
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Current synced appointment ids on the server.
-    const { data: existingRows, error: exErr } = await supabase.from("appointments").select("id,data").eq("shop_id", shop);
+    // Current synced appointment ids on the server. Paginate — an unranged .select() caps at 1000
+    // rows, so reconcile would only see the first 1,000 existing appts and could mis-delete or
+    // duplicate synced ones past that (data-integrity risk).
+    const { data: existingRows, error: exErr } = await selectAllRows(() => supabase.from("appointments").select("id,data").eq("shop_id", shop).order("id"));
     if (exErr) return res.status(502).json({ error: exErr.message });
     const existing = (existingRows || []).map((r) => ({ id: r.id, data: r.data }));
     const existingSyncedIds = existing.filter((r) => isSynced(r.data)).map((r) => r.id);

@@ -11,6 +11,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { renderMessage, renderEmailHtml, renderPlainText, parseOffsetMinutes, formatApptDateTime, sendEmail, sendSms, resolveChannels } from "../lib/messaging.js";
+import { selectAllRows } from "../lib/paginate.js";
 
 const DEAD_STATUSES = ["canceled", "cancelled", "done", "no-show", "noshow", "completed"];
 // Public site origin for the self-service manage / arrival links baked into reminders.
@@ -59,9 +60,12 @@ async function handler(req, res) {
     const shopLoc = (settings.multiLocation && settings.locations && settings.locations[0] && settings.locations[0].name) || settings.name || "";
     const shopPolicy = settings.policy || "";
 
+    // Paginate appts + clients — an unranged .select() caps at 1000 rows, so reminders for any
+    // appointment/client past the first 1,000 would silently never send. Providers/services are
+    // tiny (never near 1,000) so they stay as plain reads.
     const [appts, clients, provs, svcs] = await Promise.all([
-      supa.from("appointments").select("id, data").eq("shop_id", shop.id),
-      supa.from("clients").select("id, data").eq("shop_id", shop.id),
+      selectAllRows(() => supa.from("appointments").select("id, data").eq("shop_id", shop.id).order("id")),
+      selectAllRows(() => supa.from("clients").select("id, data").eq("shop_id", shop.id).order("id")),
       supa.from("providers").select("id, data").eq("shop_id", shop.id),
       supa.from("services").select("id, data").eq("shop_id", shop.id),
     ]);

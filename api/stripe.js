@@ -21,6 +21,7 @@
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { getStaffUser, isShopMember } from "../lib/shop-auth.js";
+import { selectAllRows } from "../lib/paginate.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -74,8 +75,10 @@ async function applyToAppt(piId, patch) {
   if (!piId || !SERVICE_KEY) return { matched: false };
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-    // Small DB (one shop today): scan + match in JS. Track B: index data->paid->>paymentIntentId.
-    const { data: rows } = await supabase.from("appointments").select("id, shop_id, data");
+    // Scan + match in JS across every shop. Paginate — an unranged .select() caps at 1000 rows,
+    // so once total appointments pass 1,000 a refund/webhook could fail to find the paid ticket
+    // and silently skip the money reconciliation. Track B: index data->paid->>paymentIntentId.
+    const { data: rows } = await selectAllRows(() => supabase.from("appointments").select("id, shop_id, data").order("id"));
     const hit = (rows || []).find((r) => r.data && r.data.paid && r.data.paid.paymentIntentId === piId);
     if (!hit) return { matched: false };
     const next = { ...hit.data, paid: { ...hit.data.paid, ...patch } };

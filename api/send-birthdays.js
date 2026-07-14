@@ -10,6 +10,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { renderEmailHtml, renderPlainText, sendEmail } from "../lib/messaging.js";
+import { selectAllRows } from "../lib/paginate.js";
 
 import { withErrorReporting, reportServerError } from "../lib/observe.js";
 export default withErrorReporting(handler, "send-birthdays");
@@ -54,7 +55,9 @@ async function handler(req, res) {
     if (!msg || !msg.enabled) continue; // owner hasn't turned the birthday message on
     const business = settings.name || "your barber";
 
-    const { data: clients } = await supa.from("clients").select("id, data").eq("shop_id", shop.id);
+    // Paginate — an unranged .select() caps at 1000 rows, so a client past the first 1,000 would
+    // never get a birthday message.
+    const { data: clients } = await selectAllRows(() => supa.from("clients").select("id, data").eq("shop_id", shop.id).order("id"));
     for (const row of clients || []) {
       const c = row.data || {};
       if (!c.birthday) continue;
