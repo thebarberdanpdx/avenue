@@ -27053,7 +27053,13 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
 
   return (
     <>
-    <div className="fade-up">
+    <div className="cp-onyx fade-up" style={{
+      "--bg": "#FFFFFF", "--panel": "#FFFFFF", "--panel2": "#F5F5F3", "--line": "#F0F0EE", "--border": "#E7E6E3", "--border2": "#D7D6D2",
+      "--text": "#161616", "--text2": "#33322F", "--sub": "#8C8B87", "--faint": "#B4B3AE",
+      "--gold": "#161616", "--on-gold": "#FFFFFF", "--font-disp": "'Hanken Grotesk', sans-serif", "--font-body": "'Hanken Grotesk', sans-serif",
+      background: "#FFFFFF", color: "#161616", fontFamily: "'Hanken Grotesk', sans-serif", textAlign: "left", minHeight: "calc(100vh - 130px)", padding: "4px 2px 40px",
+    }}>
+      <style>{".cp-onyx,.cp-onyx *{font-family:'Hanken Grotesk',sans-serif !important}.cp-onyx ::selection{background:#e9e9e7}"}</style>
       {/* Editorial masthead */}
       <div style={{ marginBottom: 22, paddingTop: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
