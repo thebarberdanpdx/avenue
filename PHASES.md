@@ -8,10 +8,10 @@ Dan's rule: **not going live until all 4 phases are done.**
 |---|---|---|
 | **1 · Foundation/reliability** | crash-hardening, payment security, key rotation, sales-can't-vanish | ✅ **Done** |
 | **2 · Prove it** | live-testing rig + Dan's on-device book→checkout dry run | ✅ **Done** |
-| **3 · Offline-first** | shop keeps working through a backend outage / bad wifi | 🔄 **~85%** (all hang/timeout coverage done + verified live; only native airplane-mode left, needs Dan) |
+| **3 · Offline-first** | shop keeps working through a backend outage / bad wifi | 🔄 **~92%** (every hang/timeout path AND the staff cached-calendar re-display verified live; only native airplane-mode left — needs Dan's device + a go/no-go decision) |
 | **4 · Migration off Mangomint** | export → import night → 2-week overlap (`MIGRATION-GUIDE.md`) | 🔄 **~50%** (importer feature-complete + verified end-to-end: dedup, quoted-comma, retention, notes, home-barber; real migration needs Dan's export) |
 
-**Overall ≈ 78%.** The remaining ~22% is weighted toward things that need **Dan + real calendar time** (the real migration with his Mangomint export, airplane-mode on his device), not solo code.
+**Overall ≈ 82%.** The solo code lane is essentially drained — the remaining ~18% is almost entirely **Dan + real calendar time**: the real migration with his Mangomint export, the 2-week overlap, a real live-card money check (unless already in daily use), and the airplane-mode go/no-go on his device.
 
 ---
 
@@ -25,7 +25,7 @@ The real outage mode is a **HANGING backend** (Supabase compute exhausted: reque
 - **Manage-appointment link** (lookup/cancel/reschedule/check-in) on outage → honest error. `[withRpcTimeout]`
 - **Checkout charge** (`stripeApi`) on outage → honest "couldn't reach the payment server". `[withRpcTimeout]` — idempotency key is KEPT on an unknown outcome, so a retry of a charge that actually landed reuses the same key → Stripe dedupes → never a double charge.
 - **Review link** on outage → honest error. `[withRpcTimeout]`
-- **Staff calendar mirror** on outage → honest "showing last synced" banner + cached calendar. `[mirrorWatchdog]` — banner verified live; the cached-appts *re-display* is unverified on the polluted test shops (see pre-migration note).
+- **Staff calendar mirror** on outage → honest "showing last synced" banner + cached calendar. `[mirrorWatchdog]` — **fully verified live**: seeding the offline cache with a today appt then hanging the backend, the reloaded dashboard re-shows the cached appt (Pulse projects its price; the tile renders on the calendar; "1 booked") AND the honest banner, no blank screen. `tests/live/outage-cache-redisplay.mjs`.
 
 **Safe by design (no timeout needed — verified by reading the control flow):**
 - `get_availability` hang → the public picker just shows all-slots-open; book_public's server-side slot guard rejects a truly-taken slot at submit (`slot_taken`). Soft degradation, not a spinner.
