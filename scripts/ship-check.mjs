@@ -166,6 +166,7 @@ const GUARDS = [
   { needle: "Home barber from history", label: "migration importer derives each client's home barber from their imported visit history (most-seen barber, ties→most recent) instead of defaulting everyone to one staff member — verified live on vero-mig, no unit test covers it" },
   { needle: "impPhone(p.phone)", label: "imported client phones normalized to 10-digit (impPhone) so returning-client recognition — the login-code lookup that matches on raw digits — works; a country-code prefix would silently break 'I've been here before' for every migrated client" },
   { needle: "owner-access-fail-safe", label: "the owner NEVER loses the Settings tab to a degraded providers load — the sanitized get_public_providers feed omits pulseRole, so isOwner must fall back to a confirmed-owner flag when the feed contains no owner at all (the 'my Settings vanished' lockout)" },
+  { needle: "PGREST_PAGINATE_ALL", label: "MasterCalendar pages appointments with .range() — an unranged PostgREST .select() caps at 1000 rows, so a shop past 1,000 total appts would silently miss days (same 1000-row truncation that hid clients past 1,000 in the staff list)" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");

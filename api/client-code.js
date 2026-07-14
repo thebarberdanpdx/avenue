@@ -4,6 +4,7 @@
 // Looks up the client (service role), stores a 6-digit code with a 10-minute
 // expiry, and sends it through the existing /api/notify pipe (email or SMS).
 import { createClient } from "@supabase/supabase-js";
+import { selectAllRows } from "../lib/paginate.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -37,8 +38,10 @@ export default async function handler(req, res) {
     const { count } = await (byPhone ? throttleQ.eq("phone", digits) : throttleQ.eq("email", em));
     if ((count || 0) >= 5) return res.status(429).json({ error: "too many requests" });
 
-    // Find the client on file (by phone digits, or by email).
-    const { data: rows, error } = await supabase.from("clients").select("id, data").eq("shop_id", shop);
+    // Find the client on file (by phone digits, or by email). Paginate — an unranged .select()
+    // caps at 1000 rows, so a returning client past the first 1,000 would never be recognized
+    // (their "I've been here before" login code would never send).
+    const { data: rows, error } = await selectAllRows(() => supabase.from("clients").select("id, data").eq("shop_id", shop).order("id"));
     if (error) return res.status(500).json({ error: "lookup failed" });
     const hit = byPhone
       ? (rows || []).find((r) => String(r.data?.phone || "").replace(/\D/g, "") === digits && !r.data?.blocked)

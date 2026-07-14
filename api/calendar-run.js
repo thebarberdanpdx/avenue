@@ -9,6 +9,7 @@
 // so the background job and the in-app sync never disagree and never churn.
 import { createClient } from "@supabase/supabase-js";
 import { parseICS } from "./calendar-sync.js";
+import { selectAllRows } from "../lib/paginate.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -128,8 +129,10 @@ async function syncShop(supabase, shop) {
   const active = feeds.filter((f) => f && f.url && f.providerId && !f.paused);
   if (!active.length) return { shop, skipped: true };
 
-  // Load all appts once; thread them through every feed's reconcile.
-  const { data: rows } = await supabase.from("appointments").select("id,data").eq("shop_id", shop);
+  // Load all appts once; thread them through every feed's reconcile. Paginate — an unranged
+  // .select() caps at 1000 rows, so reconcile would only see the first 1,000 existing appts and
+  // could wrongly re-insert or mis-delete synced ones past that (data-integrity risk).
+  const { data: rows } = await selectAllRows(() => supabase.from("appointments").select("id,data").eq("shop_id", shop).order("id"));
   let working = (rows || []).map((r) => r.data).filter(Boolean);
   const existingSyncedIds = (rows || []).filter((r) => isSynced(r.data)).map((r) => String(r.id));
 

@@ -15,6 +15,7 @@
 import { renderMessage, renderEmailHtml, renderPlainText, sendEmail, sendSms, resolveChannels } from "../lib/messaging.js";
 import { createClient } from "@supabase/supabase-js";
 import { allowRequest, clientIp } from "../lib/ratelimit.js";
+import { selectAllRows } from "../lib/paginate.js";
 
 // Light anti-abuse guard. Booking runs on gotvero.com (web AND the native app,
 // which loads from server.url = https://gotvero.com), so the only legitimate
@@ -184,7 +185,10 @@ async function handler(req, res) {
     let recognized = false, lookupOk = true;
     try {
       const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-      const { data: crows, error: cErr } = await supa.from("clients").select("data").eq("shop_id", shop);
+      // Paginate — an unranged .select() caps at 1000 rows, so a client past the first 1,000 who
+      // opted out of SMS wouldn't be found here and the server-side opt-out guard couldn't protect
+      // them (a caller could text someone who opted out).
+      const { data: crows, error: cErr } = await selectAllRows(() => supa.from("clients").select("data").eq("shop_id", shop).order("id"));
       if (cErr) throw cErr;
       // #21: find the matching CLIENT and capture their real SMS opt-out here, on the server, so a
       // caller can never text someone who opted out by passing smsOptOut:false (the manage-link

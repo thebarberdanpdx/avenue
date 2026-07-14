@@ -9,6 +9,7 @@
 // Auth: Bearer JWT + canAccessShop (same gate as pull — personal Gmail logins OK).
 import { createClient } from "@supabase/supabase-js";
 import { getStaffUser, canAccessShop } from "../lib/shop-auth.js";
+import { selectAllRows } from "../lib/paginate.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -88,9 +89,11 @@ export default async function handler(req, res) {
         return res.status(502).json({ error: msg, email: user.email || null });
       }
       // Return the authoritative server copy so clients never guess — no client-side merge.
+      // Paginate: an unranged .select() caps at 1000 rows, which would drop every client/appt
+      // past the first 1,000 on a large shop (the "only 1000 names" truncation).
       const [clRes, apRes] = await Promise.all([
-        supabase.from("clients").select("data").eq("shop_id", shop),
-        supabase.from("appointments").select("data").eq("shop_id", shop),
+        selectAllRows(() => supabase.from("clients").select("data").eq("shop_id", shop).order("id")),
+        selectAllRows(() => supabase.from("appointments").select("data").eq("shop_id", shop).order("id")),
       ]);
       if (clRes.error) return res.status(502).json({ error: clRes.error.message });
       if (apRes.error) return res.status(502).json({ error: apRes.error.message });
@@ -111,8 +114,8 @@ export default async function handler(req, res) {
     }
 
     const [clRes, apRes] = await Promise.all([
-      supabase.from("clients").select("data").eq("shop_id", shop),
-      supabase.from("appointments").select("data").eq("shop_id", shop),
+      selectAllRows(() => supabase.from("clients").select("data").eq("shop_id", shop).order("id")),
+      selectAllRows(() => supabase.from("appointments").select("data").eq("shop_id", shop).order("id")),
     ]);
     if (clRes.error) return res.status(502).json({ error: clRes.error.message });
     if (apRes.error) return res.status(502).json({ error: apRes.error.message });

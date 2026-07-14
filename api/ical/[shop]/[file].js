@@ -6,6 +6,7 @@
 // The token is issued to the signed-in owner by /api/calendar-pull (mode:"icaltoken").
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { selectAllRows } from "../../../lib/paginate.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -60,7 +61,9 @@ export default async function handler(req, res) {
       if (shopRow && shopRow.settings && shopRow.settings.name) shopName = shopRow.settings.name;
     } catch (e) {}
 
-    const { data: rows, error } = await supabase.from("appointments").select("data").eq("shop_id", shopId);
+    // Paginate — an unranged .select() caps at 1000 rows, so a busy shop's exported calendar feed
+    // would silently omit every appointment past the first 1,000.
+    const { data: rows, error } = await selectAllRows(() => supabase.from("appointments").select("data").eq("shop_id", shopId).order("id"));
     if (error) return res.status(500).send("lookup failed");
     const cutoff = Date.now() - 14 * 86400000;
     const appts = (rows || [])
