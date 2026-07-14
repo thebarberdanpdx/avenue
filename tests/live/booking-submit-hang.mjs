@@ -17,6 +17,8 @@ const byText = async (re, wait = 700) => { const el = page.getByText(re).first()
 // Drive to the details step with the backend fully reachable.
 await page.goto(URL_, { waitUntil: 'networkidle', timeout: 45000 });
 await page.waitForTimeout(2500);
+// Multi-location account → pick the test shop from the "Choose a location" chooser if it appears.
+if (await page.getByText(/Choose a location/i).first().count()) { const l = page.getByRole('button', { name: /Vero Test \(automated\)/i }).first(); if (await l.count()) { await l.click({ timeout: 6000 }).catch(() => {}); await page.waitForTimeout(1800); } }
 if (await page.getByText(/Book here/i).first().count()) await byText(/Book here/i, 1500);
 await byText(/It'?s my first time/i);
 await byRole(/^Beard Trim$/i, 1400);
