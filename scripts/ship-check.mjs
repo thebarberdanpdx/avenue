@@ -164,6 +164,7 @@ const GUARDS = [
   { needle: "service-order-dataloss", label: "services save never blanks an `order` the server has (stale device can't revert/reshuffle the menu)" },
   { needle: "byServiceOrder", label: "one deterministic menu sort (order + id tiebreak) — a missing order can't reshuffle the menu across loads" },
   { needle: "Home barber from history", label: "migration importer derives each client's home barber from their imported visit history (most-seen barber, ties→most recent) instead of defaulting everyone to one staff member — verified live on vero-mig, no unit test covers it" },
+  { needle: "impPhone(p.phone)", label: "imported client phones normalized to 10-digit (impPhone) so returning-client recognition — the login-code lookup that matches on raw digits — works; a country-code prefix would silently break 'I've been here before' for every migrated client" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");

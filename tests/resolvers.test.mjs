@@ -72,7 +72,7 @@ const CUT_DESC_LINE = (src.match(/const CONSOLIDATE_CUT_DESC = "[^"]*";/) || [])
 if (!CUT_DESC_LINE) throw new Error("resolvers.test: CONSOLIDATE_CUT_DESC not found in src/App.jsx — refusing to pass");
 const SHOP_TZ_LINE = (src.match(/const SHOP_TZ = "[^"]*";/) || [])[0];
 if (!SHOP_TZ_LINE) throw new Error("resolvers.test: SHOP_TZ not found in src/App.jsx — refusing to pass");
-const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig", "impParseCSV", "impDigits", "impGuess", "impGuessMap"];
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig", "impParseCSV", "impDigits", "impGuess", "impGuessMap", "impPhone", "impBlocked", "impMoney"];
 const extraSrc = CUT_DESC_LINE + "\n" + SHOP_TZ_LINE + "\n" + EXTRA.map(grab).join("\n");
 // computeFreeSlots has a destructuring parameter ({...}), which grab()'s brace-matcher
 // mistakes for the body — extract it by anchors instead. It depends on hoursForDate +
@@ -499,4 +499,33 @@ test("impGuessMap: maps notes / formula / comment synonyms so client notes carry
   assert.equal(R.impGuessMap(["Full Name", "Color Formula"]).notes, "Color Formula");
   assert.equal(R.impGuessMap(["Name", "Comments"]).notes, "Comments");
   assert.equal(R.impGuessMap(["Name", "Phone", "Email"]).notes, "");  // nothing notes-like → left unmapped
+});
+test("impGuessMap: Mangomint client export maps cleanly — no staff/status/date mis-map", () => {
+  const h = ["First name", "Last name", "Email", "Phone", "Phone (with country code)", "Alt Phone", "Birthday",
+    "First appointment date", "Last appointment date", "Total amount spent", "Blocked from online booking",
+    "Created at", "Notes", "State"];
+  const m = R.impGuessMap(h);
+  assert.equal(m.phone, "Phone");                       // the plain column, NOT "Phone (with country code)"
+  assert.equal(m.staff, "");                            // bare "with" no longer hijacks the phone column
+  assert.equal(m.status, "");                           // bare "state" no longer grabs the address "State"
+  assert.equal(m.date, "");                             // summary dates don't become fake appointments
+  assert.equal(m.lastVisit, "Last appointment date");
+  assert.equal(m.spent, "Total amount spent");
+  assert.equal(m.clientSince, "Created at");
+  assert.equal(m.blocked, "Blocked from online booking");
+  assert.equal(m.notes, "Notes");
+  assert.equal(m.birthday, "Birthday");
+});
+test("impPhone: normalizes to 10-digit US so returning-client recognition matches on raw digits", () => {
+  assert.equal(R.impPhone("+1 (503) 555-1234"), "(503) 555-1234");
+  assert.equal(R.impPhone("5035551234"), "(503) 555-1234");
+  assert.equal(R.impPhone("1-503-555-1234"), "(503) 555-1234");
+  // the digits of the normalized form equal what a booker types → the login-code lookup matches
+  assert.equal(R.impPhone("+15035551234").replace(/\D/g, ""), "5035551234");
+  assert.equal(R.impPhone(""), "");                     // blank stays blank
+  assert.equal(R.impPhone("+44 20 7946 0958"), "+44 20 7946 0958"); // non-US / odd length kept, not mangled
+});
+test("impBlocked: truthy only on yes/true/1/y (Mangomint exports 'Yes')", () => {
+  for (const v of ["Yes", "yes", "TRUE", "1", "y"]) assert.equal(R.impBlocked(v), true);
+  for (const v of ["", "No", "false", "0", "maybe", undefined]) assert.equal(R.impBlocked(v), false);
 });
