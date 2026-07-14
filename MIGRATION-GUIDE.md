@@ -105,10 +105,18 @@ Where the tools live: **Reports → scroll to the bottom → Data** → *Import 
        result on a client card and the calendar, then tap **Undo this import**. Undo removes
        exactly that batch and nothing else — this is your safety net all night.
 4. [ ] **Import the APPOINTMENTS file first** (the full one: history + upcoming).
-       Upload → line up columns (it guesses most) → pick the **Default staff member** → Preview.
+       Upload → line up columns (it guesses most; map the **Notes / formula** column if your export
+       has one) → pick the **Default staff member** (the fallback barber) → Preview.
        The preview shows: new clients, matched-to-existing, appointment count (past / upcoming),
        exactly who merges into an existing card (phone/email match), and possible same-name
        duplicates. Read it before tapping Import.
+       - **⚠️ Watch for the red "N rows couldn't be read" warning.** If it appears, that many rows
+         have an appointment date Vero didn't recognize, and **those appointments won't import**
+         (the clients still do). It means the date/time column isn't mapped or isn't formatted like
+         **MM/DD/YYYY** — fix the export's date format and re-import to capture them. No appointment
+         is ever dropped silently; if there's no warning, every dated row came in. *(This safety
+         check was added + verified 2026-07-13; a 500-client / 3,730-appointment import was tested
+         end-to-end and completes in seconds, so file size is not a concern.)*
        - **Why appointments before clients:** visit count, last visit, average rebook cadence,
          and imported lifetime spend are computed from history **only for clients the batch
          creates**. Let the history file create the clients; the client file then fills gaps.
@@ -143,10 +151,15 @@ Where the tools live: **Reports → scroll to the bottom → Data** → *Import 
   skipped, so import night won't spray stale texts.
 - **Birthdays imported = birthday texts.** If the automated birthday message is on, imported
   clients with birthdays are now in that pool. Decide if you want that on during week 1.
-- **Each imported client's "provider" is set to the Default staff member you picked** — their
-  visit history still shows the correct barber per appointment, but the card's home barber
-  defaults to that one person. Fix per client on the card if it matters (or ask Claude to make
-  the importer derive it from their visit history before import night — small change).
+- **Each imported client's home barber is derived from their visit history** — whoever they saw
+  most in the imported appointments becomes their card's default barber (ties break to their most
+  recent visit). A client with no matched barber in their history falls back to the **Default staff
+  member** you picked. Per-appointment barbers are always preserved, so the history stays correct
+  either way. *(Done + verified 2026-07-13.)*
+- **Private notes / color formulas come over IF you map the Notes column.** In the column-lineup
+  step there's a **"Notes / formula"** row — point it at your notes/comments/formula column and
+  each client's notes import onto their card. A merge into an existing client only fills a **blank**
+  note (it never overwrites notes you already have). If you don't map it, notes simply don't import.
 
 **One money-truth thing to expect (verified in the code):** the **Revenue report counts every
 "done" appointment in the period at its recorded price — including imported ones.** So for the
@@ -237,7 +250,7 @@ Then, in order:
 
 | Thing | What happens | What to do |
 |---|---|---|
-| **Client private notes / formulas** | The importer has no notes column — they don't import. | Keep the Mangomint export handy for lookups; hand-copy the top ~20 clients' notes onto their Vero cards; or ask Claude to add a Notes column to the importer before import night (small change). |
+| **Client private notes / formulas** | **They import now** — *if* your export has a notes/formula column and you map it (the "Notes / formula" row in column-lineup). *(Added + verified 2026-07-13.)* | Make sure Mangomint's export includes the notes column; map it at import. Anything not in the export still needs a hand-copy. |
 | **Photos** | No bulk export from Mangomint. | Screenshot the ones that matter; Vero's per-client gallery is filled going forward. |
 | **Cards on file** | Not exportable from any processor. | Rebuild at online booking + checkout over the first weeks. |
 | **Collected-payment history** | Stays in Mangomint's export (taxes). | Vero's Transactions ledger starts Day 1; the Revenue report includes imported visit values (see Phase 2 note). |
