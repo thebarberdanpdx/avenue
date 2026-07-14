@@ -768,6 +768,13 @@ const THEMES = [
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.03,
     canvas: "#FFFFFF",
     t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#FFFFFF", line:"#ECECEC", border:"#DCDCDC", border2:"#CFCFCF", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#AEAEAE", gold:"#0A0A0A", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.07)", overlay:"rgba(0,0,0,0.3)" } },
+  // Onyx — clean white + ink, one type family (Hanken). Matches the redesigned client card.
+  // A `.theme-onyx *{font-family:Hanken !important}` rule (added in buildThemeCSS) forces Hanken
+  // app-wide, overriding the ~472 hardcoded Fraunces/Jost call sites until they migrate to the vars.
+  { id: "onyx", name: "Onyx", tagline: "Clean white, ink, Hanken", cat: "Crisp & Minimal", dark: false,
+    disp: "'Hanken Grotesk', sans-serif", body: "'Hanken Grotesk', sans-serif", grain: 0.02,
+    canvas: "#FFFFFF",
+    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F5F5F3", line:"#F0F0EE", border:"#E7E6E3", border2:"#D7D6D2", text:"#161616", text2:"#33322F", sub:"#8C8B87", faint:"#B4B3AE", gold:"#161616", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.07)", overlay:"rgba(0,0,0,0.35)" } },
   { id: "slate", name: "Slate", tagline: "Simple, polished, neutral", cat: "Crisp & Minimal", dark: false,
     disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.03,
     canvas: "linear-gradient(176deg,#FAFBFC,#F0F2F6)",
@@ -824,20 +831,20 @@ const buildThemeCSS = () => THEMES.map((th) => {
   // --tint / --tint2 = the subtle "highlight/selected" FILL behind accented rows & cards.
   // In colorful themes it's a gentle gold wash; in the strict black-&-white "studio"
   // theme it collapses to pure white so highlights never read as grey.
-  const tint = th.id === "studio" ? v.panel : `color-mix(in srgb, ${v.gold} 10%, ${v.panel})`;
-  const tint2 = th.id === "studio" ? v.panel2 : `color-mix(in srgb, ${v.gold} 14%, ${v.panel2})`;
+  const tint = ["studio", "onyx"].includes(th.id) ? v.panel : `color-mix(in srgb, ${v.gold} 10%, ${v.panel})`;
+  const tint2 = ["studio", "onyx"].includes(th.id) ? v.panel2 : `color-mix(in srgb, ${v.gold} 14%, ${v.panel2})`;
   // --wash = translucent accent behind icon circles / selected pills / badges. Studio = fully
   // transparent (clean white, black icons/text, black-outlined selection) so nothing reads grey;
   // colored themes keep a soft gold wash.
-  const wash = th.id === "studio" ? "transparent" : `color-mix(in srgb, ${v.gold} 13%, transparent)`;
+  const wash = ["studio", "onyx"].includes(th.id) ? "transparent" : `color-mix(in srgb, ${v.gold} 13%, transparent)`;
   // Studio (strict B&W): override the shadow tier so every card/sheet/panel that uses
   // var(--shadow-sm/lg) lifts off the white page with one soft, consistent shadow.
   // Set on the theme class (which sits on #app-root) so the whole subtree inherits it;
   // the other 11 themes fall through to the default :root shadows, untouched.
-  const studioShadows = th.id === "studio"
+  const studioShadows = ["studio", "onyx"].includes(th.id)
     ? "--shadow-sm:0 1px 2px rgba(0,0,0,.06), 0 8px 22px rgba(0,0,0,.08);--shadow-lg:0 4px 12px rgba(0,0,0,.08), 0 18px 44px rgba(0,0,0,.12);--shadow-md:0 2px 6px rgba(0,0,0,.06), 0 10px 28px rgba(0,0,0,.09);"
     : "";
-  return `.theme-${th.id}{--bg:${v.bg};--canvas:${th.canvas || v.bg};--grain:${th.grain || 0};--grain-blend:${th.dark ? "overlay" : "multiply"};--panel:${v.panel};--panel2:${v.panel2};--tint:${tint};--tint2:${tint2};--wash:${wash};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--gold-grad:${grad};--on-gold:${v.onGold};--live:${v.live || v.gold};--shadow:${v.shadow};--overlay:${v.overlay};${studioShadows}--font-disp:${th.disp};--font-body:${th.body};}`;
+  return `.theme-${th.id}{--bg:${v.bg};--canvas:${th.canvas || v.bg};--grain:${th.grain || 0};--grain-blend:${th.dark ? "overlay" : "multiply"};--panel:${v.panel};--panel2:${v.panel2};--tint:${tint};--tint2:${tint2};--wash:${wash};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--gold-grad:${grad};--on-gold:${v.onGold};--live:${v.live || v.gold};--shadow:${v.shadow};--overlay:${v.overlay};${studioShadows}--font-disp:${th.disp};--font-body:${th.body};}` + (th.id === "onyx" ? `\n.theme-onyx, .theme-onyx *{font-family:'Hanken Grotesk', sans-serif !important;}` : "");
 }).join("\n");
 
 // Portal: render full-screen overlays. Without react-dom we can't truly portal,
