@@ -27491,7 +27491,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       "--bg": "#FFFFFF", "--panel": "#FFFFFF", "--panel2": "#F5F5F3", "--line": "#F0F0EE", "--border": "#E7E6E3", "--border2": "#D7D6D2",
       "--text": "#161616", "--text2": "#33322F", "--sub": "#8C8B87", "--faint": "#B4B3AE",
       "--gold": "#161616", "--on-gold": "#FFFFFF", "--font-disp": "'Hanken Grotesk', sans-serif", "--font-body": "'Hanken Grotesk', sans-serif",
-      background: "#FFFFFF", color: "#161616", fontFamily: "'Hanken Grotesk', sans-serif", borderRadius: 18, padding: "6px 16px 24px",
+      background: "#FFFFFF", color: "#161616", fontFamily: "'Hanken Grotesk', sans-serif", borderRadius: 18, padding: "6px 16px 24px", textAlign: "left",
     }}>
       {/* Onyx-Ivory redesign (bite #1): palette overridden on the vars above so the whole subtree
           recolors; this rule forces Hanken everywhere so no hardcoded serif (Fraunces/Bodoni) leaks in. */}
