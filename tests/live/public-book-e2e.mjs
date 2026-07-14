@@ -45,6 +45,12 @@ await page.goto(URL_, { waitUntil: 'networkidle', timeout: 45000 });
 await page.waitForTimeout(2500);
 await shot(page, '1-landing');
 
+// Multi-location account → a "Choose a location" chooser appears first. Pick the test shop.
+if (await page.getByText(/Choose a location/i).first().count()) {
+  const loc = page.getByRole('button', { name: /Vero Test \(automated\)/i }).first();
+  if (await loc.count()) { await loc.click({ timeout: 6000 }).catch(() => {}); await page.waitForTimeout(1800); }
+}
+
 // If we somehow landed on staff sign-in, take the client entry.
 if (await page.getByText(/Book here/i).first().count()) { await clickText(/Book here/i, 1500); }
 
