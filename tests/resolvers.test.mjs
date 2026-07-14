@@ -72,7 +72,7 @@ const CUT_DESC_LINE = (src.match(/const CONSOLIDATE_CUT_DESC = "[^"]*";/) || [])
 if (!CUT_DESC_LINE) throw new Error("resolvers.test: CONSOLIDATE_CUT_DESC not found in src/App.jsx — refusing to pass");
 const SHOP_TZ_LINE = (src.match(/const SHOP_TZ = "[^"]*";/) || [])[0];
 if (!SHOP_TZ_LINE) throw new Error("resolvers.test: SHOP_TZ not found in src/App.jsx — refusing to pass");
-const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig", "impParseCSV", "impDigits", "impGuess", "impGuessMap", "impPhone", "impBlocked", "impMoney", "resolveAuthStaff", "ownerAccessResilient"];
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig", "impParseCSV", "impDigits", "impGuess", "impGuessMap", "impPhone", "impBlocked", "impMoney", "resolveAuthStaff", "ownerAccessResilient", "clientListComparator"];
 const extraSrc = CUT_DESC_LINE + "\n" + SHOP_TZ_LINE + "\n" + EXTRA.map(grab).join("\n");
 // computeFreeSlots has a destructuring parameter ({...}), which grab()'s brace-matcher
 // mistakes for the body — extract it by anchors instead. It depends on hoursForDate +
@@ -528,6 +528,27 @@ test("impPhone: normalizes to 10-digit US so returning-client recognition matche
 test("impBlocked: truthy only on yes/true/1/y (Mangomint exports 'Yes')", () => {
   for (const v of ["Yes", "yes", "TRUE", "1", "y"]) assert.equal(R.impBlocked(v), true);
   for (const v of ["", "No", "false", "0", "maybe", undefined]) assert.equal(R.impBlocked(v), false);
+});
+test("clientListComparator: all 8 Clients-tab sort modes order correctly", () => {
+  const clients = [
+    { id: "zoe",   firstName: "Zoe",   lastName: "Adams", name: "Zoe Adams",  lastVisit: "2026-01-05T12:00:00Z", importedSpent: 500, clientSince: "2026-06-01T12:00:00Z", cadenceDays: 30 },
+    { id: "bob",   firstName: "Bob",   lastName: "Baker", name: "Bob Baker",  lastVisit: "2026-06-20T12:00:00Z", importedSpent: 100, clientSince: "2026-01-01T12:00:00Z", blocked: true },
+    { id: "carol", firstName: "Carol", lastName: "Nash",  name: "Carol Nash", lastVisit: "2026-03-10T12:00:00Z", importedSpent: 300, clientSince: "2026-04-01T12:00:00Z", cadenceDays: 20 },
+    { id: "dan",   firstName: "Dan",   lastName: "Zeal",  name: "Dan Zeal",   lastVisit: "2026-05-01T12:00:00Z", importedSpent: 200, clientSince: "2026-02-01T12:00:00Z", cadenceDays: 200 },
+    { id: "amy",   firstName: "Amy",   lastName: "Cole",  name: "Amy Cole",   importedSpent: 50, clientSince: "2026-07-01T12:00:00Z" },
+  ];
+  const order = (mode, paid = {}) => [...clients].sort(R.clientListComparator(mode, paid)).map((c) => c.id);
+  const top = (mode, paid = {}) => order(mode, paid)[0];
+  assert.deepEqual(order("first"), ["amy", "bob", "carol", "dan", "zoe"]);      // first name A-Z
+  assert.deepEqual(order("last"),  ["zoe", "bob", "amy", "carol", "dan"]);      // last name A-Z: Adams,Baker,Cole,Nash,Zeal
+  assert.deepEqual(order("lastvisit"), ["bob", "dan", "carol", "zoe", "amy"]);  // most recent visit first
+  assert.deepEqual(order("spend"), ["zoe", "carol", "dan", "bob", "amy"]);      // $500 → $50
+  assert.deepEqual(order("newest"), ["amy", "zoe", "carol", "dan", "bob"]);     // client-since Jul → Jan
+  assert.equal(top("recent"), "bob");     // no lastActivity → falls back to lastVisit (Jun 20 is newest)
+  assert.equal(top("blocked"), "bob");    // the blocked client floats to the top
+  assert.equal(top("due"), "zoe");        // most overdue: earliest visit + short cadence
+  assert.equal(top("spend", { amy: 10000 }), "amy"); // "Top spenders" includes REAL Vero payments, not just imported
+  assert.equal(top("bogus"), "bob");      // unknown mode falls back to recent-activity
 });
 test("ownerAccessResilient: a degraded feed can't strip the owner's Settings, but never elevates a barber", () => {
   // Live load positively identifies an owner → owner, always.
