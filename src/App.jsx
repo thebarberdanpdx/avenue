@@ -22985,15 +22985,22 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
         />
       </Sheet>
       <RegisterView open={registerOpen} onClose={() => setRegisterOpen(false)} services={services} business={business} setBusiness={setBusiness} clients={clients} setClients={setClients} providers={providers} me={me} showToast={showToast} shopId={shopId} flushShopsNow={flushShopsNow} />
-      {/* Calendar header — date headline + a clean action row. VISUAL ONLY; all handlers unchanged. */}
-      <div style={{ marginTop: 10, marginBottom: 20 }}>
-        <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, margin: "8px 0 14px", textAlign: "left", color: "inherit", cursor: "pointer", display: "block", width: "auto" }}>
-          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
-            <span>{relativeDate(selectedDate)}</span>
-            <ChevronDown size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
-          </h2>
-          <div style={{ fontSize: 12.5, letterSpacing: "3px", color: "var(--faint)", marginTop: 12, fontWeight: 500, textTransform: "uppercase" }}>{`${DAYS[selectedDate.getDay()]} · ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
-        </button>
+      {/* Calendar header — COMPACT: date headline + inline actions on one row, a single info line
+          below (was 4 stacked rows). VISUAL ONLY; every handler is unchanged — date picker, New,
+          Sale, jump-to-Today, and the ⋯ menu all do exactly what they did. */}
+      <div style={{ marginTop: 6, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, textAlign: "left", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{relativeDate(selectedDate)}</span>
+            <ChevronDown size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+            {!sameDay(selectedDate.toISOString(), today) && <button onClick={() => setDayOffset(0)} style={{ background: "var(--panel)", color: "var(--gold)", border: "1px solid var(--border)", padding: "0 13px", height: 38, borderRadius: 12, fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY }}>Today</button>}
+            <button onClick={() => setRegisterOpen(true)} aria-label="New sale" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 38, height: 38, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}><DollarSign size={17} style={{ color: "var(--text2)" }} /></button>
+            <button onClick={() => setCalMenuOpen(true)} aria-label="More actions" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 38, height: 38, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><MoreHorizontal size={18} />{(hasOpeningMatches || waitlist.length > 0) && <span style={{ position: "absolute", top: 7, right: 7, width: hasOpeningMatches ? 9 : 7, height: hasOpeningMatches ? 9 : 7, borderRadius: "50%", background: hasOpeningMatches ? "#16A34A" : "var(--text)", boxShadow: hasOpeningMatches ? "0 0 0 2px var(--panel)" : "none" }} />}</button>
+            <button onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--text)", color: "var(--bg)", padding: "0 15px", height: 38, borderRadius: 12, fontSize: 13, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} strokeWidth={2} /> New</button>
+          </div>
+        </div>
         {(() => {
           const isToday = sameDay(selectedDate.toISOString(), today);
           const booked = dayCount(() => true);
@@ -23002,19 +23009,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const next = isToday ? dayList.find((a) => a.start >= nowMin) : dayList[0];
           const gapCount = orderedStaff.reduce((n, p) => n + gapsForProvider(p).length, 0);
           const parts = [
+            `${DAYS[selectedDate.getDay()].slice(0, 3)}, ${MONTHS[selectedDate.getMonth()].slice(0, 3)} ${selectedDate.getDate()}`,
             `${booked} booked`,
             next ? `next at ${fmtTime(next.start).replace(/:00/, "")}` : (isToday ? "nothing left today" : "nothing booked"),
             gapCount > 0 ? `${gapCount} gap${gapCount === 1 ? "" : "s"} to fill` : null,
           ].filter(Boolean);
-          return <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2, fontFamily: FONT_BODY, textAlign: "left" }}>{parts.join("  ·  ")}</div>;
+          return <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 8, fontFamily: FONT_BODY, textAlign: "left" }}>{parts.join("  ·  ")}</div>;
         })()}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 16 }}>
-          <button onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--text)", color: "var(--bg)", padding: "0 18px", height: 42, borderRadius: 13, fontSize: 13, fontWeight: 500, letterSpacing: 1.2, textTransform: "uppercase", fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 7 }}><Plus size={16} strokeWidth={2} /> New</button>
-          <button onClick={() => setRegisterOpen(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 16px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 400, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 6 }}><DollarSign size={15} style={{ color: "var(--text2)" }} /> Sale</button>
-          <div style={{ flex: 1, minWidth: 8 }} />
-          {!sameDay(selectedDate.toISOString(), today) && <button onClick={() => setDayOffset(0)} style={{ background: "var(--panel)", color: "var(--gold)", border: "1px solid var(--border)", padding: "0 14px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY }}>Today</button>}
-          <button onClick={() => setCalMenuOpen(true)} aria-label="More actions" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 42, height: 42, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><MoreHorizontal size={18} />{(hasOpeningMatches || waitlist.length > 0) && <span style={{ position: "absolute", top: 8, right: 8, width: hasOpeningMatches ? 9 : 7, height: hasOpeningMatches ? 9 : 7, borderRadius: "50%", background: hasOpeningMatches ? "#16A34A" : "var(--text)", boxShadow: hasOpeningMatches ? "0 0 0 2px var(--panel)" : "none" }} />}</button>
-        </div>
       </div>
 
       <Sheet open={calMenuOpen} onClose={() => setCalMenuOpen(false)} align="bottom" maxWidth={420}>
