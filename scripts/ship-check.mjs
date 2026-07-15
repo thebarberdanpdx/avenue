@@ -172,6 +172,7 @@ const GUARDS = [
   { needle: "GUARD: nudge-real-send", label: "the rebook 'Nudge' actually POSTs to /api/notify and only marks the client handled + toasts 'sent' on a real success — it used to toast a false 'Rebook text sent' and hide the client while sending nothing" },
   { needle: "GUARD: report-deleted-service-safe", label: "Per-Barber report resolves the top-service display NAME at the source (falls back to 'Removed service' when services.find is undefined), so a service deleted from the menu after being booked can't white-screen the report on r.topService.svc.name" },
   { needle: "import-consent-from-column", label: "the migration importer reads SMS consent from the export's marketing-texts column (Yes → consent, blank/no → opt-out, no column → unknown) — it must NEVER fabricate smsConsent:true for everyone (10DLC/TCPA: forged consent records)" },
+  { needle: "GUARD: cancel-notify-wired", label: "a client cancellation (home-screen AND manage-link paths) emails the client the 'canceled' notice AND fires a biz in-app push — it used to notify no one on the home cancel and only the client on the manage-link cancel" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
