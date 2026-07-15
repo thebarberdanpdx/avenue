@@ -14792,71 +14792,42 @@ const TEAM_ALERTS = [
 // Notifications center — the single "who gets what, by what method" surface.
 // CLIENTS reflects business.messages (the real, wired client sends). YOUR TEAM reflects
 // business.staffAlerts (the real gate on staff push). Nothing here is cosmetic.
-function NotificationsCenter({ form, setForm, onOpenMessages }) {
-  const [aud, setAud] = useState("clients");
-  const messages = form.messages || [];
-  const setMsg = (id, patch) => setForm({ ...form, messages: messages.map((m) => m.id === id ? { ...m, ...patch } : m) });
-  const sa = { newBooking: true, rescheduled: true, checkedIn: true, emailStaffOnBooking: true, bookingAlertScope: "assigned", ...(form.staffAlerts || {}) };
+function NotificationsCenter({ form, setForm }) {
+  const sa = { newBooking: true, canceled: true, rescheduled: true, checkedIn: true, emailStaffOnBooking: true, bookingAlertScope: "assigned", ...(form.staffAlerts || {}) };
   const setSA = (k, v) => setForm({ ...form, staffAlerts: { ...sa, [k]: v } });
-  const CH = [["email", "Email"], ["text", "Text"], ["both", "Both"]];
+  // notifications-team-only: this card is JUST the team/biz side (business.staffAlerts). CLIENT message
+  // on/off + channel + wording live in ONE place — the "Automated Messages" card — so they're never shown twice.
   return (
     <div>
-      <Segmented options={[{ value: "clients", label: "Clients" }, { value: "team", label: "Your team" }]} value={aud} onChange={setAud} />
-      {aud === "clients" ? (<>
-        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>Automatic messages to the people you book. Each can go by text, email, or both — turn off any you don't want.</p>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 14px" }}>
-          {messages.map((m, i) => { const on = m.enabled !== false; return (
-            <div key={m.id} style={{ padding: "14px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>{m.label}</span>
-                  {m.timing && <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>{m.timing}</span>}
-                </span>
-                <Toggle on={on} onClick={() => setMsg(m.id, { enabled: !on })} />
-              </div>
-              {on && (
-                <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-                  {CH.map(([v, lbl]) => { const sel = (m.channel || "email") === v; return (
-                    <button key={v} onClick={() => setMsg(m.id, { channel: v })} style={{ flex: 1, padding: "8px 6px", borderRadius: 10, fontSize: 13, fontWeight: sel ? 600 : 400, background: sel ? "var(--wash)" : "var(--panel2)", border: `1px solid ${sel ? "var(--gold)" : "var(--border2)"}`, color: sel ? "var(--text)" : "var(--sub)", cursor: "pointer" }}>{lbl}{(v === "text" || v === "both") ? " *" : ""}</button>
-                  ); })}
-                </div>
-              )}
-            </div>
-          ); })}
-        </div>
-        <button onClick={onOpenMessages} style={{ marginTop: 14, background: "none", border: "none", color: "var(--gold)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "4px 2px", display: "inline-flex", alignItems: "center", gap: 5 }}>Edit wording & timing <ChevronRight size={15} /></button>
-        <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>* Texts begin once your A2P carrier registration clears; until then a “Text” or “Both” message is delivered by email.</p>
-      </>) : (<>
-        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>How your team is alerted to activity. App pop-ups need the Vero iOS app (and each person allowing notifications on their device); email &amp; text alerts go to the contact info saved in each staff profile.</p>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
-          {TEAM_ALERTS.map((ev, i) => { const on = sa[ev.k] !== false; return (
-            <div key={ev.k} style={{ padding: "15px 0", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <span style={{ minWidth: 0 }}>
-                <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>{ev.label}</span>
-                <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>{ev.desc} · Push</span>
-              </span>
-              <Toggle on={on} onClick={() => setSA(ev.k, !on)} />
-            </div>
-          ); })}
-        </div>
-
-        <p style={{ fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", margin: "22px 2px 10px" }}>Email / text the barber</p>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
-          <div style={{ padding: "15px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 2px 16px", fontWeight: 300 }}>How your team is alerted to activity. App pop-ups need the Vero iOS app (and each person allowing notifications on their device); email &amp; text alerts go to the contact info saved in each staff profile. Client-facing messages live under <b style={{ color: "var(--text)", fontWeight: 600 }}>Automated Messages</b>.</p>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
+        {TEAM_ALERTS.map((ev, i) => { const on = sa[ev.k] !== false; return (
+          <div key={ev.k} style={{ padding: "15px 0", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <span style={{ minWidth: 0 }}>
-              <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>Alert the barber on new bookings</span>
-              <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>Sent to the email in their staff profile · text joins once your carrier clears</span>
+              <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>{ev.label}</span>
+              <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>{ev.desc} · Push</span>
             </span>
-            <Toggle on={sa.emailStaffOnBooking !== false} onClick={() => setSA("emailStaffOnBooking", !(sa.emailStaffOnBooking !== false))} />
+            <Toggle on={on} onClick={() => setSA(ev.k, !on)} />
           </div>
-          {sa.emailStaffOnBooking !== false && (
-            <div style={{ padding: "4px 0 14px", borderTop: "1px solid var(--line)" }}>
-              <div style={{ fontSize: 13, color: "var(--sub)", margin: "12px 0 9px" }}>Who gets the alert</div>
-              <Segmented options={[{ value: "assigned", label: "Assigned barber" }, { value: "ownerPlus", label: "You + barber" }, { value: "all", label: "All staff" }]} value={sa.bookingAlertScope || "assigned"} onChange={(v) => setSA("bookingAlertScope", v)} />
-            </div>
-          )}
+        ); })}
+      </div>
+
+      <p style={{ fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", margin: "22px 2px 10px" }}>Email / text the barber</p>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
+        <div style={{ padding: "15px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>Alert the barber on new bookings</span>
+            <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>Sent to the email in their staff profile · text joins once your carrier clears</span>
+          </span>
+          <Toggle on={sa.emailStaffOnBooking !== false} onClick={() => setSA("emailStaffOnBooking", !(sa.emailStaffOnBooking !== false))} />
         </div>
-      </>)}
+        {sa.emailStaffOnBooking !== false && (
+          <div style={{ padding: "4px 0 14px", borderTop: "1px solid var(--line)" }}>
+            <div style={{ fontSize: 13, color: "var(--sub)", margin: "12px 0 9px" }}>Who gets the alert</div>
+            <Segmented options={[{ value: "assigned", label: "Assigned barber" }, { value: "ownerPlus", label: "You + barber" }, { value: "all", label: "All staff" }]} value={sa.bookingAlertScope || "assigned"} onChange={(v) => setSA("bookingAlertScope", v)} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -20199,7 +20170,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "notifications", fullBleed: true, title: "Notifications", icon: Bell, category: "Business Setup",
       status: "Who gets told what",
       keywords: "notifications alerts sms text email push reminders confirmation canceled rescheduled waitlist birthday client staff team who gets notified by what method",
-      editor: <NotificationsCenter form={form} setForm={setForm} onOpenMessages={() => setOpenCard("messages")} />,
+      editor: <NotificationsCenter form={form} setForm={setForm} />,
     },
     {
       id: "appearance", title: "Logo & Branding", icon: ImageIcon, category: "Business Setup",
