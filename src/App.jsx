@@ -1050,6 +1050,36 @@ async function recoverSucceededIntent(stripe, clientSecret) {
   return null;
 }
 
+// ---- Durable payment outbox (money-safety: outbox-payment-durable) ---------------------------------
+// A sale's ledger record is what stops a reopened ticket from re-charging (paidForAppt reads it). If
+// that write fails — bad network, a transient server error, the app killed right after — the record
+// would live only in memory and vanish on reload, and the ticket would look unpaid. This keeps a TINY
+// copy in localStorage (never photos) until the write is CONFIRMED on the server, re-attempting on
+// load, on reconnect, and on an interval. Idempotent: keyed by the payment record id, so re-applying a
+// sale already saved is a no-op and can never double-count.
+function _payOutboxKey() { return `vero_pay_outbox_${_shopIdFromUrl() || ""}`; }
+function payOutboxRead() {
+  try { const raw = localStorage.getItem(_payOutboxKey()); const v = raw ? JSON.parse(raw) : []; return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
+function payOutboxWrite(list) {
+  try { localStorage.setItem(_payOutboxKey(), JSON.stringify((Array.isArray(list) ? list : []).slice(-200))); } catch (e) {}
+}
+function payOutboxAdd(entry) {
+  if (!entry || !entry.id || !entry.clientId || !entry.rec) return;
+  const box = payOutboxRead();
+  if (box.some((e) => e.id === entry.id)) return; // idempotent by record id
+  box.push({ id: entry.id, clientId: entry.clientId, apptId: entry.apptId || null, rec: entry.rec, ts: entry.ts || 0 });
+  payOutboxWrite(box);
+}
+// Ledger recs still pending for an appointment (not already counted in its known ledger). Folded into
+// paidForAppt/paidTowardItems so a reopen credits/blocks correctly even before the drain re-injects.
+function payOutboxRecsForAppt(apptId, ledgerIds) {
+  if (!apptId) return [];
+  const seen = ledgerIds instanceof Set ? ledgerIds : new Set();
+  return payOutboxRead().filter((e) => e.apptId === apptId && !seen.has(e.id)).map((e) => e.rec).filter(Boolean);
+}
+function payOutboxHasAppt(apptId) { return !!apptId && payOutboxRead().some((e) => e.apptId === apptId); }
+
 // Real card entry. In Live it mounts Stripe Elements and charges/saves for real;
 // in Test it's a safe simulation that touches no processor and charges nothing.
 // mode: "payment" (charge `amount` dollars) | "setup" (save a card, no charge).
@@ -3265,6 +3295,40 @@ function App() {
     shopsPendingRef.current = { business: bizSnap || business, categories, cutLibrary };
     fireShopsSave();
   };
+  // outbox-payment-durable: re-apply any sale whose ledger write isn't CONFIRMED on the server yet, and
+  // keep re-attempting until it lands — on mount, on reconnect, and on an interval. A record is dropped
+  // from the outbox ONLY once it appears in the last server-confirmed clients snapshot (lastRemoteRef),
+  // so a failed/lost payment write survives a reload. Idempotent (dedupe by record id): never double-counts.
+  useEffect(() => {
+    if (!session) return;
+    const drain = () => {
+      if (!loadedRef.current || !staffClientsLoadedRef.current) return;
+      const box = payOutboxRead();
+      if (!box.length) return;
+      const serverClients = lastRemoteRef.current.clients || [];
+      const onServer = (e) => { const c = serverClients.find((sc) => sc.id === e.clientId); return !!(c && (c.payments || []).some((p) => p.id === e.id)); };
+      const pending = box.filter((e) => !onServer(e));
+      if (pending.length !== box.length) payOutboxWrite(pending); // drop entries confirmed on the server
+      if (!pending.length) return;
+      setClients((cur) => {
+        let injected = false;
+        const next = cur.map((c) => {
+          const mine = pending.filter((e) => e.clientId === c.id && !(c.payments || []).some((p) => p.id === e.id));
+          if (!mine.length) return c;
+          injected = true;
+          return { ...c, payments: [...(c.payments || []), ...mine.map((e) => e.rec)] };
+        });
+        const listForSave = injected ? next : cur;
+        if (flushClientsNow) queueMicrotask(() => flushClientsNow(listForSave));
+        return injected ? next : cur;
+      });
+    };
+    drain();
+    const onOnline = () => drain();
+    if (typeof window !== "undefined") window.addEventListener("online", onOnline);
+    const id = setInterval(drain, 20000);
+    return () => { if (typeof window !== "undefined") window.removeEventListener("online", onOnline); clearInterval(id); };
+  }, [session]);
   // cross-device-sync: detect pending local edits (add/delete/change vs server baseline).
   const tableHasUnsavedWork = (table) => {
     const sv = savingRef.current[table];
@@ -22257,12 +22321,17 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   // LEDGER has money against it. The ledger check matters: if the paid stamp failed to persist
   // (app closed mid-save), the record of the charge still exists — without this, checkout would
   // reopen at FULL PRICE and try to charge the client a second time.
-  const startCheckout = (appt, opts) => { setOpen(null); if (appt) delete committedRef.current[appt.id]; const alreadyPaid = !!(appt && appt.paid && Number(appt.paid.total) > 0) || !!(appt && paidForAppt(appt) > 0); setCheckout(((opts && opts.reopen) || alreadyPaid) ? { ...appt, __reopen: true } : appt); };
+  // outbox-payment-durable: a ticket with a not-yet-confirmed payment in the durable outbox opens in
+  // balance-only (reopen) mode too — never full-charge while a real payment for it is still in flight.
+  const startCheckout = (appt, opts) => { setOpen(null); if (appt) delete committedRef.current[appt.id]; const alreadyPaid = !!(appt && appt.paid && Number(appt.paid.total) > 0) || !!(appt && paidForAppt(appt) > 0) || !!(appt && payOutboxHasAppt(appt.id)); setCheckout(((opts && opts.reopen) || alreadyPaid) ? { ...appt, __reopen: true } : appt); };
   const [refundAppt, setRefundAppt] = useState(null); // appt whose payment is being refunded from the appointment sheet
   // Everything ever charged against an appointment (ledger first, appt summary as fallback).
   const paidForAppt = (appt) => {
     const recs = clients.flatMap((c) => (c.payments || [])).concat((business && business.sales) || []).filter((r) => r.apptId === appt.id);
-    if (recs.length) return recs.reduce((s, r) => s + (r.amount || 0) - (r.refunded || 0), 0);
+    // outbox-payment-durable: include any not-yet-confirmed sale for this ticket so a reopen can't
+    // full-charge in the window before the outbox drain re-injects it into the ledger.
+    const recsAll = recs.concat(payOutboxRecsForAppt(appt.id, new Set(recs.map((r) => r.id))));
+    if (recsAll.length) return recsAll.reduce((s, r) => s + (r.amount || 0) - (r.refunded || 0), 0);
     return (appt.paid && appt.paid.total) || 0;
   };
   // Heal tickets where payment landed but status never flipped to done (app closed mid-checkout).
@@ -22286,7 +22355,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   // newly-added items silently nets it out and undercharges them. This is items-only paid.
   const paidTowardItems = (appt) => {
     const recs = clients.flatMap((c) => (c.payments || [])).concat((business && business.sales) || []).filter((r) => r.apptId === appt.id);
-    if (recs.length) return recs.reduce((s, r) => s + (r.amount || 0) - (r.tip || 0) - (r.refunded || 0), 0);
+    // outbox-payment-durable: credit not-yet-confirmed sales too, so the reopened balance is correct.
+    const recsAll = recs.concat(payOutboxRecsForAppt(appt.id, new Set(recs.map((r) => r.id))));
+    if (recsAll.length) return recsAll.reduce((s, r) => s + (r.amount || 0) - (r.tip || 0) - (r.refunded || 0), 0);
     return Math.max(0, ((appt.paid && appt.paid.total) || 0) - ((appt.paid && appt.paid.tip) || 0));
   };
   // The actual "this ticket is done and paid" write. Runs the moment checkout shows "All done"
@@ -23805,6 +23876,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       const nextClients = clients.map((c) => c.id === liveClient.id ? { ...c, payments: [...(c.payments || []), rec] } : c);
       setClients(nextClients);
       if (flushClientsNow) flushClientsNow(nextClients);
+      // outbox-payment-durable: back the ledger write with a durable copy until it is confirmed on the
+      // server, so a failed/lost save can never let this ticket reopen and re-charge the client.
+      try { payOutboxAdd({ id: rec.id, clientId: liveClient.id, apptId: appt.id, rec, ts: rec.ts }); } catch (e) {}
     }
     // Inventory count-down (tracked products) and the walk-in sale record both live on `business`.
     // First sale only — a reopened ticket re-charges the balance and must never decrement stock again.
