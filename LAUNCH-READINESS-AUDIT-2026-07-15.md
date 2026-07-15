@@ -1,5 +1,16 @@
 # Vero — Launch-readiness audit (2026-07-15)
 
+## ⚠️ CORRECTIONS (verified against PROD after Dan's pushback — the audit got these wrong)
+The audit read code accurately but **inferred prod/operational state and was wrong twice**. Verified against the live DB:
+- **Migration is DONE, not "~50% / needs export."** `sanctuary` has **2,973 clients (998 tagged `_import`, batch b1784041249631)** and 307 appointments. Any ask for "your Mangomint export" was stale — ignore it.
+- **SMS is LIVE and sending, not "off."** `message_log` shows **25 real SMS sends** (via=sms: check-in + remind3h) since 2026-07-08. `SMS_LIVE` is set in prod. So blocker #7 below is VOID, and phone-only clients ARE reached by text.
+- Real no-contact count is **55** (no phone AND no email), not the "156" cited below.
+- The forged-consent item (#6) already applied to the 998 imported clients weeks ago with SMS running — treat it as a **verify-legal-basis** item, not an imminent landmine (they're Dan's existing clients).
+Lesson: only report prod state that's been pulled from prod. The code-fact findings I personally re-opened (double-charge idempotency, fake nudge, hardcoded password) remain valid.
+
+---
+
+
 Ran an 18-subagent adversarial audit of the whole app, then **personally verified the top claims** against the code and live DB. Tags below:
 - **[VERIFIED]** — I re-opened the exact line / ran a live test and confirmed it.
 - **[CODE-READ]** — a subagent cited a specific file:line; I trust it (5/5 of the ones I spot-checked were exact) but did not personally re-open every one.
