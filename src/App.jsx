@@ -12620,13 +12620,18 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       const key = String(a.id);
       nextSnap[key] = { start: a.start, bookedFor: a.bookedFor, status: a.status, hasNote: !!a.hasNote, photos: a.photos || 0, note: (a.note || "").trim(), extrasAt: a.clientExtrasAt || "" };
       if (a.status === "block") continue;
-      if (a.source === "sync" || a._synced) continue; // mirrored appts stay silent — the Sync panel reports them, not the bell
+      const isSynced = a.source === "sync" || a._synced;
       const prev = snap[key];
       const base = { apptId: key, name: a.name || a.title || "Client", service: a.serviceName || a.title || "", providerId: a.providerId, when: a.bookedFor, start: a.start, ts: Date.now() };
       if (a.status === "cancelled") {
+        // GUARD: cancel-bell-through-sync — a cancellation rings the in-app bell EVEN when it arrives via
+        // sync (a client canceling online must land in the owner's feed, not just the Sync panel — this is
+        // the "I didn't see the in-app notification" fix). The prev-status diff fires it only ONCE, so
+        // there's no mirror flood. Other change kinds still stay silent on sync (below).
         if (prev && prev.status !== "cancelled") fresh.push({ ...base, id: "nc_" + key + "_" + Date.now(), kind: "canceled" });
         continue;
       }
+      if (isSynced) continue; // other changes (new/moved/note) stay silent when synced — push covers them, and it avoids a full-mirror flood
       if (!prev) {
         fresh.push({ ...base, id: "nn_" + key + "_" + Date.now(), kind: "new", note: (a.note || "").trim() });
       } else if (prev.start !== a.start || prev.bookedFor !== a.bookedFor) {
@@ -14780,6 +14785,7 @@ function Stepper({ value, onChange, min = 0, max = 999, step = 1, suffix, zeroLa
 // The staff-push events the app actually fires (gated for real by fireStaffPush via business.staffAlerts).
 const TEAM_ALERTS = [
   { k: "newBooking", label: "New booking", desc: "A client books — online or in person" },
+  { k: "canceled", label: "Cancellation", desc: "A client cancels their appointment" },
   { k: "rescheduled", label: "Rescheduled or moved", desc: "An appointment's time changes" },
   { k: "checkedIn", label: "Client checked in", desc: "Someone's marked as arrived" },
 ];
