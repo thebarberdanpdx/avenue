@@ -25383,6 +25383,10 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [revertAsk, setRevertAsk] = useState(0); // $ still on record when "Back to confirmed" was tapped (0 = closed)
   const [deleteAsk, setDeleteAsk] = useState(false); // "are you sure?" — EVERY delete confirms (owner's rule)
+  const [notifyOnDelete, setNotifyOnDelete] = useState(true); // cancel-notify-toggle: on a staff delete, email the client the "canceled" notice — default on, case-by-case
+  const _delClient = (clients || []).find((c) => c.id === appt.clientId);
+  const _delEmail = (appt.email || (_delClient && _delClient.email) || "").trim();
+  const _delPhone = (appt.phone || (_delClient && _delClient.phone) || "").trim();
   // Un-refunded money in the LEDGER for this appointment — the source of truth for refund
   // availability (appt.paid alone misses reverted tickets whose payment is still on record).
   const apptLedgerLeft = (() => {
@@ -26403,7 +26407,11 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       ? <>This ticket has been checked out{apptLedgerLeft > 0.009 ? ` — $${apptLedgerLeft.toFixed(2)} is still on record` : ""}. Deleting permanently removes it from the calendar and your reports. This can't be undone.</>
                       : <>{(appt.name || "This client")}'s {appt.serviceName || appt.title || "appointment"} will be permanently removed from the calendar. This can't be undone — to keep the record, mark it cancelled instead.</>}
                   </div>
-                  <button className="lift" onClick={() => { setDeleteAsk(false); onDelete(appt.id); }} style={{ width: "100%", background: "#B5564B", color: "#fff", border: "none", padding: "15px 0", borderRadius: 14, fontSize: 16.5, fontWeight: 600, cursor: "pointer" }}>Delete appointment</button>
+                  <button onClick={() => { if (_delEmail) setNotifyOnDelete((v) => !v); }} disabled={!_delEmail} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "transparent", border: `1px solid ${T.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 12, cursor: _delEmail ? "pointer" : "default", opacity: _delEmail ? 1 : 0.55 }}>
+                    <span style={{ fontSize: 14.5, color: T.text, textAlign: "left" }}>{_delEmail ? "Email the client it's cancelled" : "No client email on file — can't notify"}</span>
+                    <span style={{ width: 42, height: 25, borderRadius: 13, background: (notifyOnDelete && _delEmail) ? T.text : (T.line || "#ccc"), position: "relative", flexShrink: 0, transition: "background .15s" }}><span style={{ position: "absolute", top: 3, left: (notifyOnDelete && _delEmail) ? 20 : 3, width: 19, height: 19, borderRadius: "50%", background: T.panel || "#fff", transition: "left .15s" }} /></span>
+                  </button>
+                  <button className="lift" onClick={() => { if (notifyOnDelete && _delEmail) { try { fireApptNotify({ msgId: "canceled", appt, business, providers, contact: { email: _delEmail, phone: _delPhone } }); } catch (e) {} } setDeleteAsk(false); onDelete(appt.id); }} style={{ width: "100%", background: "#B5564B", color: "#fff", border: "none", padding: "15px 0", borderRadius: 14, fontSize: 16.5, fontWeight: 600, cursor: "pointer" }}>Delete appointment</button>
                   <button onClick={() => setDeleteAsk(false)} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: T.sub, fontSize: 15.5, padding: 8, cursor: "pointer" }}>Keep it</button>
                 </div>
               </div>
