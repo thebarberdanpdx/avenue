@@ -1035,6 +1035,21 @@ async function stripeApi(payload) {
   return data;
 }
 
+// Money-safety (sale-recover-succeeded): a charge whose confirm SUCCEEDED on Stripe but whose
+// response was lost to a dropped network leaves a held clientSecret pointing at an ALREADY-PAID
+// intent. Given that secret, return the succeeded intent's id so the caller records it as paid
+// WITHOUT charging again; return null if it hasn't succeeded (safe to charge/clear as before).
+// Never throws — a failed lookup (still offline) just falls through to the normal path.
+async function recoverSucceededIntent(stripe, clientSecret) {
+  try {
+    if (!stripe || !clientSecret) return null;
+    const r = await stripe.retrievePaymentIntent(clientSecret);
+    const pi = r && r.paymentIntent;
+    if (pi && pi.status === "succeeded") return pi.id;
+  } catch (e) {}
+  return null;
+}
+
 // Real card entry. In Live it mounts Stripe Elements and charges/saves for real;
 // in Test it's a safe simulation that touches no processor and charges nothing.
 // mode: "payment" (charge `amount` dollars) | "setup" (save a card, no charge).
@@ -1095,6 +1110,11 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
           try {
             if (isPay) {
               const dCents = Math.round(Number(amount) * 100);
+              // sale-recover-succeeded: an already-succeeded deposit intent (dropped response) settles as paid.
+              if (saleRef.current.clientSecret && saleRef.current.cents === dCents) {
+                const recId = await recoverSucceededIntent(stripe, saleRef.current.clientSecret);
+                if (recId) { ev.complete("success"); if (!dead) { setResult({ paid: true, intentId: recId, last4: null, brand: null }); setPhase("done"); } return; }
+              }
               let dSecret = saleRef.current.clientSecret && saleRef.current.cents === dCents ? saleRef.current.clientSecret : null;
               if (!dSecret) {
                 const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit" });
@@ -1158,6 +1178,11 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
       }
       if (isPay) {
         const dCents = Math.round(Number(amount) * 100);
+        // sale-recover-succeeded: an already-succeeded deposit intent (dropped response) settles as paid.
+        if (saleRef.current.clientSecret && saleRef.current.cents === dCents) {
+          const recId = await recoverSucceededIntent(e.stripe, saleRef.current.clientSecret);
+          if (recId) { setResult({ paid: true, intentId: recId, last4: null, brand: null }); setBusy(false); setPhase("done"); return; }
+        }
         let dSecret = saleRef.current.clientSecret && saleRef.current.cents === dCents ? saleRef.current.clientSecret : null;
         if (!dSecret) {
           const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit" });
@@ -1165,7 +1190,14 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
           dSecret = intent.clientSecret; saleRef.current = { clientSecret: dSecret, cents: dCents };
         }
         const conf = await e.stripe.confirmCardPayment(dSecret, { payment_method: pm.paymentMethod.id });
-        if (conf.error) { if (conf.error.code === "payment_intent_unexpected_state") saleRef.current = { clientSecret: null, cents: null }; setErr(conf.error.message || "Your card was declined. Try a different card."); setBusy(false); return; }
+        if (conf.error) {
+          if (conf.error.code === "payment_intent_unexpected_state") {
+            const recId = await recoverSucceededIntent(e.stripe, dSecret);
+            if (recId) { setResult({ paid: true, intentId: recId, last4: null, brand: null }); setBusy(false); setPhase("done"); return; }
+            saleRef.current = { clientSecret: null, cents: null };
+          }
+          setErr(conf.error.message || "Your card was declined. Try a different card."); setBusy(false); return;
+        }
         if (!conf.paymentIntent || conf.paymentIntent.status !== "succeeded") { setErr("The payment didn't complete. Try again."); setBusy(false); return; }
         setResult({ paid: true, intentId: conf.paymentIntent.id, last4: c4.last4 || "••••", brand: c4.brand });
       } else {
@@ -23643,6 +23675,12 @@ function CardChargeInline({ amount, appt, onCancel, onPaid, money }) {
     setBusy(true); setErr("");
     try {
       const cents = Math.round(Number(amount) * 100);
+      // sale-recover-succeeded: if a held intent for this exact amount already SUCCEEDED (the confirm
+      // landed but the response was lost), record it as paid — never mint or confirm a second charge.
+      if (saleRef.current.clientSecret && saleRef.current.cents === cents) {
+        const recId = await recoverSucceededIntent(stripe, saleRef.current.clientSecret);
+        if (recId) { onPaid({ id: recId, brand: null, last4: null }); setBusy(false); return; }
+      }
       const pm = await stripe.createPaymentMethod({ type: "card", card });
       if (pm.error) throw new Error(pm.error.message);
       let clientSecret = saleRef.current.clientSecret && saleRef.current.cents === cents ? saleRef.current.clientSecret : null;
@@ -23654,7 +23692,11 @@ function CardChargeInline({ amount, appt, onCancel, onPaid, money }) {
       }
       const conf = await stripe.confirmCardPayment(clientSecret, { payment_method: pm.paymentMethod.id });
       if (conf.error) {
-        if (conf.error.code === "payment_intent_unexpected_state") saleRef.current = { clientSecret: null, cents: null };
+        if (conf.error.code === "payment_intent_unexpected_state") {
+          const recId = await recoverSucceededIntent(stripe, clientSecret);
+          if (recId) { onPaid({ id: recId, brand: null, last4: null }); setBusy(false); return; }
+          saleRef.current = { clientSecret: null, cents: null };
+        }
         throw new Error(conf.error.message);
       }
       if (!conf.paymentIntent || conf.paymentIntent.status !== "succeeded") throw new Error("The payment didn't complete. Try again.");
@@ -24659,6 +24701,11 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
         setBusy(false); return;
       }
       const cents = Math.round(Number(amount) * 100);
+      // sale-recover-succeeded: reuse an already-succeeded intent instead of charging a second time.
+      if (saleRef.current.clientSecret && saleRef.current.cents === cents) {
+        const recId = await recoverSucceededIntent(stripe, saleRef.current.clientSecret);
+        if (recId) { onPaid({ paymentIntentId: recId, brand: null, last4: null }); return; }
+      }
       let clientSecret = saleRef.current.clientSecret && saleRef.current.cents === cents ? saleRef.current.clientSecret : null;
       if (!clientSecret) {
         const intent = await stripeApi({ action: "sale_intent", amount, description: description || "Vero — sale" });
@@ -24668,7 +24715,11 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
       }
       const conf = await stripe.confirmCardPayment(clientSecret, { payment_method: pm.paymentMethod.id });
       if (conf.error) {
-        if (conf.error.code === "payment_intent_unexpected_state") saleRef.current = { clientSecret: null, cents: null };
+        if (conf.error.code === "payment_intent_unexpected_state") {
+          const recId = await recoverSucceededIntent(stripe, clientSecret);
+          if (recId) { onPaid({ paymentIntentId: recId, brand: null, last4: null }); return; }
+          saleRef.current = { clientSecret: null, cents: null };
+        }
         throw new Error(conf.error.message);
       }
       if (conf.paymentIntent && conf.paymentIntent.status === "succeeded") {
