@@ -129,31 +129,43 @@ async function handler(req, res) {
         clientNote = crow && crow.data ? String(crow.data.notes || "").trim().slice(0, 500) : "";
       } catch (e) {}
     }
-    const subject = `New booking — ${clientName}`;
-    const lines = [`${clientName} booked ${svc}.`, when];
-    if (note) lines.push(`Booking note: "${note}"`);
+    // Event-aware wording. Defaults to the booking phrasing, so any legacy caller that sends no
+    // `event` stays identical to before.
+    const event = String(b.staff.event || "newBooking");
+    const W = {
+      newBooking:  { subj: `New booking — ${clientName}`,   line: `${clientName} booked ${svc}.`,         sms: `New booking: ${clientName} - ${svc}. ${when}` },
+      canceled:    { subj: `Cancellation — ${clientName}`,  line: `${clientName} canceled ${svc}.`,        sms: `Canceled: ${clientName} - ${svc}. ${when}` },
+      rescheduled: { subj: `Rescheduled — ${clientName}`,   line: `${clientName} moved ${svc}.`,           sms: `Moved: ${clientName} - ${svc}. ${when}` },
+      checkedIn:   { subj: `Checked in — ${clientName}`,    line: `${clientName} checked in for ${svc}.`,  sms: `Checked in: ${clientName} - ${svc}. ${when}` },
+    };
+    const w = W[event] || W.newBooking;
+    const subject = w.subj;
+    const lines = [w.line, when];
+    if (note) lines.push(`Note: "${note}"`);
     if (clientNote) lines.push(`Note on file: "${clientNote}"`);
     const textBody = lines.filter(Boolean).join("\n");
-    // SMS is one glanceable line — who, what, when — with the name shown ONCE and no appended notes,
-    // so the whole alert lands inside a single 160-char GSM segment. (Email keeps the fuller body above.)
-    const smsRaw = `New booking: ${clientName} - ${svc}. ${when}`.replace(/\s+/g, " ").trim();
+    // SMS is one glanceable line — who, what, when — inside a single 160-char GSM segment.
+    const smsRaw = w.sms.replace(/\s+/g, " ").trim();
     const smsText = smsRaw.length <= 160 ? smsRaw : smsRaw.slice(0, 160).replace(/\s+\S*$/, "");
+
+    // Per-channel gates. Absent `channels` -> email+text both on (preserves the original booking-alert
+    // behavior for any legacy caller). New callers pass { email, text } straight from the owner's toggles.
+    const chFlags = b.staff.channels && typeof b.staff.channels === "object" ? b.staff.channels : null;
+    const sendMail = chFlags ? chFlags.email !== false : true;
+    const sendText = chFlags ? chFlags.text === true : true;
 
     const sent = [];
     for (const p of recip) {
       const pEmail = String(p.email || "").trim();
       const pPhone = String(p.phone || "").replace(/\D/g, "");
       const r = { id: p.id };
-      try { if (pEmail) { await sendEmail({ to: pEmail, subject, text: textBody }); r.email = "sent"; } else r.email = "no-email"; }
+      try { if (sendMail && pEmail) { await sendEmail({ to: pEmail, subject, text: textBody }); r.email = "sent"; } else r.email = sendMail ? "no-email" : "off"; }
       catch (e) { r.email = "error: " + e.message; }
-      // SMS is GSM-7; non-GSM characters get delivered as "?". sendSms() sanitizes centrally
-      // (see gsmSafe in lib/messaging.js), so every SMS — including the middot service separator —
-      // reads clean without each call site handling it.
-      try { if (SMS_LIVE && pPhone) { await sendSms({ to: pPhone, text: smsText }); r.sms = "sent"; } }
+      try { if (sendText && SMS_LIVE && pPhone) { await sendSms({ to: pPhone, text: smsText }); r.sms = "sent"; } else r.sms = sendText ? (SMS_LIVE ? "no-phone" : "sms-off") : "off"; }
       catch (e) { r.sms = "error: " + e.message; }
       sent.push(r);
     }
-    return res.status(200).json({ ok: true, staff: true, smsLive: SMS_LIVE, scope: scope || "assigned", sent });
+    return res.status(200).json({ ok: true, staff: true, event, smsLive: SMS_LIVE, scope: scope || "assigned", sent });
   }
 
   const ctx = b.context || {};

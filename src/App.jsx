@@ -4458,54 +4458,62 @@ function runningLateFailReason(res) {
   return "it couldn't be delivered";
 }
 
-// Buzz the shop's phones (native app push) about a staff-side appointment event.
-// Same server endpoint the online-booking path uses, so closed-app notifications
-// behave identically no matter where the change came from. Fire-and-forget — a
-// push failure must never affect the appointment itself.
+// Resolve a team-alert event's channels from business.staffAlerts, honoring BOTH the legacy
+// shape (sa[event] = boolean push-gate, plus emailStaffOnBooking for the booking email) AND the
+// current per-event shape (sa[event] = { push, text, email }). ONE reader so the settings UI, the
+// push gate, and the email/text sender always agree on what's on. teamCh-staff-alerts (guard).
+function teamCh(sa, k) {
+  const s = sa || {};
+  const v = s[k];
+  if (v && typeof v === "object") return { push: v.push !== false, text: v.text === true, email: v.email === true };
+  // Legacy / unset: the boolean (or undefined) gates PUSH only, default on. Email/text default off --
+  // EXCEPT booking, which legacy shops sent by BOTH email AND text together, gated by
+  // emailStaffOnBooking (default on). Preserve that exactly so upgrading a shop never silently drops
+  // a booking alert the barber was already getting; the first per-channel toggle supersedes this.
+  const bookOn = k === "newBooking" && (s.emailStaffOnBooking !== false);
+  return { push: v !== false, text: bookOn, email: bookOn };
+}
+
+// Alert the team about a staff-side appointment event. ONE dispatcher for all three channels:
+//   - in-app / device PUSH (to the shop's registered devices) when ch.push, and
+//   - EMAIL / TEXT the barber -- recipients + wording resolved SERVER-SIDE (api/notify) so a public
+//     booker never sees staff contact info -- for whichever of {email,text} the owner turned on.
+// Channels come from teamCh(staffAlerts, event); scope (who is emailed/texted) is staffAlerts.
+// bookingAlertScope. Fire-and-forget -- an alert failure must never touch the appointment itself.
 function fireStaffPush({ shopId, title, appt, prevAppt, event, business }) {
   try {
     if (!shopId || !appt) return;
-    // The notifications center gates which events push the team. Missing flag → push (prior behavior).
-    const sa = business && business.staffAlerts;
-    if (event && sa && sa[event] === false) return;
+    const sa = (business && business.staffAlerts) || {};
+    const ch = event ? teamCh(sa, event) : { push: true, text: false, email: false };
     const fmtWhen = (a) => (a && a.bookedFor) ? new Date(a.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
     const whenStr = fmtWhen(appt);
     const nNote = (appt.note || "").trim();
-    let body;
-    if (prevAppt) {
-      // Reschedule: show what it was → what it's now.
-      const prevStr = fmtWhen(prevAppt);
-      body = [appt.name, appt.title || appt.serviceName].filter(Boolean).join(" · ") + ((prevStr && whenStr) ? `\n${prevStr} \u2192 ${whenStr}` : (whenStr ? `\n${whenStr}` : ""));
-    } else {
-      body = [appt.name, appt.title || appt.serviceName, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : "");
+    // ---- In-app / device push ----
+    if (ch.push) {
+      let body;
+      if (prevAppt) {
+        const prevStr = fmtWhen(prevAppt);
+        body = [appt.name, appt.title || appt.serviceName].filter(Boolean).join(" · ") + ((prevStr && whenStr) ? `\n${prevStr} → ${whenStr}` : (whenStr ? `\n${whenStr}` : ""));
+      } else {
+        body = [appt.name, appt.title || appt.serviceName, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n“${nNote}”` : "");
+      }
+      fetch(API_BASE + "/api/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shopId, title, body, data: { t: "appt", id: appt.id }, clientId: appt.clientId || null }),
+      }).catch(() => {});
     }
-    fetch(API_BASE + "/api/push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shopId, title, body, data: { t: "appt", id: appt.id }, clientId: appt.clientId || null }),
-    }).catch(() => {});
-  } catch (e) {}
-}
-
-// Email (and, once SMS is live, text) the barber a new booking — at the email/phone saved in
-// their staff profile. Recipients are resolved SERVER-SIDE (api/notify) so a public booker
-// never sees staff contact info; this only sends shopId + providerId + scope + plain context.
-// Scope is owner-set in Notifications → Your team: "assigned" (default) | "ownerPlus" | "all".
-function fireStaffNotify({ shopId, appt, business }) {
-  try {
-    if (!shopId || !appt) return;
-    const sa = (business && business.staffAlerts) || {};
-    if (sa.emailStaffOnBooking === false) return; // master off
-    const scope = sa.bookingAlertScope || "assigned";
-    const when = appt.bookedFor ? new Date(appt.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
-    fetch(API_BASE + "/api/notify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        staff: { shopId, providerId: appt.providerId || null, scope, clientId: appt.clientId || null },
-        context: { client: appt.name || "A client", service: appt.title || appt.serviceName || "an appointment", when, note: (appt.note || appt.detail || "").trim() },
-      }),
-    }).catch(() => {});
+    // ---- Email / text the barber (server-resolved, per-event, scoped). fire-staff-channels (guard) ----
+    if (ch.email || ch.text) {
+      fetch(API_BASE + "/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          staff: { shopId, providerId: appt.providerId || null, scope: sa.bookingAlertScope || "assigned", clientId: appt.clientId || null, event: event || "newBooking", channels: { email: !!ch.email, text: !!ch.text } },
+          context: { client: appt.name || "A client", service: appt.title || appt.serviceName || "an appointment", when: whenStr, note: (appt.note || appt.detail || "").trim() },
+        }),
+      }).catch(() => {});
+    }
   } catch (e) {}
 }
 
@@ -5787,7 +5795,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     };
 
     // Staff/preview bookings persist through the dashboard's own save path — show success immediately.
-    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); captureClientPhotos(); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); { const _paid = newAppts[0] && (newAppts[0].prepaidTotal || newAppts[0].deposit || 0); if (_paid > 0) fireApptNotify({ msgId: "deposit", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Payment received`, extra: { amount: `$${_paid}` } }); } fireStaffPush({ shopId, title: "New booking", appt: newAppts[0], event: "newBooking", business }); fireStaffNotify({ shopId, appt: newAppts[0], business }); setBookedId(baseId); setBookedClientId(clientId); galleryCapturedRef.current = false; setStep(8); return; }
+    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); captureClientPhotos(); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); { const _paid = newAppts[0] && (newAppts[0].prepaidTotal || newAppts[0].deposit || 0); if (_paid > 0) fireApptNotify({ msgId: "deposit", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Payment received`, extra: { amount: `$${_paid}` } }); } fireStaffPush({ shopId, title: "New booking", appt: newAppts[0], event: "newBooking", business }); setBookedId(baseId); setBookedClientId(clientId); galleryCapturedRef.current = false; setStep(8); return; }
     // GUARD: cancel-window-lock — a reschedule/change-service that started OUTSIDE the change
     // window but is being confirmed INSIDE it (browse, phone sleeps, confirm hours later) must
     // not go through: block before anything is written, keep the original appointment untouched.
@@ -5839,14 +5847,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             fireStaffPush({ shopId, title: "Appointment rescheduled", appt: ap0, prevAppt: reschedPrev, event: "rescheduled", business });
             setReschedPrev(null);
           } else {
-            const whenStr = ap0.bookedFor ? new Date(ap0.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
             const nNote = (ap0.note || "").trim();
-            fetch(API_BASE + "/api/push", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : ""), data: { t: "appt", id: ap0.id }, clientId: ap0.clientId || null }),
-            }).catch(() => {});
-            fireStaffNotify({ shopId, appt: ap0, business });
+            fireStaffPush({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", appt: ap0, event: "newBooking", business });
           }
         } catch (e) {}
         setBookedId(baseId); setBookedClientId(clientId); setBookedToken(newAppts[0] && newAppts[0].manageToken); galleryCapturedRef.current = false; setStep(8);
@@ -14789,45 +14791,40 @@ const TEAM_ALERTS = [
   { k: "rescheduled", label: "Rescheduled or moved", desc: "An appointment's time changes" },
   { k: "checkedIn", label: "Client checked in", desc: "Someone's marked as arrived" },
 ];
-// Notifications center — the single "who gets what, by what method" surface.
-// CLIENTS reflects business.messages (the real, wired client sends). YOUR TEAM reflects
-// business.staffAlerts (the real gate on staff push). Nothing here is cosmetic.
+// Notifications center — the team/biz side only (business.staffAlerts). Each event routes to any
+// of three channels independently: in-app push, text, or email. Client-facing messages live in ONE
+// place — the "Automated Messages" card (business.messages) — so nothing is ever shown twice.
 function NotificationsCenter({ form, setForm }) {
   const sa = { newBooking: true, canceled: true, rescheduled: true, checkedIn: true, emailStaffOnBooking: true, bookingAlertScope: "assigned", ...(form.staffAlerts || {}) };
-  const setSA = (k, v) => setForm({ ...form, staffAlerts: { ...sa, [k]: v } });
-  // notifications-team-only: this card is JUST the team/biz side (business.staffAlerts). CLIENT message
-  // on/off + channel + wording live in ONE place — the "Automated Messages" card — so they're never shown twice.
+  // Writing a per-event {push,text,email} object supersedes any legacy boolean for that event.
+  const setEvent = (k, next) => setForm({ ...form, staffAlerts: { ...sa, [k]: next } });
+  const setScope = (v) => setForm({ ...form, staffAlerts: { ...sa, bookingAlertScope: v } });
+  const CHAN = [["push", "In-app"], ["text", "Text"], ["email", "Email"]];
+  // team-channel-matrix (guard): in-app / text / email are chosen per event; teamCh() reads both the
+  // legacy boolean shape and this per-event object shape, and fireStaffPush honors all three channels.
   return (
     <div>
-      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 2px 16px", fontWeight: 300 }}>How your team is alerted to activity. App pop-ups need the Vero iOS app (and each person allowing notifications on their device); email &amp; text alerts go to the contact info saved in each staff profile. Client-facing messages live under <b style={{ color: "var(--text)", fontWeight: 600 }}>Automated Messages</b>.</p>
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
-        {TEAM_ALERTS.map((ev, i) => { const on = sa[ev.k] !== false; return (
-          <div key={ev.k} style={{ padding: "15px 0", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <span style={{ minWidth: 0 }}>
-              <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>{ev.label}</span>
-              <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>{ev.desc} · Push</span>
-            </span>
-            <Toggle on={on} onClick={() => setSA(ev.k, !on)} />
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 2px 16px", fontWeight: 300 }}>Pick how your team hears about each event. <b style={{ color: "var(--text)", fontWeight: 600 }}>In-app</b> pop-ups need the Vero app with notifications allowed; <b style={{ color: "var(--text)", fontWeight: 600 }}>Text</b> and <b style={{ color: "var(--text)", fontWeight: 600 }}>Email</b> go to the phone &amp; email saved in each barber's staff profile. Messages to your <i>clients</i> live under <b style={{ color: "var(--text)", fontWeight: 600 }}>Automated Messages</b>.</p>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 12px" }}>
+        {TEAM_ALERTS.map((ev, i) => { const ch = teamCh(sa, ev.k); return (
+          <div key={ev.k} style={{ padding: "14px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
+            <div style={{ fontSize: 15.5, lineHeight: 1.3 }}>{ev.label}</div>
+            <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 2, marginBottom: 11 }}>{ev.desc}</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {CHAN.map(([c, lbl]) => { const on = !!ch[c]; return (
+                <button key={c} onClick={() => setEvent(ev.k, { push: !!ch.push, text: !!ch.text, email: !!ch.email, [c]: !on })} style={{ flex: 1, padding: "9px 6px", borderRadius: 10, fontSize: 13, fontWeight: on ? 600 : 400, background: on ? "var(--wash)" : "var(--panel2)", border: "1px solid " + (on ? "var(--gold)" : "var(--border2)"), color: on ? "var(--text)" : "var(--sub)", cursor: "pointer" }}>{lbl}{c === "text" ? " *" : ""}</button>
+              ); })}
+            </div>
           </div>
         ); })}
       </div>
 
-      <p style={{ fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", margin: "22px 2px 10px" }}>Email / text the barber</p>
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
-        <div style={{ padding: "15px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <span style={{ minWidth: 0 }}>
-            <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>Alert the barber on new bookings</span>
-            <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>Sent to the email in their staff profile · text joins once your carrier clears</span>
-          </span>
-          <Toggle on={sa.emailStaffOnBooking !== false} onClick={() => setSA("emailStaffOnBooking", !(sa.emailStaffOnBooking !== false))} />
-        </div>
-        {sa.emailStaffOnBooking !== false && (
-          <div style={{ padding: "4px 0 14px", borderTop: "1px solid var(--line)" }}>
-            <div style={{ fontSize: 13, color: "var(--sub)", margin: "12px 0 9px" }}>Who gets the alert</div>
-            <Segmented options={[{ value: "assigned", label: "Assigned barber" }, { value: "ownerPlus", label: "You + barber" }, { value: "all", label: "All staff" }]} value={sa.bookingAlertScope || "assigned"} onChange={(v) => setSA("bookingAlertScope", v)} />
-          </div>
-        )}
+      <p style={{ fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", margin: "22px 2px 10px" }}>Who gets the text / email</p>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px" }}>
+        <Segmented options={[{ value: "assigned", label: "Assigned barber" }, { value: "ownerPlus", label: "You + barber" }, { value: "all", label: "All staff" }]} value={sa.bookingAlertScope || "assigned"} onChange={setScope} />
+        <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginTop: 11 }}>In-app pop-ups always reach every device signed in to this shop. This picks who gets the <b style={{ color: "var(--text)", fontWeight: 600 }}>text</b> or <b style={{ color: "var(--text)", fontWeight: 600 }}>email</b> for the events above.</p>
       </div>
+      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>* Text sends to the phone saved in the barber's profile. If a barber has no phone (or no email) on file, that channel is simply skipped for them.</p>
     </div>
   );
 }
@@ -22790,7 +22787,6 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     // pushes still fire either way; the toggle only silences the CLIENT.
     if (notifyClient !== false) fireApptNotify({ msgId: "booked", appt: newAppt, business, providers, contact: { email: (bookClient ? bookClient.email : walkInEmail) || "", phone: (bookClient ? bookClient.phone : walkInPhone) || "" }, subject: `${business.name}: Appointment confirmed` });
     fireStaffPush({ shopId, title: "New booking", appt: newAppt, event: "newBooking", business });
-    fireStaffNotify({ shopId, appt: newAppt, business });
     setNewApptSlot(null);
     setConflictModal(null);
     showToast(notifyClient !== false ? `${newAppt.name} booked at ${fmtTime(useStart)}.` : `${newAppt.name} booked at ${fmtTime(useStart)} — no notification sent.`);
