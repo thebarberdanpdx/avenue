@@ -27110,6 +27110,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
   const [nudgeConfirm, setNudgeConfirm] = useState(null); // { c, days, over } awaiting a send
   const [nudgeChannel, setNudgeChannel] = useState("text"); // "text" | "email"
   const [nudgeMsg, setNudgeMsg] = useState("");
+  const [nudgeBusy, setNudgeBusy] = useState(false);
   // Both Nudge and X mark the client as handled — they fall out of the list until their next visit.
   const markHandled = (clientId) => {
     setClients((cur) => cur.map((c) => c.id === clientId ? { ...c, nudgeDismissedAt: new Date().toISOString() } : c));
@@ -27122,18 +27123,41 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
     const hasPhone = !!(o.c.phone && o.c.phone.replace(/\D/g, "").length >= 10);
     const hasEmail = !!(o.c.email && o.c.email.includes("@"));
     setNudgeChannel(hasPhone ? "text" : (hasEmail ? "email" : "text"));
-    setNudgeMsg(`Hey ${first}, it's been a little while — ready for your next visit with ${provName}? Tap to grab a time: [your booking link]`);
+    const bookUrl = `${window.location.origin}/book?shop=${encodeURIComponent(shopId || "")}`;
+    setNudgeMsg(`Hey ${first}, it's been a little while — ready for your next visit with ${provName}? Tap to grab a time: ${bookUrl}`);
     setNudgeConfirm(o);
   };
-  const sendNudge = () => {
-    if (!nudgeConfirm) return;
+  // GUARD: nudge-real-send — the rebook nudge MUST actually POST to /api/notify and only mark the client
+  // handled + toast "sent" on a REAL success. It used to just toast "Rebook text sent" and hide the client
+  // while sending nothing — a false "sent" that let a lapsing client slip away silently. Never revert to a
+  // fire-and-forget toast: no send, no "sent".
+  const sendNudge = async () => {
+    if (!nudgeConfirm || nudgeBusy) return;
     const o = nudgeConfirm;
-    const first = (o.c.name || "").split(" ")[0];
-    const via = nudgeChannel === "email" ? "email" : "text";
-    const to = via === "email" ? o.c.email : o.c.phone;
-    if (showToast) showToast(`Rebook ${via} sent to ${first}${to ? ` (${to})` : ""}.`);
-    markHandled(o.c.id);
-    setNudgeConfirm(null);
+    const first = (o.c.name || "there").split(" ")[0];
+    const channel = nudgeChannel === "email" ? "email" : "text";
+    const email = (o.c.email || "").trim();
+    const phone = (o.c.phone || "").trim();
+    if (channel === "email" ? !email : !phone) { if (showToast) showToast(`No ${channel === "email" ? "email" : "phone number"} on file for ${first}.`); return; }
+    const bookUrl = `${window.location.origin}/book?shop=${encodeURIComponent(shopId || "")}`;
+    const body = String(nudgeMsg || "").replace(/\[your booking link\]/g, bookUrl);
+    setNudgeBusy(true);
+    try {
+      const r = await withRpcTimeout(fetch(API_BASE + "/api/notify", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shop: shopId, channel, to: { email, phone, smsOptOut: !!o.c.smsOptOut }, subject: "Time to book your next visit", body }),
+      }));
+      const data = await r.json().catch(() => ({}));
+      const sentOk = r.ok && data.results && Object.values(data.results).some((v) => v === "sent");
+      if (!sentOk) throw new Error(data.error || "Message didn't send — check the client's contact info.");
+      if (showToast) showToast(`Rebook ${data.results.sms === "sent" ? "text" : "email"} sent to ${first}.`);
+      markHandled(o.c.id);
+      setNudgeConfirm(null);
+    } catch (e) {
+      if (showToast) showToast(`Couldn't send — ${(e && e.message) || "try again."}`);
+    } finally {
+      setNudgeBusy(false);
+    }
   };
   const dismiss = (o) => { markHandled(o.c.id); };
 
@@ -27301,7 +27325,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
             <textarea value={nudgeMsg} onChange={(e) => setNudgeMsg(e.target.value)} rows={4} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, resize: "vertical", lineHeight: 1.5, outline: "none", marginBottom: 8 }} />
             <p style={{ fontSize: 13.5, color: "var(--faint)", marginBottom: 18, lineHeight: 1.4 }}>Your booking link is added automatically when it sends.</p>
 
-            <button className="lift" onClick={sendNudge} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none" }}>Send {nudgeChannel === "email" ? "email" : "text"}</button>
+            <button className="lift" disabled={nudgeBusy} onClick={sendNudge} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", opacity: nudgeBusy ? 0.6 : 1 }}>{nudgeBusy ? "Sending…" : `Send ${nudgeChannel === "email" ? "email" : "text"}`}</button>
             <button onClick={() => setNudgeConfirm(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 2px" }}>Cancel</button>
           </div>
         </div>
