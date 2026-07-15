@@ -23627,17 +23627,32 @@ function CardChargeInline({ amount, appt, onCancel, onPaid, money }) {
     });
     return () => { dead = true; try { elRef.current && elRef.current.unmount(); } catch (e) {} elRef.current = null; stripeRef.current = null; };
   }, []);
+  // GUARD: sale-intent-idempotent — cache ONE PaymentIntent per amount for this sale, so a retry
+  // after a dropped/uncertain response re-confirms the SAME intent (a no-op once it has succeeded)
+  // instead of minting a second charge. Root cause: sale_intent's create returns 2xx BEFORE the
+  // client-side confirm, so stripeApi rotates its idempotency key away before money moves — the
+  // reliable double-charge guard is holding the intent here on the client and reusing it on retry.
+  const saleRef = useRef({ clientSecret: null, cents: null });
   const charge = async () => {
     const stripe = stripeRef.current, card = elRef.current;
     if (!stripe || !card || busy) return;
     setBusy(true); setErr("");
     try {
+      const cents = Math.round(Number(amount) * 100);
       const pm = await stripe.createPaymentMethod({ type: "card", card });
       if (pm.error) throw new Error(pm.error.message);
-      const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: `Checkout — ${appt?.name || "client"}` });
-      if (!intent.clientSecret) throw new Error(intent.error || "Couldn't start the charge.");
-      const conf = await stripe.confirmCardPayment(intent.clientSecret, { payment_method: pm.paymentMethod.id });
-      if (conf.error) throw new Error(conf.error.message);
+      let clientSecret = saleRef.current.clientSecret && saleRef.current.cents === cents ? saleRef.current.clientSecret : null;
+      if (!clientSecret) {
+        const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: `Checkout — ${appt?.name || "client"}` });
+        if (!intent.clientSecret) throw new Error(intent.error || "Couldn't start the charge.");
+        clientSecret = intent.clientSecret;
+        saleRef.current = { clientSecret, cents };
+      }
+      const conf = await stripe.confirmCardPayment(clientSecret, { payment_method: pm.paymentMethod.id });
+      if (conf.error) {
+        if (conf.error.code === "payment_intent_unexpected_state") saleRef.current = { clientSecret: null, cents: null };
+        throw new Error(conf.error.message);
+      }
       if (!conf.paymentIntent || conf.paymentIntent.status !== "succeeded") throw new Error("The payment didn't complete. Try again.");
       const c4 = pm.paymentMethod.card || {};
       onPaid({ id: conf.paymentIntent.id, brand: c4.brand || null, last4: c4.last4 || null });
@@ -24609,10 +24624,13 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  // GUARD: sale-intent-idempotent — one PaymentIntent per sale, reused on retry so a dropped-response
+  // retry can't double-charge; reset on each (re)open so a fresh sale always starts a fresh intent.
+  const saleRef = useRef({ clientSecret: null, cents: null });
   useEffect(() => {
     if (!open) return;
     let dead = false;
-    setReady(false); setErr(""); setBusy(false);
+    setReady(false); setErr(""); setBusy(false); saleRef.current = { clientSecret: null, cents: null };
     getStripe().then((stripe) => {
       if (dead) return;
       if (!stripe) { setErr("Couldn't load Stripe — check your connection and try again."); return; }
@@ -24636,12 +24654,21 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
         onPaid({ paymentIntentId: null, brand: pm.paymentMethod.card.brand, last4: pm.paymentMethod.card.last4, test: true });
         setBusy(false); return;
       }
-      const intent = await stripeApi({ action: "sale_intent", amount, description: description || "Vero — sale" });
-      if (!intent.clientSecret) throw new Error(intent.error || "Couldn't start the charge.");
-      const conf = await stripe.confirmCardPayment(intent.clientSecret, { payment_method: pm.paymentMethod.id });
-      if (conf.error) throw new Error(conf.error.message);
+      const cents = Math.round(Number(amount) * 100);
+      let clientSecret = saleRef.current.clientSecret && saleRef.current.cents === cents ? saleRef.current.clientSecret : null;
+      if (!clientSecret) {
+        const intent = await stripeApi({ action: "sale_intent", amount, description: description || "Vero — sale" });
+        if (!intent.clientSecret) throw new Error(intent.error || "Couldn't start the charge.");
+        clientSecret = intent.clientSecret;
+        saleRef.current = { clientSecret, cents };
+      }
+      const conf = await stripe.confirmCardPayment(clientSecret, { payment_method: pm.paymentMethod.id });
+      if (conf.error) {
+        if (conf.error.code === "payment_intent_unexpected_state") saleRef.current = { clientSecret: null, cents: null };
+        throw new Error(conf.error.message);
+      }
       if (conf.paymentIntent && conf.paymentIntent.status === "succeeded") {
-        onPaid({ paymentIntentId: intent.id, brand: pm.paymentMethod.card.brand, last4: pm.paymentMethod.card.last4 });
+        onPaid({ paymentIntentId: conf.paymentIntent.id, brand: pm.paymentMethod.card.brand, last4: pm.paymentMethod.card.last4 });
       } else { throw new Error("The payment didn't complete."); }
     } catch (e) { setErr(e.message || "Couldn't take the payment."); }
     finally { setBusy(false); }

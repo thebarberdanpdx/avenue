@@ -168,6 +168,7 @@ const GUARDS = [
   { needle: "owner-access-fail-safe", label: "the owner NEVER loses the Settings tab to a degraded providers load — the sanitized get_public_providers feed omits pulseRole, so isOwner must fall back to a confirmed-owner flag when the feed contains no owner at all (the 'my Settings vanished' lockout)" },
   { needle: "PGREST_PAGINATE_ALL", label: "MasterCalendar pages appointments with .range() — an unranged PostgREST .select() caps at 1000 rows, so a shop past 1,000 total appts would silently miss days (same 1000-row truncation that hid clients past 1,000 in the staff list)" },
   { needle: "GUARD: access-lockdown", label: "only shop members (canAccessShop) can open the business dashboard — a sync-pull 403 shows the AccessDenied screen instead of the dashboard shell, with a per-email fail-open (any email that ever loaded is never blocked) so a transient 403 can't lock a real owner out" },
+  { needle: "GUARD: sale-intent-idempotent", label: "in-person card sale (CardChargeInline + Register) caches ONE PaymentIntent per amount and reuses it on retry, so a Charge tapped again after a dropped/uncertain response re-confirms the same intent (no-op once succeeded) instead of double-charging the client" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
