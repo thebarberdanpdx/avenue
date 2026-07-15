@@ -3060,6 +3060,32 @@ function App() {
     return () => { alive = false; };
   }, [sessionUid]);
 
+  // GUARD: access-lockdown — AUTHORITATIVE dashboard-access check, decoupled from the data mirror.
+  // mirrorFromServer bails early on ANY unsaved work / in-flight save (and a non-member's first failed
+  // RLS write creates exactly that state), so it can't be relied on to ever reach sync-pull for a
+  // non-member — which is why piggybacking the gate on it let a non-member through. This dedicated probe
+  // runs once per sign-in with NONE of those guards: sync-pull answers 403 for a non-member (→ block) or
+  // 200 for a member (→ allow + remember on this device). FAIL-OPEN: only an explicit 403 blocks, never
+  // for an email that has loaded before, and any other outcome (401 / 5xx / network / timeout) leaves
+  // access untouched — a blip can never lock a real owner out.
+  useEffect(() => {
+    if (!session) { setAccessDenied(false); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const headers = await authedHeaders();
+        const r = await fetch(API_BASE + "/api/sync-pull", { method: "POST", headers, body: JSON.stringify({ shop: SHOP_ID, mode: "access" }), cache: "no-store" });
+        if (!alive) return;
+        const body = await r.json().catch(() => ({}));
+        const who = body.email || session?.user?.email || null;
+        if (r.status === 403) { if (!wasAuthorized(who)) setAccessDenied(true); }
+        else if (r.ok) { markAuthorized(who); setAccessDenied(false); }
+        // else (401 / 5xx / network): leave accessDenied as-is — fail-open, never block on a non-403.
+      } catch (e) { /* network error → fail-open, don't block */ }
+    })();
+    return () => { alive = false; };
+  }, [sessionUid]);
+
   // Public booking: fetch this account's bookable locations (names only) so the booking page can
   // offer a location chooser for multi-shop businesses. Non-staff only; single-shop returns empty.
   useEffect(() => {
