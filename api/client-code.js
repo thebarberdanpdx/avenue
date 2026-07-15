@@ -5,9 +5,11 @@
 // expiry, and sends it through the existing /api/notify pipe (email or SMS).
 import { createClient } from "@supabase/supabase-js";
 import { selectAllRows } from "../lib/paginate.js";
+import { resolveChannels, sendSms, sendEmail } from "../lib/messaging.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+const SMS_LIVE = process.env.SMS_LIVE === "true";
 
 const maskEmail = (em) => {
   const [user, domain] = em.split("@");
@@ -59,23 +61,18 @@ export default async function handler(req, res) {
       const { error: insErr } = await supabase.from("client_login_codes").insert(row);
       if (insErr) return res.status(500).json({ error: "could not create code" });
 
-      // Send it through the existing notify pipe. Template is pre-rendered (no tags).
-      const origin = `https://${req.headers.host}`;
-      // `shop` is required by /api/notify's anti-relay check (the recipient must be
-      // on file for this shop). We only reach here when `hit` matched a real client,
-      // so the recipient is on file and the send passes.
-      const body = byPhone
-        ? { shop, channel: "text", to: { phone: digits }, subject: "Your sign-in code", template: `Your sign-in code is ${code}. It expires in 10 minutes.`, context: {} }
-        : { shop, channel: "email", to: { email: em }, subject: "Your sign-in code", template: `Your sign-in code is ${code}. It expires in 10 minutes. If you didn't request this, you can ignore this email.`, context: {} };
-      await fetch(origin + "/api/notify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // Trusted server-to-server call → skip notify's public Origin/rate-limit gate.
-          "x-internal-key": process.env.INTERNAL_API_KEY || "",
-        },
-        body: JSON.stringify(body),
-      }).catch(() => {});
+      // login-code-transactional: a sign-in code is TRANSACTIONAL — the client just requested it by
+      // entering their contact info to log in. It must send regardless of a MARKETING opt-out
+      // (smsOptOut). A carrier-level STOP still blocks delivery at the network (correct), but a
+      // Mangomint marketing opt-out must never stop someone from logging in to book. So we send it
+      // DIRECTLY here (NOT through /api/notify, which suppresses on smsOptOut → the whole reason an
+      // opted-out returning client got no code). We already verified `hit` is on file for this shop.
+      const smsText = `Your sign-in code is ${code}. It expires in 10 minutes.`;
+      const emailText = `Your sign-in code is ${code}. It expires in 10 minutes. If you didn't request this, you can ignore this email.`;
+      const cEmail = String((hit.data && hit.data.email) || em || "").trim();
+      const ch = resolveChannels({ channel: byPhone ? "text" : "email", smsLive: SMS_LIVE, email: cEmail, phone: digits, smsOptOut: false });
+      try { if (ch.sms) await sendSms({ to: digits, text: smsText }); } catch (e) { /* uniform response below regardless */ }
+      try { if (ch.email && cEmail) await sendEmail({ to: cEmail, subject: "Your sign-in code", text: emailText }); } catch (e) {}
     }
 
     // Uniform success — never reveals whether the identity matched a client.
