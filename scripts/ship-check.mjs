@@ -173,6 +173,7 @@ const GUARDS = [
   { needle: "GUARD: report-deleted-service-safe", label: "Per-Barber report resolves the top-service display NAME at the source (falls back to 'Removed service' when services.find is undefined), so a service deleted from the menu after being booked can't white-screen the report on r.topService.svc.name" },
   { needle: "import-consent-from-column", label: "the migration importer reads SMS consent from the export's marketing-texts column (Yes → consent, blank/no → opt-out, no column → unknown) — it must NEVER fabricate smsConsent:true for everyone (10DLC/TCPA: forged consent records)" },
   { needle: "GUARD: cancel-notify-wired", label: "a client cancellation (home-screen AND manage-link paths) emails the client the 'canceled' notice AND fires a biz in-app push — it used to notify no one on the home cancel and only the client on the manage-link cancel" },
+  { needle: "GUARD: cancel-bell-through-sync", label: "a cancellation rings the owner's in-app bell even when it arrives via sync — a client canceling online must land in the feed, not be silently swallowed by the mirror-flood suppression that gates other change kinds" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
