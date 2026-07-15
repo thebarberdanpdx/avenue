@@ -170,6 +170,7 @@ const GUARDS = [
   { needle: "GUARD: access-lockdown", label: "only shop members (canAccessShop) can open the business dashboard — a sync-pull 403 shows the AccessDenied screen instead of the dashboard shell, with a per-email fail-open (any email that ever loaded is never blocked) so a transient 403 can't lock a real owner out" },
   { needle: "GUARD: sale-intent-idempotent", label: "in-person card sale (CardChargeInline + Register) caches ONE PaymentIntent per amount and reuses it on retry, so a Charge tapped again after a dropped/uncertain response re-confirms the same intent (no-op once succeeded) instead of double-charging the client" },
   { needle: "GUARD: nudge-real-send", label: "the rebook 'Nudge' actually POSTs to /api/notify and only marks the client handled + toasts 'sent' on a real success — it used to toast a false 'Rebook text sent' and hide the client while sending nothing" },
+  { needle: "GUARD: report-deleted-service-safe", label: "Per-Barber report resolves the top-service display NAME at the source (falls back to 'Removed service' when services.find is undefined), so a service deleted from the menu after being booked can't white-screen the report on r.topService.svc.name" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");

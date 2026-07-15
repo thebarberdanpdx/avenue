@@ -1050,6 +1050,10 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
   const cardBox = useRef(null);
   const prBox = useRef(null);
   const els = useRef(null);
+  // GUARD: sale-intent-idempotent — one deposit PaymentIntent per amount, reused across retries (manual
+  // card AND wallet) so a retry after a dropped/uncertain response re-confirms the same intent instead
+  // of double-charging the booking deposit.
+  const saleRef = useRef({ clientSecret: null, cents: null });
 
   useEffect(() => {
     setReady(false);
@@ -1090,17 +1094,22 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
         pr.on("paymentmethod", async (ev) => {
           try {
             if (isPay) {
-              const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit" });
-              if (!intent.clientSecret) { ev.complete("fail"); setErr(intent.error || "Couldn't start the charge."); return; }
-              const conf = await stripe.confirmCardPayment(intent.clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false });
+              const dCents = Math.round(Number(amount) * 100);
+              let dSecret = saleRef.current.clientSecret && saleRef.current.cents === dCents ? saleRef.current.clientSecret : null;
+              if (!dSecret) {
+                const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit" });
+                if (!intent.clientSecret) { ev.complete("fail"); setErr(intent.error || "Couldn't start the charge."); return; }
+                dSecret = intent.clientSecret; saleRef.current = { clientSecret: dSecret, cents: dCents };
+              }
+              const conf = await stripe.confirmCardPayment(dSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false });
               if (conf.error) { ev.complete("fail"); setErr(conf.error.message || "Payment failed."); return; }
               ev.complete("success");
               if (conf.paymentIntent && conf.paymentIntent.status === "requires_action") {
-                const again = await stripe.confirmCardPayment(intent.clientSecret);
+                const again = await stripe.confirmCardPayment(dSecret);
                 if (again.error) { setErr(again.error.message || "Payment needs another step."); return; }
               }
               const c4 = (ev.paymentMethod && ev.paymentMethod.card) || {};
-              if (!dead) { setResult({ paid: true, intentId: intent.id, last4: c4.last4 || "••••", brand: c4.brand }); setPhase("done"); }
+              if (!dead) { setResult({ paid: true, intentId: conf.paymentIntent.id, last4: c4.last4 || "••••", brand: c4.brand }); setPhase("done"); }
             } else {
               // Save the wallet card on file — no charge now.
               const setup = await stripeApi({ action: "setup", customerId: null, name: clientName, email: clientEmail, phone: clientPhone });
@@ -1148,12 +1157,17 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
         return;
       }
       if (isPay) {
-        const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit" });
-        if (!intent.clientSecret) { setErr(intent.error || "Couldn't start the charge."); setBusy(false); return; }
-        const conf = await e.stripe.confirmCardPayment(intent.clientSecret, { payment_method: pm.paymentMethod.id });
-        if (conf.error) { setErr(conf.error.message || "Your card was declined. Try a different card."); setBusy(false); return; }
+        const dCents = Math.round(Number(amount) * 100);
+        let dSecret = saleRef.current.clientSecret && saleRef.current.cents === dCents ? saleRef.current.clientSecret : null;
+        if (!dSecret) {
+          const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit" });
+          if (!intent.clientSecret) { setErr(intent.error || "Couldn't start the charge."); setBusy(false); return; }
+          dSecret = intent.clientSecret; saleRef.current = { clientSecret: dSecret, cents: dCents };
+        }
+        const conf = await e.stripe.confirmCardPayment(dSecret, { payment_method: pm.paymentMethod.id });
+        if (conf.error) { if (conf.error.code === "payment_intent_unexpected_state") saleRef.current = { clientSecret: null, cents: null }; setErr(conf.error.message || "Your card was declined. Try a different card."); setBusy(false); return; }
         if (!conf.paymentIntent || conf.paymentIntent.status !== "succeeded") { setErr("The payment didn't complete. Try again."); setBusy(false); return; }
-        setResult({ paid: true, intentId: intent.id, last4: c4.last4 || "••••", brand: c4.brand });
+        setResult({ paid: true, intentId: conf.paymentIntent.id, last4: c4.last4 || "••••", brand: c4.brand });
       } else {
         const setup = await stripeApi({ action: "setup", customerId: null, name: clientName, email: clientEmail, phone: clientPhone });
         if (!setup.clientSecret) { setErr(setup.error || "Couldn't set up the card."); setBusy(false); return; }
@@ -11609,7 +11623,11 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
       svcCount[a.serviceId] = (svcCount[a.serviceId] || 0) + 1;
     });
     const topSvcEntry = Object.entries(svcCount).sort(([, x], [, y]) => y - x)[0];
-    const topService = topSvcEntry ? { svc: services.find((s) => s.id === topSvcEntry[0]), count: topSvcEntry[1] } : null;
+    // GUARD: report-deleted-service-safe — a service can be DELETED from the menu after it was booked,
+    // so services.find() returns undefined; resolving a safe display name here (not in the render) stops
+    // the Per-Barber report from white-screening on r.topService.svc.name. (Siblings already guard this.)
+    const topSvc = topSvcEntry ? services.find((s) => s.id === topSvcEntry[0]) : null;
+    const topService = topSvcEntry ? { svc: topSvc || null, name: topSvc ? topSvc.name : "Removed service", count: topSvcEntry[1] } : null;
 
     // 60-day retention for THIS provider's clients only:
     // of clients whose first visit with this barber was 60–180 days ago,
@@ -11761,7 +11779,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
                   </div>
                   <div>
                     <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>TOP SERVICE</div>
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.topService ? r.topService.svc.name : "—"}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.topService ? r.topService.name : "—"}</div>
                     {r.topService && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 1 }}>{r.topService.count}×</div>}
                   </div>
                   <div>
