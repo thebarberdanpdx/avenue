@@ -12672,20 +12672,15 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     );
   }
 
-  // Dark header retired (2026-07-15): on iOS it merged with the black status bar into a heavy
-  // black slab with the shop name floating low, and it ate calendar grid height. The clean light
-  // bar reads better and stays distinct from the status bar. (Kept as a flag so it's easy to
-  // revisit a *slim* dark bar later, tuned on-device.)
-  const barDark = false;
   return (
     <div style={{ position: "relative", minHeight: "100dvh" }}>
-      <div style={{ borderBottom: barDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 12px) 18px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: barDark ? "#171717" : "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: barDark ? "none" : "blur(20px) saturate(1.4)", WebkitBackdropFilter: barDark ? "none" : "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
-        {navStack.length > 0 ? <BackBar to={backLabel} onClick={navBack} style={{ marginBottom: 0, color: barDark ? "#E8E8E8" : undefined }} /> : <div style={{ width: 50 }} />}
-        <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} dark={barDark} />
-        <div style={{ width: 50, textAlign: "right", fontSize: 10, color: barDark ? "#8E8E8E" : "var(--faint)", lineHeight: 1.25 }}>
-          {syncHealth && syncHealth.at && !syncHealth.err ? (syncHealth.via === "api" ? "Synced" : "Sync") : null}
-          {authEmail ? <div style={{ marginTop: 2, maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={authEmail}>{authEmail.split("@")[0]}</div> : null}
-        </div>
+      {/* Slim header: small fixed top padding (the native status bar already reserves the notch area,
+          so env(safe-area-inset-top) was double-counting and ballooning this bar). Sync status text
+          removed — the sync-GAP alert is a separate banner, so nothing important is lost here. */}
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "9px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
+        {navStack.length > 0 ? <BackBar to={backLabel} onClick={navBack} style={{ marginBottom: 0 }} /> : <div style={{ width: 40 }} />}
+        <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} />
+        <div style={{ width: 40 }} />
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
         {/* Per-tab crash containment: a render error in ONE tab shows a recoverable "something went
