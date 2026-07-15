@@ -383,7 +383,7 @@ const DEFAULT_BUSINESS = {
   ],
   // ---- Staff push alerts: which appointment events push the team's iOS app. Read by
   //      fireStaffPush (the real gate). Default all on = preserves prior always-push behavior. ----
-  staffAlerts: { newBooking: true, rescheduled: true, checkedIn: true, emailStaffOnBooking: true, bookingAlertScope: "assigned" },
+  staffAlerts: { newBooking: true, rescheduled: true, checkedIn: true, canceled: true, emailStaffOnBooking: true, bookingAlertScope: "assigned" },
   // ---- Customer reviews: after-visit review requests + internal moderation + storefront social proof.
   //      enabled = master off until the owner sets it up. afterVisit = only ask once a client has
   //      come this many times (returning clients leave more, more honest reviews). autoApprove=false
@@ -6075,6 +6075,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (!isFinite(_tt) || (_tt - Date.now()) < (manageWindowHrs * 60 - 3) * 60000) { setHomeAction({ type: "locked", appt }); return; }
     try { supabase.rpc("cancel_my_appointment", { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(appt.id), p_session: matched.sessionToken }).catch(() => {}); } catch (e) {}
     setMyAppts((cur) => cur.map((a) => a.id === appt.id ? { ...a, status: "cancelled" } : a));
+    // GUARD: cancel-notify-wired — a home-screen cancel must ALSO email the client the "canceled" notice
+    // AND in-app-alert the biz (staff SMS/email off — push only). Previously ONLY the manage-link cancel
+    // notified anyone, so a home cancel was silent to both sides.
+    try { fireApptNotify({ msgId: "canceled", appt, business, providers, contact: { email: appt.email || (matched && matched.email) || "", phone: appt.phone || (matched && matched.phone) || "" } }); } catch (e) {}
+    try { fireStaffPush({ shopId, title: "Appointment canceled", appt, event: "canceled", business }); } catch (e) {}
   };
   const lblStyle = { fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 10px" };
   const avStyle = { width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 14, color: "var(--text)", flexShrink: 0 };
@@ -9009,7 +9014,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
     if (busy) return;
     if (!stillChangeable()) { setPhase("view"); return; }
     setBusy(true);
-    try { await withRpcTimeout(supabase.rpc("manage_cancel_by_token", { p_token: token })); fireNotify("canceled", appt); setPhase("cancelled"); if (onChanged) onChanged({ type: "cancel" }); }
+    try { await withRpcTimeout(supabase.rpc("manage_cancel_by_token", { p_token: token })); fireNotify("canceled", appt); try { fireStaffPush({ shopId, title: "Appointment canceled", appt, event: "canceled", business }); } catch (e) {} setPhase("cancelled"); if (onChanged) onChanged({ type: "cancel" }); }
     catch (e) { setPhase("error"); } finally { setBusy(false); }
   };
   const submitReschedule = async () => {
