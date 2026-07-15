@@ -22865,7 +22865,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     // + overdue "welcome back" buffer (audit #27): a returning client past the threshold auto-gets a
     // few free extra minutes. No price change — the buffer only ever touches duration.
     const dur = getDuration(client, service, providerId) + (Number(optAddMin) || 0) + overdueBufferMin(client, business);
-    const price = priceWithTimeRules(service, providerId, selectedDate, useStart) + (Number(optAddPrice) || 0);
+    // calendar-custom-price (guard): a client's own custom price must win HERE too — duration already
+    // threads `client` above, but price used to ignore customPrices and lock the DEFAULT onto the appt,
+    // which then charged wrong at checkout. Match the storefront (~5142): a custom price is a flat
+    // override (skips time-of-day rules, exactly like the storefront); otherwise use time-rule pricing.
+    const _cp = client && client.customPrices ? client.customPrices[service.id] : null;
+    const _hasCP = _cp != null && _cp !== "";
+    const price = (_hasCP ? Number(_cp) : priceWithTimeRules(service, providerId, selectedDate, useStart)) + (Number(optAddPrice) || 0);
     // Stamp the appointment with the day currently shown on the calendar, or it can't be placed on any date.
     const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(useStart / 60), useStart % 60, 0, 0);
 
@@ -24508,11 +24514,14 @@ function RefundSheet({ open, onClose, client, payment, onApply, showToast }) {
     try {
       // Card charges go through Stripe; manual records (cash / Venmo / …) just record the
       // refund in the books — the money is handed back in person.
+      let applied = Math.round(n * 100) / 100; // cash / manual: record what was entered
       if (payment.paymentIntentId) {
         const res = await stripeApi({ action: "refund", paymentIntentId: payment.paymentIntentId, amount: n });
         if (!(res.status === "succeeded" || res.status === "pending")) { setErr(`Stripe returned "${res.status}".`); return; }
+        // refund-record-actual (guard): record Stripe's ACTUAL refunded amount, not the typed one.
+        if (Number.isFinite(res.amount) && res.amount > 0) applied = res.amount;
       }
-      const amt = Math.round(n * 100) / 100;
+      const amt = applied;
       if (onApply) onApply(amt);
       setDone(amt); showToast(`Refunded $${amt}${payment.paymentIntentId ? " to the card" : ` (${payMethodLabel(payment)})`} — ${client?.name || payment?.clientName || "client"}.`);
     } catch (e) { setErr(e.message || "Refund failed."); }
@@ -25417,14 +25426,18 @@ function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, sho
     if (!sel || !(n > 0) || n > remaining || busy) { setErr(n > remaining ? `Max refundable is $${remaining.toFixed(2)}.` : "Enter an amount."); return; }
     setBusy(true); setErr("");
     try {
+      let applied = n; // cash / manual refunds: record exactly what was entered
       if (sel.paymentIntentId && live) {
         const res = await stripeApi({ action: "refund", paymentIntentId: sel.paymentIntentId, amount: n });
         if (!(res && (res.status === "succeeded" || res.status === "pending"))) throw new Error((res && res.error) || "Stripe couldn't process the refund.");
+        // refund-record-actual (guard): record the amount STRIPE ACTUALLY refunded, not the typed one —
+        // the authoritative figure was in hand (api returns it) but discarded, so the ledger could drift.
+        if (Number.isFinite(res.amount) && res.amount > 0) applied = res.amount;
       }
-      const newRefunded = +(((sel.refunded || 0) + n)).toFixed(2);
+      const newRefunded = +(((sel.refunded || 0) + applied)).toFixed(2);
       patch(sel, { refunded: newRefunded, status: newRefunded >= (sel.amount || 0) ? "refunded" : "partial" });
-      setDone(n);
-      showToast && showToast(`Refunded $${n.toFixed(2)}${sel.paymentIntentId ? " to the card" : ` (${payMethodLabel(sel)})`}.`);
+      setDone(applied);
+      showToast && showToast(`Refunded $${applied.toFixed(2)}${sel.paymentIntentId ? " to the card" : ` (${payMethodLabel(sel)})`}.`);
       // Every dollar on this ticket returned → the caller puts the appointment back to
       // CONFIRMED, as if the client hasn't come in yet. Ledger history stays intact.
       const allOut = recs.every((r) => (r.id === sel.id ? newRefunded : (r.refunded || 0)) >= (r.amount || 0) - 0.001);

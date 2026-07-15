@@ -177,6 +177,8 @@ const GUARDS = [
   { needle: "fire-staff-channels", label: "every staff alert routes to the owner's chosen channels — fireStaffPush sends in-app push AND (per teamCh) emails/texts the barber only for the channels turned on per event; it must never revert to push-only (drops the barber's email/text) or always-send (surprise SMS charges + spam)" },
   { needle: "sale-recover-succeeded", label: "the dropped-response double-charge window is closed — before re-charging a held intent (checkout, Register, deposit manual + wallet), recoverSucceededIntent() asks Stripe if it ALREADY succeeded and records it as paid instead of minting/confirming a second charge; removing this reopens a real double-bill when the network drops mid-confirm" },
   { needle: "outbox-payment-durable", label: "a sale's ledger record is backed by a durable localStorage outbox that survives reload/kill and re-lands on reconnect, and paidForAppt/startCheckout read it — so a payment whose write failed can never let a reopened ticket re-charge the client; removing it reopens the offline-save double-charge gap" },
+  { needle: "calendar-custom-price", label: "booking a client from the day calendar (commitAppt) applies their per-client customPrices — it used to ignore them and lock the DEFAULT price onto the appt, charging a custom-rate client the wrong price at checkout (duration honored the override but price didn't)" },
+  { needle: "refund-record-actual", label: "a card refund records the amount STRIPE ACTUALLY refunded (res.amount), not the amount typed — both refund paths; the authoritative figure was being discarded, so the ledger could silently drift from the processor" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
