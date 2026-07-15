@@ -21531,8 +21531,12 @@ function CreatePopover({ slot, providerName, onAppt, onBlock, onClose }) {
 // viewport instead of sinking. Flat underlined fields, action pinned low.
 // ============================================================
 const _SHEET = {
-  wrap: { position: "fixed", inset: 0, zIndex: 2000, background: "var(--bg)", display: "flex", flexDirection: "column", fontFamily: FONT_BODY },
-  head: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "calc(env(safe-area-inset-top) + 20px) 22px 16px" },
+  // sheet-dvh-scroll (guard): size to the DYNAMIC viewport (100dvh), NOT inset:0. On iOS mobile web
+  // `inset:0`/`bottom:0` resolves against the tall LAYOUT viewport, pushing `foot` (the Save button)
+  // below the visible area with no way to scroll to it. 100dvh tracks the visible viewport — matches
+  // the app's own Sheet (~877). head/foot flexShrink:0 so a tall body can never compress the Save CTA.
+  wrap: { position: "fixed", top: 0, left: 0, right: 0, height: "100dvh", zIndex: 2000, background: "var(--bg)", display: "flex", flexDirection: "column", fontFamily: FONT_BODY },
+  head: { flexShrink: 0, display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "calc(env(safe-area-inset-top) + 20px) 22px 16px" },
   title: { fontSize: 21, fontWeight: 600, letterSpacing: -0.4 },
   sub: { fontSize: 13, color: "var(--gold)", fontWeight: 500, marginTop: 5 },
   cancel: { border: "1px solid var(--border)", background: "transparent", color: "var(--sub)", fontSize: 12.5, fontWeight: 600, letterSpacing: 1.2, padding: "9px 14px", borderRadius: 10, cursor: "pointer", flexShrink: 0, fontFamily: FONT_BODY },
@@ -21543,7 +21547,7 @@ const _SHEET = {
   content: { flex: 1, padding: "8px 22px", minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch" },
   uf: { width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 0 13px", borderBottom: "1px solid var(--border)", background: "none", textAlign: "left", cursor: "pointer", fontFamily: FONT_BODY },
   tog: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "19px 0 14px", borderBottom: "1px solid var(--border)", cursor: "pointer" },
-  foot: { padding: "16px 22px calc(env(safe-area-inset-bottom) + 18px)" },
+  foot: { flexShrink: 0, padding: "16px 22px calc(env(safe-area-inset-bottom) + 18px)" },
   cta: { width: "100%", border: "none", borderRadius: 13, padding: "16px 0", fontSize: 15, fontWeight: 600, background: "var(--gold)", color: "var(--on-gold)", fontFamily: FONT_BODY, letterSpacing: 0.2, cursor: "pointer" },
   pickRow: (sel) => ({ display: "block", width: "100%", textAlign: "left", padding: "15px 22px", background: sel ? "var(--wash)" : "transparent", border: "none", borderBottom: "1px solid var(--line)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 16, fontWeight: sel ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }),
 };
