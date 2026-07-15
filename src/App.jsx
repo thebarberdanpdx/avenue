@@ -2360,6 +2360,15 @@ function App() {
   const [lastSaveError, setLastSaveError] = useState(""); // actual save-error detail, surfaced in the banner for diagnosis
   // cross-device-sync: honest pull status so a device that failed to download never looks "empty by design".
   const [syncHealth, setSyncHealth] = useState({ serverClients: null, serverAppts: null, err: null, at: 0, pulling: false });
+  // GUARD: access-lockdown — only emails the server recognizes as shop members (canAccessShop) may open
+  // the business dashboard. sync-pull answers 403 for a non-member, and we block them here instead of
+  // showing the (empty) dashboard shell. FAIL-OPEN: an explicit 403 is the ONLY trigger, and never for an
+  // email that has EVER loaded successfully on this device (a transient 403 can't lock a real owner out).
+  // Legit owners never 403 — isShopMember passes them via the memberships table.
+  const [accessDenied, setAccessDenied] = useState(false);
+  const authzKey = (email) => `vero_authz_${SHOP_ID}_${String(email || "").toLowerCase()}`;
+  const markAuthorized = (email) => { try { if (email) localStorage.setItem(authzKey(email), "1"); } catch (e) {} };
+  const wasAuthorized = (email) => { try { return !!(email && localStorage.getItem(authzKey(email))); } catch (e) { return false; } };
   // Only nag about a failed save if it STAYS failed for a few seconds — a transient blip that the
   // next save fixes shouldn't flash the orange banner. Dismissible; auto-resets when a save succeeds.
   const [showSaveBanner, setShowSaveBanner] = useState(false);
@@ -2847,8 +2856,16 @@ function App() {
         });
         const body = await r.json().catch(() => ({}));
         if (r.ok && (body.ok || Array.isArray(body.clients) || Array.isArray(body.appointments))) {
+          markAuthorized(body.email || session?.user?.email || null); // remember this email is a real member
+          setAccessDenied(false);
           applyServerMirror({ ...body, ok: true, via: "api" });
           return true;
+        }
+        // GUARD: access-lockdown — a 403 means canAccessShop rejected this signed-in email; it isn't a shop
+        // member, so it can't open the business dashboard. Never block an email that has loaded before.
+        if (r.status === 403 && !wasAuthorized(body.email || session?.user?.email || null)) {
+          setAccessDenied(true);
+          return false;
         }
         apiErr = body.error || (r.ok ? "sync-pull returned no data" : `sync-pull HTTP ${r.status}`);
         console.error("[vero] mirrorFromServer api failed:", apiErr, body.email || "", body);
@@ -3624,10 +3641,33 @@ function App() {
       {view === "managetoken" && <ManageByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} providers={providers} services={services} onExit={goBooking} />}
       {view === "reviewtoken" && <ReviewByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} onExit={goBooking} />}
       {view === "shop" && (session
-        ? (masterMode
+        ? (accessDenied
+          ? <AccessDenied email={session?.user?.email || null} onSignOut={staffSignOut} onBooking={goBooking} />
+          : masterMode
           ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={staffSignOut} />
           : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} flushServicesNow={flushServicesNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} syncHealth={syncHealth} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
+    </div>
+  );
+}
+
+// Shown when a signed-in email is NOT a member of this shop (canAccessShop 403). Keeps non-staff out
+// of the business dashboard entirely. The "Try again" reload is the fail-safe for the rare case where a
+// REAL member's first load on a new device hits a transient 403 (canAccessShop fails CLOSED on a DB
+// blip) — a reload re-pulls, and a genuine member then gets in, so the screen is never a dead-end for an
+// owner. A true non-member just 403s again and stays out. (access-lockdown)
+function AccessDenied({ email, onSignOut, onBooking }) {
+  return (
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 24px", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY, textAlign: "center" }}>
+      <div style={{ width: "100%", maxWidth: 380 }}>
+        <div style={{ width: 58, height: 58, borderRadius: 16, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}><Lock size={26} style={{ color: "var(--sub)" }} /></div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 600, marginBottom: 12, letterSpacing: "-0.3px" }}>Not authorized</h2>
+        <p style={{ color: "var(--sub)", fontSize: 15, lineHeight: 1.55, marginBottom: email ? 6 : 22 }}>This account isn't on the staff list for this shop, so it can't open the business dashboard.</p>
+        {email && <p style={{ color: "var(--faint)", fontSize: 13.5, marginBottom: 22 }}>Signed in as {email}</p>}
+        <button className="lift" onClick={onSignOut} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 14.5, fontWeight: 600, borderRadius: 12, cursor: "pointer", marginBottom: 10 }}>Sign out</button>
+        <button onClick={() => { try { window.location.reload(); } catch (e) {} }} style={{ width: "100%", background: "none", border: "1px solid var(--line)", color: "var(--text)", padding: 13, fontSize: 14, fontWeight: 600, borderRadius: 12, cursor: "pointer", marginBottom: 10 }}>Staff member? Try again</button>
+        <button onClick={onBooking} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14, padding: 8, cursor: "pointer" }}>Go to booking →</button>
+      </div>
     </div>
   );
 }
