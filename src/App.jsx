@@ -3359,16 +3359,15 @@ function App() {
     return () => { try { if (rtMirrorTimerRef.current) clearTimeout(rtMirrorTimerRef.current); if (channel) supabase.removeChannel(channel); } catch (e) { /* ignore */ } };
   }, [dataLoaded, SHOP_ID, session]);
 
-  // Client-facing surfaces ALWAYS render in the Studio look, whatever the shop/staff theme is —
-  // customers should see one consistent, on-brand storefront. Only the staff dashboard ("shop")
-  // uses the per-user theme. Client components style purely off CSS vars, so swapping the applied
-  // theme class is all that's needed.
+  // Client-facing surfaces (storefront, manage-appointment, terms/privacy) AND the pre-auth staff
+  // login ALWAYS render in the Onyx look — clean white, Hanken, no serif — regardless of the
+  // shop/staff theme, so customers and the sign-in screen see one consistent on-brand surface.
+  // Only the signed-in staff dashboard uses the per-user theme. Client components style purely off
+  // CSS vars, so swapping the applied theme class is all that's needed. (Was "studio" — Fraunces
+  // serif — until 2026-07-15; moved to Onyx so no serif shows on any customer-facing surface.)
   const CLIENT_FACING_VIEWS = ["client", "manage", "managetoken", "reviewtoken", "terms", "privacy", "preview"];
-  // Client-facing surfaces force Studio; the pre-auth staff login (view "shop" with no session)
-  // uses the clean app default rather than whatever dark theme the shop saved — a plain sign-in
-  // screen shouldn't render in the owner's dashboard theme. Everything else uses the per-user theme.
-  const appliedTheme = CLIENT_FACING_VIEWS.includes(view) ? "studio"
-                     : (view === "shop" && !session) ? DEFAULT_THEME
+  const appliedTheme = CLIENT_FACING_VIEWS.includes(view) ? "onyx"
+                     : (view === "shop" && !session) ? "onyx"
                      : theme;
 
   // Mirror the theme class onto <html> so CSS variables (--gold, --bg, --text, etc.) cascade
