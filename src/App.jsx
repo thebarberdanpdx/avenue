@@ -11747,34 +11747,15 @@ function LocationSwitcher({ current, fallbackName, authEmail, business, dark }) 
   const cur = shops.find((s) => s.shop_id === current);
   const displayName = (cur && cur.shop_name) || fallbackName;
   const go = (id) => { try { const u = new URL(window.location.href); u.searchParams.set("shop", id); window.location.href = u.toString(); } catch (e) {} };
-  // Brand lockup: the shop's logo (or a monogram from its name) + name + industry·city tagline.
-  // `dark` = the light lockup used on the dark Onyx banner; otherwise it uses theme colors.
-  const initial = String(displayName || "?").trim().charAt(0).toUpperCase() || "?";
-  const industryLabel = business && business.industry ? business.industry.charAt(0).toUpperCase() + business.industry.slice(1) : "";
-  const city = String((business && business.cityZip) || "").split(",")[0].trim();
-  const tagline = [industryLabel, city].filter(Boolean).join(" · ");
   const nameCol = dark ? "#F4F4F4" : "var(--text)";
-  const subCol = dark ? "#9A9A9A" : "var(--sub)";
-  // Monogram (single initial) — a shop's real logo is usually a wide wordmark that would crop to an
-  // illegible sliver in this 32px mark, so the header uses a clean monogram; the full logo still shows
-  // on the storefront where it has room.
-  const Mark = <div style={{ width: 32, height: 32, borderRadius: 9, background: dark ? "#FFFFFF" : "#161616", color: dark ? "#161616" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, flexShrink: 0 }}>{initial}</div>;
-  const Lockup = (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-      {Mark}
-      <div style={{ minWidth: 0, textAlign: "left" }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: nameCol, letterSpacing: 0.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</div>
-        {tagline && <div style={{ fontSize: 11, color: subCol, fontWeight: 500, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tagline}</div>}
-      </div>
-    </div>
-  );
+  const nameStyle = { fontSize: 17, fontWeight: 600, letterSpacing: 0.2, color: nameCol, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "62vw" };
   if (!Array.isArray(shops) || shops.length <= 1) {
-    return Lockup;
+    return <div style={nameStyle}>{displayName}</div>;
   }
   return (
     <div style={{ display: "contents" }}>
-      <button onClick={() => setOpen(true)} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", maxWidth: "70vw" }}>
-        {Lockup}
+      <button onClick={() => setOpen(true)} style={{ display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", padding: 0, cursor: "pointer", maxWidth: "70vw" }}>
+        <span style={nameStyle}>{displayName}</span>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={dark ? "#8E8E8E" : "var(--faint)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
       </button>
       {open && (
@@ -12691,17 +12672,15 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     );
   }
 
-  const barDark = theme === "onyx"; // dark app header (light brand lockup) for the Onyx look; other themes keep the light bar
+  const barDark = theme === "onyx"; // dark app header bar for the Onyx look (light text on it); other themes keep the light bar
   return (
     <div style={{ position: "relative", minHeight: "100dvh" }}>
-      <div style={{ borderBottom: barDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 14px) 18px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: barDark ? "#171717" : "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: barDark ? "none" : "blur(20px) saturate(1.4)", WebkitBackdropFilter: barDark ? "none" : "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
-        {navStack.length > 0
-          ? <BackBar to={backLabel} onClick={navBack} style={{ marginBottom: 0, color: barDark ? "#E8E8E8" : undefined }} />
-          : <LocationSwitcher current={shopId} business={business} fallbackName={business.name} authEmail={authEmail} dark={barDark} />}
-        <div style={{ flex: 1 }} />
-        <div style={{ textAlign: "right", fontSize: 10, color: barDark ? "#8E8E8E" : "var(--faint)", lineHeight: 1.25, flexShrink: 0 }}>
+      <div style={{ borderBottom: barDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 12px) 18px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: barDark ? "#171717" : "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: barDark ? "none" : "blur(20px) saturate(1.4)", WebkitBackdropFilter: barDark ? "none" : "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
+        {navStack.length > 0 ? <BackBar to={backLabel} onClick={navBack} style={{ marginBottom: 0, color: barDark ? "#E8E8E8" : undefined }} /> : <div style={{ width: 50 }} />}
+        <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} dark={barDark} />
+        <div style={{ width: 50, textAlign: "right", fontSize: 10, color: barDark ? "#8E8E8E" : "var(--faint)", lineHeight: 1.25 }}>
           {syncHealth && syncHealth.at && !syncHealth.err ? (syncHealth.via === "api" ? "Synced" : "Sync") : null}
-          {authEmail ? <div style={{ marginTop: 2, maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={authEmail}>{authEmail.split("@")[0]}</div> : null}
+          {authEmail ? <div style={{ marginTop: 2, maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={authEmail}>{authEmail.split("@")[0]}</div> : null}
         </div>
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
