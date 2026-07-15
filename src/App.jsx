@@ -15916,13 +15916,16 @@ function impGuessMap(headers) {
   const spent = impGuess(headers, ["total amount spent", "total spent", "lifetime spend", "lifetime value"]);
   const clientSince = impGuess(headers, ["created at", "client since", "customer since", "member since", "date added", "date created"]);
   const blocked = impGuess(headers, ["blocked from online booking", "blocked", "banned", "do not book"]);
+  // SMS marketing consent from the export ("Receives marketing texts" in Mangomint). Drives smsConsent /
+  // smsOptOut on import — NEVER fabricated. (import-consent-from-column)
+  const smsTexts = impGuess(headers, ["receives marketing texts", "marketing texts", "marketing text", "receives texts", "text consent", "sms consent", "accepts texts"]);
   // Every header already claimed above (plus other spend/summary columns we intentionally ignore, e.g.
   // "Total amount spent YTD") is off-limits to the generic appointment fields — so date/price/staff/
   // status match only genuine appointment columns and can't reuse a client-summary column.
   const summaryIgnore = headers.filter((h) => /amount spent|lifetime|total spent|first appointment/i.test(String(h)));
-  const claimed = [first, last, full, email, phone, birthday, notes, lastVisit, spent, clientSince, blocked, ...summaryIgnore].filter(Boolean);
+  const claimed = [first, last, full, email, phone, birthday, notes, lastVisit, spent, clientSince, blocked, smsTexts, ...summaryIgnore].filter(Boolean);
   return {
-    full, first, last, email, phone, birthday, notes, lastVisit, spent, clientSince, blocked,
+    full, first, last, email, phone, birthday, notes, lastVisit, spent, clientSince, blocked, smsTexts,
     date: impGuess(headers, ["appointment date", "start date", "booking date", "date", "booked", "scheduled"], claimed),
     time: impGuess(headers, ["start time", "appointment time", "time", "start"], claimed),
     service: impGuess(headers, ["service", "treatment", "appointment type", "item", "type"], claimed),
@@ -16043,8 +16046,8 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       const email = get(row, "email");
       const key = pd.length >= 7 ? pd : (name ? "n:" + name.toLowerCase() : null);
       if (!key) return;
-      if (!people.has(key)) people.set(key, { name: name || "Client", firstName: first, lastName: last, email, phone, key, birthday: get(row, "birthday"), notes: get(row, "notes"), lastVisit: get(row, "lastVisit"), spent: get(row, "spent"), clientSince: get(row, "clientSince"), blocked: impBlocked(get(row, "blocked")) });
-      else { const ex = people.get(key); if (!ex.email && email) ex.email = email; if (!ex.name && name) ex.name = name; if (!ex.phone && phone) ex.phone = phone; if (!ex.birthday) ex.birthday = get(row, "birthday"); if (!ex.notes && get(row, "notes")) ex.notes = get(row, "notes"); if (!ex.lastVisit && get(row, "lastVisit")) ex.lastVisit = get(row, "lastVisit"); if (!ex.spent && get(row, "spent")) ex.spent = get(row, "spent"); if (!ex.clientSince && get(row, "clientSince")) ex.clientSince = get(row, "clientSince"); if (impBlocked(get(row, "blocked"))) ex.blocked = true; }
+      if (!people.has(key)) people.set(key, { name: name || "Client", firstName: first, lastName: last, email, phone, key, birthday: get(row, "birthday"), notes: get(row, "notes"), lastVisit: get(row, "lastVisit"), spent: get(row, "spent"), clientSince: get(row, "clientSince"), blocked: impBlocked(get(row, "blocked")), smsTexts: get(row, "smsTexts") });
+      else { const ex = people.get(key); if (!ex.email && email) ex.email = email; if (!ex.name && name) ex.name = name; if (!ex.phone && phone) ex.phone = phone; if (!ex.birthday) ex.birthday = get(row, "birthday"); if (!ex.notes && get(row, "notes")) ex.notes = get(row, "notes"); if (!ex.lastVisit && get(row, "lastVisit")) ex.lastVisit = get(row, "lastVisit"); if (!ex.spent && get(row, "spent")) ex.spent = get(row, "spent"); if (!ex.clientSince && get(row, "clientSince")) ex.clientSince = get(row, "clientSince"); if (impBlocked(get(row, "blocked"))) ex.blocked = true; if (!ex.smsTexts && get(row, "smsTexts")) ex.smsTexts = get(row, "smsTexts"); }
       // appointment for this row?
       const dateStr = get(row, "date");
       if (dateStr) {
@@ -16119,7 +16122,12 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
         clientSince: _cs ? _cs.toISOString() : undefined,     // from "Created at"
         blocked: p.blocked ? true : undefined,                // blocked-from-online-booking → can't get a login code
         blockReason: p.blocked ? "Blocked from online booking (imported)" : undefined,
-        smsConsent: true, smsConsentAt: new Date().toISOString(), // owner default: everyone consented on import
+        // import-consent-from-column: SMS consent comes from the export's marketing-texts column, NEVER
+        // fabricated. "Yes" → real consent; column present but blank/no → opt out (don't text); no such
+        // column in the file → unknown (leave unset, so the send logic won't text them until they opt in).
+        smsConsent: map.smsTexts ? /^(y|yes|true|1)$/i.test((p.smsTexts || "").trim()) : undefined,
+        smsConsentAt: (map.smsTexts && /^(y|yes|true|1)$/i.test((p.smsTexts || "").trim())) ? new Date().toISOString() : undefined,
+        smsOptOut: (map.smsTexts && !/^(y|yes|true|1)$/i.test((p.smsTexts || "").trim())) ? true : undefined,
         lastActivity: new Date().toISOString(), customDurations: {}, notes: p.notes || "",
         messages: [], gallery: [], timeline: [], family: [], _import: bId,
       });
