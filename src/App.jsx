@@ -11755,10 +11755,10 @@ function LocationSwitcher({ current, fallbackName, authEmail, business, dark }) 
   const tagline = [industryLabel, city].filter(Boolean).join(" · ");
   const nameCol = dark ? "#F4F4F4" : "var(--text)";
   const subCol = dark ? "#9A9A9A" : "var(--sub)";
-  const logo = business && business.logo;
-  const Mark = logo
-    ? <img src={imgUrl(logo, 96)} alt="" style={{ width: 32, height: 32, borderRadius: 9, objectFit: "cover", flexShrink: 0 }} />
-    : <div style={{ width: 32, height: 32, borderRadius: 9, background: dark ? "#FFFFFF" : "#161616", color: dark ? "#161616" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, flexShrink: 0 }}>{initial}</div>;
+  // Monogram (single initial) — a shop's real logo is usually a wide wordmark that would crop to an
+  // illegible sliver in this 32px mark, so the header uses a clean monogram; the full logo still shows
+  // on the storefront where it has room.
+  const Mark = <div style={{ width: 32, height: 32, borderRadius: 9, background: dark ? "#FFFFFF" : "#161616", color: dark ? "#161616" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, flexShrink: 0 }}>{initial}</div>;
   const Lockup = (
     <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
       {Mark}
