@@ -80,6 +80,14 @@ export default async function handler(req, res) {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     const mode = body.mode || "pull";
 
+    // Lightweight membership probe for the client access-lockdown gate. canAccessShop already passed
+    // above, so reaching here means this signed-in user IS a member — answer cheaply, no table reads.
+    // A non-member never reaches this line (the canAccessShop check 403'd them first), which is exactly
+    // what lets the client decide dashboard access from a fast 200/403 without downloading the shop.
+    if (mode === "access") {
+      return res.status(200).json({ ok: true, mode: "access", shop, email: user.email || null });
+    }
+
     if (mode === "save") {
       const table = String(body.table || "");
       if (!SAVE_TABLES.has(table)) return res.status(400).json({ error: "invalid table" });
