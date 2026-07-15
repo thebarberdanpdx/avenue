@@ -179,6 +179,7 @@ const GUARDS = [
   { needle: "outbox-payment-durable", label: "a sale's ledger record is backed by a durable localStorage outbox that survives reload/kill and re-lands on reconnect, and paidForAppt/startCheckout read it — so a payment whose write failed can never let a reopened ticket re-charge the client; removing it reopens the offline-save double-charge gap" },
   { needle: "calendar-custom-price", label: "booking a client from the day calendar (commitAppt) applies their per-client customPrices — it used to ignore them and lock the DEFAULT price onto the appt, charging a custom-rate client the wrong price at checkout (duration honored the override but price didn't)" },
   { needle: "refund-record-actual", label: "a card refund records the amount STRIPE ACTUALLY refunded (res.amount), not the amount typed — both refund paths; the authoritative figure was being discarded, so the ledger could silently drift from the processor" },
+  { needle: "provider-photo-hours-revert", label: "providers/services/waitlist use LIVE refs (providersRef/servicesRef/waitlistRef) in localTableState — a realtime refetch used to merge a STALE closure over the server and re-save it, reverting a just-saved staff photo/hours edit; reverting this reopens the 'edits don't stick' bug (appts/clients already use refs for the same reason)" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");

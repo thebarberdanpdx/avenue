@@ -2279,6 +2279,14 @@ function App() {
     return Array.from(byKey.values());
   };
   const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
+  // cross-device-sync (provider-photo-hours-revert): providers/services/waitlist need LIVE refs too --
+  // localTableState read the STALE closure for these, so a realtime refetch merged an old local snapshot
+  // over the server and re-saved it, reverting a just-saved photo/hours edit (email/phone were spared
+  // only because they commit via an on-Done draft + the syncList backstop). Refs merge against LIVE rows,
+  // exactly like appts/clients above. Does NOT touch syncList (sole writer) or the email/phone/pin guards.
+  const providersRef = useRef(providers); providersRef.current = providers;
+  const servicesRef = useRef(services); servicesRef.current = services;
+  const waitlistRef = useRef(waitlist); waitlistRef.current = waitlist;
   // Theme: PER staff member. Each signed-in person keeps their own theme — stored in
   // business.userThemes keyed by their provider id (syncs across their devices) — falling back to
   // the shop default (business.theme) → "studio". signedInUser mirrors the dashboard's
@@ -2692,9 +2700,9 @@ function App() {
   const localTableState = (table) => {
     if (table === "appointments") return apptsRef.current;
     if (table === "clients") return clientsRef.current;
-    if (table === "waitlist") return waitlist;
-    if (table === "services") return services;
-    if (table === "providers") return providers;
+    if (table === "waitlist") return waitlistRef.current;
+    if (table === "services") return servicesRef.current;
+    if (table === "providers") return providersRef.current;
     return [];
   };
   const mergeApptRow = (server, local) => {
