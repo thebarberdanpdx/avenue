@@ -11731,7 +11731,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
 // (a no-op for single-shop accounts). With more than one, the name becomes a tappable control
 // that opens a sheet to switch shops. Switching reloads the dashboard pointed at the chosen
 // shop (?shop=<id>), reusing the existing URL resolver — so the live data path is untouched.
-function LocationSwitcher({ current, fallbackName, authEmail }) {
+function LocationSwitcher({ current, fallbackName, authEmail, business, dark }) {
   const [shops, setShops] = useState([]);
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -11744,18 +11744,38 @@ function LocationSwitcher({ current, fallbackName, authEmail }) {
     })();
     return () => { alive = false; };
   }, [authEmail]);
-  const nameStyle = { fontFamily: "'Fraunces', serif", fontSize: 18, letterSpacing: 0.3, fontWeight: 500, color: "var(--text)" };
   const cur = shops.find((s) => s.shop_id === current);
   const displayName = (cur && cur.shop_name) || fallbackName;
   const go = (id) => { try { const u = new URL(window.location.href); u.searchParams.set("shop", id); window.location.href = u.toString(); } catch (e) {} };
+  // Brand lockup: the shop's logo (or a monogram from its name) + name + industry·city tagline.
+  // `dark` = the light lockup used on the dark Onyx banner; otherwise it uses theme colors.
+  const initial = String(displayName || "?").trim().charAt(0).toUpperCase() || "?";
+  const industryLabel = business && business.industry ? business.industry.charAt(0).toUpperCase() + business.industry.slice(1) : "";
+  const city = String((business && business.cityZip) || "").split(",")[0].trim();
+  const tagline = [industryLabel, city].filter(Boolean).join(" · ");
+  const nameCol = dark ? "#F4F4F4" : "var(--text)";
+  const subCol = dark ? "#9A9A9A" : "var(--sub)";
+  const logo = business && business.logo;
+  const Mark = logo
+    ? <img src={imgUrl(logo, 96)} alt="" style={{ width: 32, height: 32, borderRadius: 9, objectFit: "cover", flexShrink: 0 }} />
+    : <div style={{ width: 32, height: 32, borderRadius: 9, background: dark ? "#FFFFFF" : "#161616", color: dark ? "#161616" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, flexShrink: 0 }}>{initial}</div>;
+  const Lockup = (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      {Mark}
+      <div style={{ minWidth: 0, textAlign: "left" }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: nameCol, letterSpacing: 0.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</div>
+        {tagline && <div style={{ fontSize: 11, color: subCol, fontWeight: 500, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tagline}</div>}
+      </div>
+    </div>
+  );
   if (!Array.isArray(shops) || shops.length <= 1) {
-    return <div style={nameStyle}>{displayName}</div>;
+    return Lockup;
   }
   return (
     <div style={{ display: "contents" }}>
-      <button onClick={() => setOpen(true)} style={{ display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", padding: 0, cursor: "pointer", maxWidth: "62vw" }}>
-        <span style={{ ...nameStyle, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</span>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+      <button onClick={() => setOpen(true)} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", maxWidth: "70vw" }}>
+        {Lockup}
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={dark ? "#8E8E8E" : "var(--faint)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
       </button>
       {open && (
         <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "64px 18px", zIndex: 120 }}>
@@ -12671,14 +12691,17 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     );
   }
 
+  const barDark = theme === "onyx"; // dark app header (light brand lockup) for the Onyx look; other themes keep the light bar
   return (
     <div style={{ position: "relative", minHeight: "100dvh" }}>
-      <div style={{ borderBottom: "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 16px) 20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
-        {navStack.length > 0 ? <BackBar to={backLabel} onClick={navBack} style={{ marginBottom: 0 }} /> : <div style={{ width: 50 }} />}
-        <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} />
-        <div style={{ width: 50, textAlign: "right", fontSize: 10, color: "var(--faint)", lineHeight: 1.25 }}>
+      <div style={{ borderBottom: barDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 14px) 18px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: barDark ? "#171717" : "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: barDark ? "none" : "blur(20px) saturate(1.4)", WebkitBackdropFilter: barDark ? "none" : "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
+        {navStack.length > 0
+          ? <BackBar to={backLabel} onClick={navBack} style={{ marginBottom: 0, color: barDark ? "#E8E8E8" : undefined }} />
+          : <LocationSwitcher current={shopId} business={business} fallbackName={business.name} authEmail={authEmail} dark={barDark} />}
+        <div style={{ flex: 1 }} />
+        <div style={{ textAlign: "right", fontSize: 10, color: barDark ? "#8E8E8E" : "var(--faint)", lineHeight: 1.25, flexShrink: 0 }}>
           {syncHealth && syncHealth.at && !syncHealth.err ? (syncHealth.via === "api" ? "Synced" : "Sync") : null}
-          {authEmail ? <div style={{ marginTop: 2, maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={authEmail}>{authEmail.split("@")[0]}</div> : null}
+          {authEmail ? <div style={{ marginTop: 2, maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={authEmail}>{authEmail.split("@")[0]}</div> : null}
         </div>
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
