@@ -12672,7 +12672,11 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     );
   }
 
-  const barDark = theme === "onyx"; // dark app header bar for the Onyx look (light text on it); other themes keep the light bar
+  // Dark header retired (2026-07-15): on iOS it merged with the black status bar into a heavy
+  // black slab with the shop name floating low, and it ate calendar grid height. The clean light
+  // bar reads better and stays distinct from the status bar. (Kept as a flag so it's easy to
+  // revisit a *slim* dark bar later, tuned on-device.)
+  const barDark = false;
   return (
     <div style={{ position: "relative", minHeight: "100dvh" }}>
       <div style={{ borderBottom: barDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 12px) 18px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: barDark ? "#171717" : "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: barDark ? "none" : "blur(20px) saturate(1.4)", WebkitBackdropFilter: barDark ? "none" : "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
