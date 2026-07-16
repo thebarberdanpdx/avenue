@@ -13695,7 +13695,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     const togRow = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "18px 0", borderTop: "1px solid var(--line)" };
     return (
     <>
-      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>{kind === "all" ? "Paid extras and quick questions clients answer while booking. Shown in the order below." : (kind === "addon" ? "Paid extras clients can add while booking — each can add price, time, or both. Shown in the order below." : "Quick questions clients answer while booking (e.g. “Skin fade?”). Shown in the order below.")}</p>
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>{kind === "all" ? "Paid extras clients can add while booking. Shown in the order below." : (kind === "addon" ? "Paid extras clients can add while booking — each can add price, time, or both. Shown in the order below." : "Quick questions clients answer while booking (e.g. “Skin fade?”). Shown in the order below.")}</p>
       {(() => {
         // Keep each group's REAL array index (edits + reorder rely on it), but in the merged "all"
         // view always list Questions before Add-ons — questions are always priority, matching the
@@ -14001,7 +14001,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         );
       })}
       {kind !== "choice" && <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "addon", photo: "", featured: false, item: { name: "", desc: "", addsPrice: true, price: 5, addsTime: true, min: 10 } }] })} style={{ ...addTileStyle, width: "100%", padding: "14px 10px" }}><Plus size={17} /> Add an add-on</button>}
-      {kind !== "addon" && <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "choice", photo: "", options: [{ id: "yes", label: "Yes", price: 5, min: 0 }, { id: "no", label: "No", price: 0, min: 0 }] }] })} style={{ ...addTileStyle, width: "100%", padding: "14px 10px", marginTop: kind === "all" ? 10 : 0 }}><Plus size={17} /> Add a question</button>}
       {kind !== "choice" && otherAddons.length > 0 && <button onClick={() => setPickAddon(true)} style={{ ...addTileStyle, width: "100%", padding: "12px 10px", marginTop: 10, borderStyle: "solid", fontSize: 14 }}><Copy size={16} /> Add from another service</button>}
     </>
     );
@@ -14802,7 +14801,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     <div className="fade-up" style={{ paddingBottom: 90 }}>
       {/* two-tab switch (the screen is already titled "Services & Menu" by the settings shell) */}
       <div style={{ display: "flex", gap: 6, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 13, padding: 4, margin: "4px 0 18px" }}>
-        {[{ id: "services", label: "Services" }, { id: "addons", label: "Add-ons" }, { id: "questions", label: "Questions" }].map((t) => { const on = menuTab === t.id; return (
+        {[{ id: "services", label: "Services" }, { id: "addons", label: "Add-ons" }].map((t) => { const on = menuTab === t.id; return (
           <button key={t.id} onClick={() => { setMenuTab(t.id); setEditMode(false); setLibJump(null); }} style={{ flex: 1, padding: "10px 6px", borderRadius: 10, border: "none", background: on ? "var(--panel)" : "transparent", color: on ? "var(--text)" : "var(--sub)", fontFamily: FONT_BODY, fontSize: 14, fontWeight: on ? 600 : 500, boxShadow: on ? "var(--shadow-sm)" : "none", cursor: "pointer", transition: "background .15s ease, color .15s ease" }}>{t.label}</button>
         ); })}
       </div>
