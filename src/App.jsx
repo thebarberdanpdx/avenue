@@ -5768,7 +5768,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         const _exId = existing.id; if (smsConsent) setClients((cur) => cur.map((c) => c.id === _exId ? { ...c, smsConsent: true, smsConsentAt: new Date().toISOString(), smsOptOut: false } : c)); // opt-in re-enables texting for imported/no-consent clients (consent-reenables-sms)
       } else {
         clientId = "c" + baseId + Math.floor(Math.random() * 1000);
-        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), smsConsent: smsConsent, smsConsentAt: smsConsent ? new Date().toISOString() : undefined, provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30), business) : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile) ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } : undefined };
+        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), smsConsent: smsConsent, smsConsentAt: smsConsent ? new Date().toISOString() : undefined, smsOptOut: smsConsent ? false : true, provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30), business) : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile) ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } : undefined };
         setClients((cur) => [newClient, ...cur]);
         newClientRow = { id: String(clientId), shop_id: shopId, data: newClient };
       }
@@ -6041,7 +6041,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     // The SMS + cancellation agreements now sit BELOW the card. If they aren't both checked yet,
     // don't auto-finish — clear the pending flag and let the Book button commit once they agree.
     // (When they agreed first, this passes straight through and still finishes in one tap.)
-    if (!agreed || !smsConsent) { setPendingFinish(false); return; }
+    if (!agreed) { setPendingFinish(false); return; }  // SMS consent optional — only the cancellation policy gates booking; SMS toggle looks required but never blocks (sms-consent-optional)
     setPendingFinish(false);
     const digits = (s) => (s || "").replace(/\D/g, "");
     const phoneChanged = !!matched && digits(phone) !== digits(matched.phone);
@@ -8401,7 +8401,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 const livePay = business.payments?.live === true;
                 const paid = !!(cardInfo && cardInfo.paid);
                 const last4 = (cardInfo && cardInfo.last4) || "••••";
-                const identityOk = agreed && smsConsent && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10 && (!cart.some((e) => e && e.service && e.service.booking && e.service.booking.requireAddress) || !!newAddress.trim());
+                const identityOk = agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10 && (!cart.some((e) => e && e.service && e.service.booking && e.service.booking.requireAddress) || !!newAddress.trim()); // SMS consent optional (sms-consent-optional)
                 const tipBtn = (on) => ({ flex: "1 1 58px", background: on ? "var(--text)" : "var(--panel2)", color: on ? "var(--bg)" : "var(--text)", border: `1px solid ${on ? "var(--text)" : "var(--border)"}`, borderRadius: 11, padding: "10px 6px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", lineHeight: 1.25, textAlign: "center" });
                 return (
                   <div style={{ background: "var(--panel)", border: `1px solid ${paid ? "color-mix(in srgb, var(--text) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16, boxShadow: "var(--shadow-sm)" }}>
@@ -8576,7 +8576,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               // #7: a prepay service must be PAID before the booking can be locked (not just a card added).
               const payFull = cart.length ? cart.some((e) => e && e.service && e.service.booking && e.service.booking.requirePayment) : false;
               const paid = !!(cardInfo && cardInfo.paid);
-              const baseOk = agreed && smsConsent && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10 && (!cart.some((e) => e && e.service && e.service.booking && e.service.booking.requireAddress) || !!newAddress.trim());
+              const baseOk = agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10 && (!cart.some((e) => e && e.service && e.service.booking && e.service.booking.requireAddress) || !!newAddress.trim());
               const canLock = payFull ? (baseOk && paid) : (baseOk && (!needsCard || cardOnFile));
               return (
             <>
@@ -8590,7 +8590,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 return;
               }
               commitBooking(phone, newEmail);
-            }} style={{ width: "100%", background: canLock ? "var(--text)" : "transparent", color: canLock ? "var(--bg)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (payFull && !paid ? "PAY ABOVE TO BOOK" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : ((!smsConsent || !agreed) ? "CHECK BOTH BOXES TO BOOK" : `BOOK FOR ${relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate).split(",")[0].toUpperCase() + " " + MONTHS[selectedDate.getMonth()].toUpperCase() + " " + selectedDate.getDate() : relativeDate(selectedDate).toUpperCase()}`)))}</button>
+            }} style={{ width: "100%", background: canLock ? "var(--text)" : "transparent", color: canLock ? "var(--bg)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (payFull && !paid ? "PAY ABOVE TO BOOK" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : ((!agreed) ? "AGREE TO THE POLICY TO BOOK" : `BOOK FOR ${relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate).split(",")[0].toUpperCase() + " " + MONTHS[selectedDate.getMonth()].toUpperCase() + " " + selectedDate.getDate() : relativeDate(selectedDate).toUpperCase()}`)))}</button>
             {bookErr && <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "color-mix(in srgb, #c0392b 14%, var(--panel))", color: "var(--text)", fontSize: 13.5, lineHeight: 1.45, textAlign: "center" }}>Couldn't confirm your booking — check your connection and tap again. Your time wasn't held, so nothing's lost.</div>}
             {reschedTooLate && <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13.5, lineHeight: 1.45, textAlign: "center" }}>Your original appointment is now less than {manageWindowHrs} hours away, so it can't be changed online anymore. It's still booked exactly as it was — call us and we'll help.</div>}
             </>
