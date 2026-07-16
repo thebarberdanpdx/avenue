@@ -13266,11 +13266,11 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   );
 
   // ---- shared premium style idiom (matches ProductsEditor) ----
-  const inpStyle = { width: "100%", boxSizing: "border-box", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 16px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY };
-  const sectionLblStyle = { fontSize: 13.5, letterSpacing: 0, textTransform: "none", color: "var(--sub)", fontWeight: 500, margin: "26px 2px 9px" };
+  const inpStyle = { width: "100%", boxSizing: "border-box", background: "var(--panel)", border: "1.5px solid var(--border2)", borderRadius: 13, padding: "17px 16px", color: "var(--text)", fontSize: 16.5, fontFamily: FONT_BODY };
+  const sectionLblStyle = { fontSize: 14, letterSpacing: 0, textTransform: "none", color: "var(--sub)", fontWeight: 600, margin: "34px 2px 11px" };
   const SectionLbl = ({ children, style }) => <div style={{ ...sectionLblStyle, ...style }}>{children}</div>;
-  const moneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "var(--panel)", boxSizing: "border-box", minWidth: 0 };
-  const moneyInput = { flex: 1, minWidth: 0, boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: "16px 14px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY };
+  const moneyWrap = { display: "flex", alignItems: "center", border: "1.5px solid var(--border2)", borderRadius: 13, overflow: "hidden", background: "var(--panel)", boxSizing: "border-box", minWidth: 0 };
+  const moneyInput = { flex: 1, minWidth: 0, boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: "17px 14px", color: "var(--text)", fontSize: 16.5, fontFamily: FONT_BODY };
   const moneyPrefix = { padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 };
   const unitSuffix = { padding: "0 16px 0 0", color: "var(--sub)", fontSize: 14 };
   const chip = (on) => ({ background: on ? "var(--text)" : "transparent", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, color: on ? "var(--bg)" : "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" });
