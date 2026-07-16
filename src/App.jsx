@@ -14977,8 +14977,11 @@ function NewClientCapControls({ nc, patch, first }) {
   const ROW = { display: "flex", alignItems: "center", minHeight: 58, padding: "13px 16px" };
   const SOFT = { fontSize: 13, fontWeight: 600, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--sub)", margin: "20px 4px 10px" };
   const HINT = { fontSize: 13.5, color: "var(--faint)", margin: "10px 4px 0", lineHeight: 1.45 };
-  const capStep = (value, onChange) => (
-    <Stepper value={value} onChange={onChange} min={0} max={99} nullLabel="No limit" onValueTap={() => onChange(value == null ? 3 : null)} />
+  // new-client-cap-typed: a typed number field that matches "Max appointments per day" right above it.
+  // Blank = No limit (unlimited); 0 = take no new clients. (Was a +/- stepper where tapping the number
+  // toggled No-limit<->3, which read as broken next to a type-a-number field.)
+  const capInput = (value, onChange) => (
+    <input type="number" min="0" max="99" inputMode="numeric" value={value == null ? "" : value} onChange={(e) => { const r = e.target.value.trim(); onChange(r === "" ? null : Math.max(0, Math.min(99, parseInt(r, 10) || 0))); }} placeholder="No limit" style={{ width: 88, flexShrink: 0, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 11px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
   );
   return (
     <div>
@@ -14997,18 +15000,18 @@ function NewClientCapControls({ nc, patch, first }) {
         {nc.capMode === "same" ? (
           <>
             <div style={{ ...CARD, marginTop: 12 }}>
-              <div style={ROW}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>New clients per day</div>{capStep(nc.capSame, (v) => patch({ capSame: v }))}</div>
+              <div style={ROW}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>New clients per day</div>{capInput(nc.capSame, (v) => patch({ capSame: v }))}</div>
             </div>
-            <p style={HINT}>Tap the number to set “No limit” (unlimited). Set it to 0 to take none.</p>
+            <p style={HINT}>Type a number. Leave it blank for No limit (unlimited), or enter 0 to take no new clients.</p>
           </>
         ) : (
           <>
             <div style={{ ...CARD, marginTop: 12 }}>
               {NC_WEEK.map(([k, full], i) => (
-                <div key={k} style={{ ...ROW, borderTop: i ? "1px solid var(--line)" : "none" }}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>{full}</div>{capStep(nc.capWeek[k], (v) => patch({ capWeek: { ...nc.capWeek, [k]: v } }))}</div>
+                <div key={k} style={{ ...ROW, borderTop: i ? "1px solid var(--line)" : "none" }}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>{full}</div>{capInput(nc.capWeek[k], (v) => patch({ capWeek: { ...nc.capWeek, [k]: v } }))}</div>
               ))}
             </div>
-            <p style={HINT}>Tap a number to set “No limit” (unlimited). 0 means no new clients that day.</p>
+            <p style={HINT}>Type each day's number. Blank = No limit; 0 = no new clients that day.</p>
           </>
         )}
         <p style={HINT}>New means anyone with no prior booking. Once {first} hits the limit for a day, that day shows as fully booked to new clients online — they’re offered the waitlist instead. Staff can still book anyone in by hand.</p>
