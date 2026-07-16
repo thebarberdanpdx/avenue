@@ -14968,44 +14968,21 @@ function normNewClients(x) {
   };
 }
 
-function NewClientsEditor({ providers = [], setProviders, onBackRef }) {
-  const staff = (providers || []).filter((p) => p.id !== "anyone");
-  const [pid, setPid] = useState(staff[0]?.id || null);
-  const prov = staff.find((p) => p.id === pid) || staff[0] || null;
-  const nc = normNewClients(prov?.newClients);
-  const patch = (obj) => { if (!prov || !setProviders) return; setProviders(providers.map((p) => p.id === prov.id ? { ...p, newClients: { ...normNewClients(p.newClients), ...obj } } : p)); };
-
-  if (!prov) return <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5 }}>Add a staff member first — each person sets their own new-client limits.</div>;
-
+// New-client daily cap CONTROLS — reusable so the per-barber profile page (StaffMembersView) is the
+// single home for it. `nc` = normNewClients(prov.newClients); `patch(obj)` merges obj into that prov's
+// newClients; `first` = the barber's first name. Writes the SAME prov.newClients the booking flow
+// enforces (newClientCapReached), so moving the UI here changed nothing about how the cap works.
+function NewClientCapControls({ nc, patch, first }) {
   const CARD = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" };
   const ROW = { display: "flex", alignItems: "center", minHeight: 58, padding: "13px 16px" };
-  const SOFT = { fontSize: 13, fontWeight: 600, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--sub)", margin: "26px 4px 10px" };
+  const SOFT = { fontSize: 13, fontWeight: 600, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--sub)", margin: "20px 4px 10px" };
   const HINT = { fontSize: 13.5, color: "var(--faint)", margin: "10px 4px 0", lineHeight: 1.45 };
-  const first = (prov.name || "").split(" ")[0] || "this person";
-
-  // ---------- Main screen ----------
   const capStep = (value, onChange) => (
     <Stepper value={value} onChange={onChange} min={0} max={99} nullLabel="No limit" onValueTap={() => onChange(value == null ? 3 : null)} />
   );
   return (
     <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, maxWidth: "34ch", marginBottom: 4 }}>Decide how many new people can book each day. New means anyone who hasn't booked before — found automatically.</p>
-
-      {staff.length > 1 && (
-        <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "16px 0 4px", margin: "0 -2px", WebkitOverflowScrolling: "touch" }}>
-          {staff.map((p) => {
-            const on = p.id === prov.id;
-            return (
-              <button key={p.id} onClick={() => setPid(p.id)} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, padding: "6px 13px 6px 6px", borderRadius: 999, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: "var(--text)", cursor: "pointer", fontFamily: FONT_BODY }}>
-                <Avatar size={26} photo={p.photo} initial={(p.name || "?")[0]} color={p.color} />
-                <span style={{ fontSize: 14, fontWeight: on ? 600 : 400 }}>{(p.name || "").split(" ")[0]}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <div style={{ ...CARD, marginTop: 4 }}>
+      <div style={CARD}>
         <div style={ROW}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, color: "var(--text)" }}>Limit new clients per day</div>
@@ -15014,17 +14991,15 @@ function NewClientsEditor({ providers = [], setProviders, onBackRef }) {
           <Toggle on={nc.enabled} onClick={() => patch({ enabled: !nc.enabled })} />
         </div>
       </div>
-
       {nc.enabled && (<>
         <div style={SOFT}>How many per day</div>
         <Segmented options={[{ value: "same", label: "Same every day" }, { value: "week", label: "Per weekday" }]} value={nc.capMode} onChange={(m) => patch({ capMode: m })} />
-
         {nc.capMode === "same" ? (
           <>
             <div style={{ ...CARD, marginTop: 12 }}>
               <div style={ROW}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>New clients per day</div>{capStep(nc.capSame, (v) => patch({ capSame: v }))}</div>
             </div>
-            <p style={HINT}>Tap the number to set "No limit" (unlimited). Set it to 0 to take none.</p>
+            <p style={HINT}>Tap the number to set “No limit” (unlimited). Set it to 0 to take none.</p>
           </>
         ) : (
           <>
@@ -15033,11 +15008,10 @@ function NewClientsEditor({ providers = [], setProviders, onBackRef }) {
                 <div key={k} style={{ ...ROW, borderTop: i ? "1px solid var(--line)" : "none" }}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>{full}</div>{capStep(nc.capWeek[k], (v) => patch({ capWeek: { ...nc.capWeek, [k]: v } }))}</div>
               ))}
             </div>
-            <p style={HINT}>Tap a number to set "No limit" (unlimited). 0 means no new clients that day.</p>
+            <p style={HINT}>Tap a number to set “No limit” (unlimited). 0 means no new clients that day.</p>
           </>
         )}
-
-        <p style={HINT}>New means anyone with no prior booking. Once {first} hits the limit for a day, that day shows as fully booked to new clients online — they're offered the waitlist instead. Staff can still book anyone in by hand.</p>
+        <p style={HINT}>New means anyone with no prior booking. Once {first} hits the limit for a day, that day shows as fully booked to new clients online — they’re offered the waitlist instead. Staff can still book anyone in by hand.</p>
       </>)}
     </div>
   );
@@ -17340,6 +17314,11 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             </div>
             <input type="number" min="0" value={person.maxPerDay || ""} onChange={(e) => patch(person.id, { maxPerDay: Math.max(0, parseInt(e.target.value || "0", 10)) })} placeholder="No limit" style={{ width: 88, flexShrink: 0, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 11px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
           </div>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, padding: "0 2px" }}>New clients {(person.name || "").split(" ")[0] || "this chair"} accepts</div>
+          <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 2px 12px" }}>Cap how many brand-new clients can book {(person.name || "").split(" ")[0] || "this chair"} online each day. New means anyone who has not booked before.</p>
+          <NewClientCapControls nc={normNewClients(person.newClients)} patch={(o) => patch(person.id, { newClients: { ...normNewClients(person.newClients), ...o } })} first={(person.name || "").split(" ")[0] || "this chair"} />
         </div>
         {(() => {
           const bk = business?.booking || {};
@@ -20478,21 +20457,6 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <PhotoModeSetting mode={form.bookingPhotos?.mode || "optional"} onChange={(m) => setForm({ ...form, bookingPhotos: { ...(form.bookingPhotos || {}), mode: m } })} />,
     },
     {
-      id: "newclients", fullBleed: true, title: "New clients", icon: UserPlus, category: "Online Booking",
-      status: (() => {
-        const s = (providers || []).filter((p) => p.id !== "anyone");
-        const set = s.filter((p) => {
-          const n = p.newClients; if (!n || !n.enabled) return false;   // off = not limiting
-          const same = n.capMode !== "week" && n.capSame != null;
-          const wk = n.capMode === "week" && Object.values(n.capWeek || {}).some((v) => v != null);
-          return same || wk;
-        }).length;
-        return set ? `${set} of ${s.length} staff limited` : "No limits — unlimited new clients";
-      })(),
-      keywords: "new clients per day limit cap first time first-time waitlist gate accept how many",
-      editor: <NewClientsEditor providers={providers} setProviders={setProviders} onBackRef={editorBack} />,
-    },
-    {
       id: "tipping", title: "Tipping", icon: DollarSign, category: "Payments & Checkout",
       status: form.tipping?.enabled ? `${(form.tipping.presets || []).join("/")}%` : "Off", keywords: "tip tipping gratuity percent checkout payment",
       editor: <TippingEditor t={form.tipping || { enabled: true, presets: [18, 20, 25], allowCustom: true, allowNoTip: true, smartDefault: 20 }} onChange={(tp) => setForm({ ...form, tipping: tp })} />,
@@ -20597,8 +20561,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     { id: "staff", section: "Your shop", label: "Team", icon: Users, desc: "Staff, access & pay", settings: ["staff", "staffpin"] },
     { id: "menu",  section: "What you sell", label: "Services & menu", icon: Scissors, desc: "What you offer & pricing", settings: ["servicesmenu"] },
     { id: "productscat", section: "What you sell", label: "Products", icon: Package, desc: "Retail you sell — haircare, skincare, merch", settings: ["products"] },
-    { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "Times, page & what clients can do", settings: ["avoidgaps", "autotiming", "anyonerouting", "newclients", "booking", "bookingwords", "website", "reviews", "showprices", "rebook_usual", "family", "refphotos"], groups: [
-      { label: "Times & availability", collapse: true, desc: "Booking times, smart timing & who gets the booking", ids: ["avoidgaps", "autotiming", "anyonerouting", "newclients"] },
+    { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "Times, page & what clients can do", settings: ["avoidgaps", "autotiming", "anyonerouting", "booking", "bookingwords", "website", "reviews", "showprices", "rebook_usual", "family", "refphotos"], groups: [
+      { label: "Times & availability", collapse: true, desc: "Booking times, smart timing & who gets the booking", ids: ["avoidgaps", "autotiming", "anyonerouting"] },
       { label: "Your booking page", ids: ["booking", "bookingwords", "website", "reviews"] },
       { label: "What clients can do", ids: ["showprices", "rebook_usual", "family", "refphotos"] },
     ] },
