@@ -8530,6 +8530,18 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               );
             })()}
 
+            {/* Cancellation policy — collapsed to an agree row with an expandable "Read it" */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "6px 18px", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
+                <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, color: "var(--text)", cursor: "pointer", flex: 1, textAlign: "left" }}>
+                  <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+                  <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>I agree to the cancellation policy</span>
+                </button>
+                {business.policy && <button onClick={() => setPolicyOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, fontWeight: 600, padding: "6px 2px", flexShrink: 0, cursor: "pointer" }}>{policyOpen ? "Hide" : "Read it ›"}</button>}
+              </div>
+              {policyOpen && business.policy && <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 14px" }}>{business.policy}</p>}
+            </div>
+
             {/* SMS consent — styled to match the cancellation-policy row (toggle + "Read it ›").
                   COMPLIANCE (10DLC / carrier-vetted): the mandatory disclosure — msg & data rates,
                   STOP, HELP, privacy link — stays VISIBLE at opt-in; only the fuller vetted copy sits
@@ -8553,18 +8565,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </p>
                 )}
               </div>
-
-            {/* Cancellation policy — collapsed to an agree row with an expandable "Read it" */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "6px 18px", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
-                <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, color: "var(--text)", cursor: "pointer", flex: 1, textAlign: "left" }}>
-                  <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-                  <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>I agree to the cancellation policy</span>
-                </button>
-                {business.policy && <button onClick={() => setPolicyOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, fontWeight: 600, padding: "6px 2px", flexShrink: 0, cursor: "pointer" }}>{policyOpen ? "Hide" : "Read it ›"}</button>}
-              </div>
-              {policyOpen && business.policy && <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 14px" }}>{business.policy}</p>}
-            </div>
 
             {(() => {
               const bk = business.booking || {};
