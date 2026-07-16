@@ -14977,12 +14977,22 @@ function NewClientCapControls({ nc, patch, first }) {
   const ROW = { display: "flex", alignItems: "center", minHeight: 58, padding: "13px 16px" };
   const SOFT = { fontSize: 13, fontWeight: 600, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--sub)", margin: "20px 4px 10px" };
   const HINT = { fontSize: 13.5, color: "var(--faint)", margin: "10px 4px 0", lineHeight: 1.45 };
-  // new-client-cap-typed: a typed number field that matches "Max appointments per day" right above it.
-  // Blank = No limit (unlimited); 0 = take no new clients. (Was a +/- stepper where tapping the number
-  // toggled No-limit<->3, which read as broken next to a type-a-number field.)
-  const capInput = (value, onChange) => (
-    <input type="number" min="0" max="99" inputMode="numeric" value={value == null ? "" : value} onChange={(e) => { const r = e.target.value.trim(); onChange(r === "" ? null : Math.max(0, Math.min(99, parseInt(r, 10) || 0))); }} placeholder="No limit" style={{ width: 88, flexShrink: 0, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 11px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
-  );
+  // new-client-cap-ticker: a plain −/+ ticker — no keyboard, nothing to erase. Steps
+  // No limit → None → 1 → 2 … ; − at None returns to No limit. No limit = unlimited new
+  // clients; None = take zero. Caps are small integers, so tapping beats typing here.
+  const capTicker = (value, onChange) => {
+    const isNull = value == null;
+    const display = isNull ? "No limit" : (value === 0 ? "None" : String(value));
+    const dec = () => { if (!isNull) onChange(value <= 0 ? null : value - 1); };
+    const inc = () => onChange(isNull ? 0 : Math.min(99, value + 1));
+    return (
+      <div style={{ display: "inline-flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: 11, overflow: "hidden", flexShrink: 0 }}>
+        <button onClick={dec} aria-label="Fewer" style={{ width: 42, height: 38, border: "none", borderRight: "1px solid var(--border)", background: "var(--panel2)", color: isNull ? "var(--faint)" : "var(--text)", fontSize: 19, lineHeight: 1, cursor: "pointer", fontFamily: FONT_BODY }}>−</button>
+        <span style={{ minWidth: 82, textAlign: "center", fontSize: 14.5, fontWeight: 500, color: isNull ? "var(--sub)" : "var(--text)", padding: "0 6px", whiteSpace: "nowrap" }}>{display}</span>
+        <button onClick={inc} aria-label="More" style={{ width: 42, height: 38, border: "none", borderLeft: "1px solid var(--border)", background: "var(--panel2)", color: "var(--text)", fontSize: 19, lineHeight: 1, cursor: "pointer", fontFamily: FONT_BODY }}>+</button>
+      </div>
+    );
+  };
   return (
     <div>
       <div style={CARD}>
@@ -15000,18 +15010,18 @@ function NewClientCapControls({ nc, patch, first }) {
         {nc.capMode === "same" ? (
           <>
             <div style={{ ...CARD, marginTop: 12 }}>
-              <div style={ROW}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>New clients per day</div>{capInput(nc.capSame, (v) => patch({ capSame: v }))}</div>
+              <div style={ROW}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>New clients per day</div>{capTicker(nc.capSame, (v) => patch({ capSame: v }))}</div>
             </div>
-            <p style={HINT}>Type a number. Leave it blank for No limit (unlimited), or enter 0 to take no new clients.</p>
+            <p style={HINT}>Tap − / + to set the cap. No limit = unlimited; None = take no new clients.</p>
           </>
         ) : (
           <>
             <div style={{ ...CARD, marginTop: 12 }}>
               {NC_WEEK.map(([k, full], i) => (
-                <div key={k} style={{ ...ROW, borderTop: i ? "1px solid var(--line)" : "none" }}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>{full}</div>{capInput(nc.capWeek[k], (v) => patch({ capWeek: { ...nc.capWeek, [k]: v } }))}</div>
+                <div key={k} style={{ ...ROW, borderTop: i ? "1px solid var(--line)" : "none" }}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>{full}</div>{capTicker(nc.capWeek[k], (v) => patch({ capWeek: { ...nc.capWeek, [k]: v } }))}</div>
               ))}
             </div>
-            <p style={HINT}>Type each day's number. Blank = No limit; 0 = no new clients that day.</p>
+            <p style={HINT}>Tap − / + for each day. No limit = unlimited; None = none that day.</p>
           </>
         )}
         <p style={HINT}>New means anyone with no prior booking. Once {first} hits the limit for a day, that day shows as fully booked to new clients online — they’re offered the waitlist instead. Staff can still book anyone in by hand.</p>
