@@ -181,6 +181,7 @@ const GUARDS = [
   { needle: "refund-record-actual", label: "a card refund records the amount STRIPE ACTUALLY refunded (res.amount), not the amount typed — both refund paths; the authoritative figure was being discarded, so the ledger could silently drift from the processor" },
   { needle: "provider-photo-hours-revert", label: "providers/services/waitlist use LIVE refs (providersRef/servicesRef/waitlistRef) in localTableState — a realtime refetch used to merge a STALE closure over the server and re-save it, reverting a just-saved staff photo/hours edit; reverting this reopens the 'edits don't stick' bug (appts/clients already use refs for the same reason)" },
   { needle: "sheet-dvh-scroll", label: "_SHEET.wrap sizes to 100dvh (not inset:0) so the pinned foot/Save button stays on-screen on iOS mobile web — inset:0 resolves against the tall layout viewport and pushes Save below the visible area with no way to scroll to it (the calendar Edit-hours / TimeBlock sheets)" },
+  { needle: "hours-sheet-stable-identity", label: "DayEditSheet + RepeatPopup are MODULE-LEVEL components (stable identity), rendered with a per-day key — so a background realtime re-render of StaffMembersView can't remount them mid-edit and silently wipe the in-progress staff-hours draft / reset scroll; inlining them again (const X = () => {}) reopens that edit-loss bug" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
