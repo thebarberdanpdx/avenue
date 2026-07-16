@@ -5765,6 +5765,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       }
       if (existing && existing.id) {
         clientId = existing.id; // reuse the existing profile
+        const _exId = existing.id; if (smsConsent) setClients((cur) => cur.map((c) => c.id === _exId ? { ...c, smsConsent: true, smsConsentAt: new Date().toISOString(), smsOptOut: false } : c)); // opt-in re-enables texting for imported/no-consent clients (consent-reenables-sms)
       } else {
         clientId = "c" + baseId + Math.floor(Math.random() * 1000);
         const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), smsConsent: smsConsent, smsConsentAt: smsConsent ? new Date().toISOString() : undefined, provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30), business) : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile) ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } : undefined };
@@ -5774,7 +5775,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     } else if (matched) {
       // Returning client confirmed/updated their info — write the chosen values to their profile
       // so a barber-added record gets an email, a corrected name persists, etc.
-      setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), lastActivity: new Date().toISOString() } : c));
+      setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), lastActivity: new Date().toISOString(), ...(smsConsent ? { smsConsent: true, smsConsentAt: new Date().toISOString(), smsOptOut: false } : {}) } : c)); // opt-in re-enables texting for imported/no-consent clients (consent-reenables-sms)
     }
     // New-client-per-day cap (audit #29): a genuinely first-time booker (a brand-new profile was just
     // created — matched/looked-up returning clients never count) can't push a barber past their daily
