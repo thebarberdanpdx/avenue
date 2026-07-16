@@ -13241,7 +13241,21 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       // and lets a stale copy quietly win. Never create a service without one.
       const maxOrder = services.reduce((m, s) => Math.max(m, (s && typeof s.order === "number") ? s.order : -1), -1);
       setServices([...services, { ...clean, order: maxOrder + 1 }]);
-    } else setServices(services.map((s) => (s.id === editing ? { ...clean, order: (typeof s.order === "number" ? s.order : clean.order) } : s)));
+    } else {
+      // Global cut styles: a service's cut-style DEFINITIONS (label/desc/+price/+time, matched by option
+      // id) propagate to every other service that offers cut styles — so you "define once." Per-barber
+      // overrides live on each service's own staff map and are left untouched, and only services that
+      // already offer cut styles receive the sync (never adds/removes the group). (cut-styles-global)
+      const cutG = (clean.addonGroups || []).find((g) => g && g.type === "choice" && String(g.id) === "cutchoice");
+      const syncCut = (svc) => {
+        if (!cutG) return svc;
+        const idx = (svc.addonGroups || []).findIndex((x) => x && x.type === "choice" && String(x.id) === "cutchoice");
+        if (idx < 0) return svc;
+        const opts = (cutG.options || []).map((o) => ({ ...o }));
+        return { ...svc, addonGroups: svc.addonGroups.map((x, k) => (k === idx ? { ...x, label: cutG.label, required: cutG.required, options: opts } : x)) };
+      };
+      setServices(services.map((s) => (s.id === editing ? { ...clean, order: (typeof s.order === "number" ? s.order : clean.order) } : syncCut(s))));
+    }
     // MangoMint pattern: saving a section lands on the service's section menu. A brand-new
     // service becomes a real one (editing → its id) so its menu opens with add-ons/staff ready.
     if (editing === "new") setEditing(clean.id);
@@ -14021,7 +14035,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const removeCutStyle = (oi) => { if (typeof window !== "undefined" && !window.confirm("Remove this cut style?")) return; setCutGroup({ options: cutOpts.filter((_, k) => k !== oi) }); };
   const cutsBody = cutGroup ? (
     <>
-      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 22 }}>Clients choose one when they book, and read its description on a pop-up first. Price &amp; time add on top of the base ({form.price ? `$${form.price}` : "—"} · {form.duration || "—"} min).</p>
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 22 }}>Clients choose one when they book, and read its description on a pop-up first. Price &amp; time add on top of the base ({form.price ? `$${form.price}` : "—"} · {form.duration || "—"} min). Shared across your haircut services — edit once here.</p>
       <div>
         {cutOpts.map((o, oi) => {
           const open = openCutId === o.id;
