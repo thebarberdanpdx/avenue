@@ -233,6 +233,23 @@ try {
   record(false, "Calendar sync contract (structural)", "check error: " + e.message);
 }
 
+// 6b) Declaration-order guard (temporal dead zone). `cutsScreen` builds its JSX eagerly and CALLS
+//     backBar() the moment its const initializes, so `backBar` MUST be declared before it. A backBar
+//     declared later is a runtime ReferenceError ("Cannot access 'backBar' before initialization")
+//     that crashes the whole Services editor on open — shipped once on 2026-07-16, invisible to both
+//     the build and eslint no-undef (the var IS defined, just used too early). This locks the order.
+try {
+  const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
+  const bb = app.indexOf("const backBar =");
+  const cs = app.indexOf("const cutsScreen =");
+  const ok = bb !== -1 && cs !== -1 && bb < cs;
+  record(ok, "No TDZ in Services editor (backBar before cutsScreen)",
+    ok ? "backBar is declared before its eager use in cutsScreen"
+       : "backBar is missing or declared AFTER cutsScreen — temporal-dead-zone crash on the Services page; move the backBar declaration above cutsScreen");
+} catch (e) {
+  record(false, "No TDZ in Services editor (backBar before cutsScreen)", "check error: " + e.message);
+}
+
 // 7) No out-of-scope variable references (eslint no-undef). This is the EXACT class of bug
 //    that crashed the Settings tab on 2026-07-11 — a variable used where it isn't in scope
 //    (a prop not passed down). `npm run build` does NOT catch it: it only throws when that

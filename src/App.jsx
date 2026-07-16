@@ -14040,6 +14040,18 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const addonsBody = renderGroups("all"); // merged: add-ons + questions in one section
   const questionsBody = renderGroups("choice"); // kept for the standalone Questions deep-link (legacy)
 
+  // A whole-row back link (chevron + label both tappable). Declared HERE — ABOVE cutsScreen/cutsBody —
+  // on purpose: cutsScreen builds its JSX eagerly and CALLS backBar() the moment its const initializes,
+  // so a declaration further down (where the other drill-in screens live) was a temporal-dead-zone
+  // ReferenceError ("Cannot access backBar before initialization") that crashed the whole Services
+  // editor on open. Keep backBar above the first screen that uses it. (tdz-backbar-guard)
+  const backBar = (label, onBack) => (
+    <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "none", padding: "6px 6px 6px 0", marginBottom: 6, cursor: "pointer", color: "var(--gold)", WebkitTapHighlightColor: "transparent" }}>
+      <ChevronLeft size={20} />
+      <span style={{ fontSize: 13, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{label}</span>
+    </button>
+  );
+
   // ---- CUT STYLES (clean, first-class) — a re-skin of the existing "cutchoice" question. Reads/writes
   // the SAME addonGroup.options + staff.answerPrice/answerDur, so the pricing engine (answerPriceFor/
   // answerDuration → locked appt.price) is untouched. Styles add price/time on top of the base, like
@@ -14425,13 +14437,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.1px" }}>{label}</span>
       {sub && <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 400 }}> · {sub}</span>}
     </div>
-  );
-  // A whole-row back link (chevron + label both tappable, with a comfortable hit area).
-  const backBar = (label, onBack) => (
-    <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "none", padding: "6px 6px 6px 0", marginBottom: 6, cursor: "pointer", color: "var(--gold)", WebkitTapHighlightColor: "transparent" }}>
-      <ChevronLeft size={20} />
-      <span style={{ fontSize: 13, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{label}</span>
-    </button>
   );
   const microLbl = { fontFamily: FONT_BODY, fontSize: 12, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 5, display: "block" };
   const fieldBox = { border: "1px solid var(--border2)", borderRadius: 12, background: "var(--panel)", padding: "9px 13px 10px" };
