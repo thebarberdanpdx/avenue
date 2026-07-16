@@ -66,6 +66,17 @@ function runningLateText(business, { client, provider, range }) {
     .replace(/\{range\}/g, String(range == null ? "" : range));
 }
 
+// visit-stamp: return the client with lastVisit advanced to this visit's date and visits bumped by one,
+// so the rebook / overdue radar (which reads client.lastVisit + cadenceDays) builds from real checkouts.
+// PURE + idempotency lives at the call site (gated on the appt not already being counted → visitCountedAt),
+// so a reopened / re-paid ticket never double-counts. lastVisit only moves FORWARD, so checking out an old
+// backfilled ticket can't rewind a newer visit. Unit-tested in tests/visit-stamp.test.mjs.
+function stampVisitOnClient(c, appt) {
+  const visitIso = (appt && appt.bookedFor) || new Date().toISOString();
+  const advance = (!c || !c.lastVisit || new Date(visitIso) > new Date(c.lastVisit)) ? visitIso : c.lastVisit;
+  return { ...c, lastVisit: advance, visits: (Number(c && c.visits) || 0) + 1, lastActivity: new Date().toISOString() };
+}
+
 // Native-only haptic tap (Capacitor Haptics). Dynamically imported like our other native plugins so
 // the web bundle stays lean; a silent no-op on the web (Apple blocks web haptics) and never throws.
 // The physical "tick" on a tap is what makes the installed app feel native rather than like a machine.
@@ -22298,7 +22309,15 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const commitCheckout = (id, summary) => {
     if (committedRef.current[id]) return;
     committedRef.current[id] = true;
-    setAppts((cur) => { const next = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
+    const _visitSrc = appts.find((a) => a.id === id);
+    const _countVisit = !!(_visitSrc && !_visitSrc.visitCountedAt);   // count each appt as a visit at most once
+    setAppts((cur) => { const next = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null, visitCountedAt: a.visitCountedAt || new Date().toISOString() } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
+    // visit-stamp: a completed checkout advances the client's lastVisit + bumps visits (once per appt,
+    // gated by visitCountedAt), so the rebook / overdue radar builds from real checkouts. Skips the
+    // "guest" placeholder; walk-ins have a real client record so they count.
+    if (_countVisit && _visitSrc && _visitSrc.clientId && _visitSrc.clientId !== "guest") {
+      setClients((curC) => curC.map((c) => c.id === _visitSrc.clientId ? stampVisitOnClient(c, _visitSrc) : c));
+    }
     // "Text a reminder instead" stamps the client HERE, at the same commit moment as the ticket —
     // stamping it after the closing dwell (like the old checkout write) could lose the reminder
     // to an app swipe-away. The reminder cron picks it up from client.bookReminder.
@@ -27623,7 +27642,13 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const cancelAppt = (a) => { setAppts((cur) => { const next = cur.map((x) => x.id === a.id ? { ...x, status: "cancelled" } : x); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; }); setDetail(null); showToast("Appointment cancelled."); };
   // Commit runs the moment checkout shows "All done" (idempotent — the close re-runs it harmlessly),
   // so backgrounding the app during the closing animation can't lose the paid/done status.
-  const commitCheckoutLite = (id, summary) => setAppts((cur) => { const next = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt) } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
+  const commitCheckoutLite = (id, summary) => {
+    const src = appts.find((a) => a.id === id);
+    const countVisit = !!(src && !src.visitCountedAt);
+    setAppts((cur) => { const next = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), visitCountedAt: a.visitCountedAt || new Date().toISOString() } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
+    // visit-stamp: mirror commitCheckout — advance lastVisit + bump visits once per appt (visitCountedAt).
+    if (countVisit && src && src.clientId && src.clientId !== "guest") setClients((curC) => curC.map((c) => c.id === src.clientId ? stampVisitOnClient(c, src) : c));
+  };
   const finishCheckoutLite = (id, summary) => { commitCheckoutLite(id, summary); setCheckout(null); showToast("Payment recorded."); };
   const sameDayLocal = (iso, ref) => { if (!iso || !ref) return false; const a = new Date(iso); return a.getFullYear() === ref.getFullYear() && a.getMonth() === ref.getMonth() && a.getDate() === ref.getDate(); };
   // Double-booking guard for inline reschedule — mirrors the online-booking guard
