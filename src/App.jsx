@@ -14033,6 +14033,27 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const setCutOpt = (oi, patch) => setCutGroup({ options: cutOpts.map((x, k) => (k === oi ? { ...x, ...patch } : x)) });
   const addCutStyle = () => { const id = "cs" + Date.now(); setCutGroup({ options: [...cutOpts, { id, label: "", desc: "", price: 0, min: 0 }] }); setOpenCutId(id); };
   const removeCutStyle = (oi) => { if (typeof window !== "undefined" && !window.confirm("Remove this cut style?")) return; setCutGroup({ options: cutOpts.filter((_, k) => k !== oi) }); };
+  // Offers-cut-styles toggle: adds/removes the shared cut question on THIS service. Turning it on seeds
+  // the styles from another haircut service (or a sensible default) so they stay "defined once"; turning
+  // it off removes the group. Persists immediately so the hub toggle sticks without a section save. (cut-styles-toggle)
+  const setOffersCutStyles = (on) => {
+    const groups = form.addonGroups || [];
+    const has = groups.some((g) => g && g.type === "choice" && String(g.id) === "cutchoice");
+    if (on === has) return;
+    let newGroups;
+    if (on) {
+      const src = (services || []).map((s) => (s.addonGroups || []).find((g) => g && g.type === "choice" && String(g.id) === "cutchoice")).find(Boolean);
+      const opts = src ? (src.options || []).map((o) => ({ ...o })) : [
+        { id: "standard", label: "Standard cut", desc: "Some length kept, nothing taken down to the skin.", price: 0, min: 0 },
+        { id: "skinfade", label: "Skin fade or specialty style", desc: "Faded down close to the skin.", price: 5, min: 10 },
+      ];
+      newGroups = [{ id: "cutchoice", label: "Choose your cut", type: "choice", required: true, options: opts }, ...groups];
+    } else {
+      newGroups = groups.filter((g) => !(g && g.type === "choice" && String(g.id) === "cutchoice"));
+    }
+    setForm((f) => ({ ...f, addonGroups: newGroups }));
+    if (editing && editing !== "new") setServices((svcs) => svcs.map((s) => (s.id === editing ? { ...s, addonGroups: newGroups } : s)));
+  };
   const cutsBody = cutGroup ? (
     <>
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 22 }}>Clients choose one when they book, and read its description on a pop-up first. Price &amp; time add on top of the base ({form.price ? `$${form.price}` : "—"} · {form.duration || "—"} min). Shared across your haircut services — edit once here.</p>
@@ -14637,7 +14658,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             : (offeringCount === staffList.length ? "All staff · default pricing" : `${offeringCount} of ${staffList.length} · default pricing`);
           const menuRows = [
             { target: "details", label: "Details", sub: `$${form.price || "—"} · ${form.duration || "—"} min · ${form.category || cats[0]}` },
-            ...(cutGroup ? [{ target: "cuts", label: "Cut styles", sub: `${cutOpts.length} style${cutOpts.length === 1 ? "" : "s"}${cutGroup.required !== false ? " · required" : ""}` }] : []),
             { target: "staff", label: "Staff", sub: staffSub },
             { target: "addons", label: "Add-ons", sub: addonCount ? `${addonCount} added` : "None yet" },
             { target: "photos", label: "Photos", sub: photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "None yet" },
@@ -14663,6 +14683,26 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                     <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
                   </button>
                 ))}
+              </div>
+
+              {/* Offers cut styles — adds/removes the shared cut question; when on, jump to the shared styles editor. */}
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden", marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "18px 18px" }}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, color: "var(--text)" }}>Offers cut styles</span>
+                    <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>Clients pick a style when they book</span>
+                  </span>
+                  <span onClick={() => setOffersCutStyles(!cutGroup)} style={{ cursor: "pointer", flexShrink: 0 }}>{pillSwitch(!!cutGroup)}</span>
+                </div>
+                {cutGroup && (
+                  <button onClick={() => setSection("cuts")} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "var(--panel2)", border: "none", borderTop: "1px solid var(--line)", padding: "15px 18px", textAlign: "left", cursor: "pointer" }}>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "block", fontSize: 14, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cutOpts.map((o) => o.label).filter(Boolean).join(" · ") || "No styles yet"}</span>
+                      <span style={{ display: "block", fontSize: 12, color: "var(--faint)", marginTop: 3 }}>Shared across your haircuts — edit once</span>
+                    </span>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", flexShrink: 0 }}>Edit ›</span>
+                  </button>
+                )}
               </div>
 
               {/* Advanced (cut styles legacy + combo) */}
