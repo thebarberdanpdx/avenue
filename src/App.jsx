@@ -5569,7 +5569,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     for (const g of gs) {
       const resolved = g.type === "choice"
         ? (!!(e.addons || {})[g.id] || g.required === false)
-        : (g.required !== true ? true : (!!(e.addons || {})[g.id] || !!(e.declined || {})[g.id]));
+        : (g.required === false ? true : (!!(e.addons || {})[g.id] || !!(e.declined || {})[g.id])); // addon-required-default (see gate below)
       if (resolved) n++; else break;
     }
     return n + "/" + gs.length;
@@ -6796,7 +6796,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const ordered = [...choices, ...extras];
           const isResolved = (g) => g.type === "choice"
             ? (!!(e.addons || {})[g.id] || g.required === false)
-            : (g.required !== true ? true : (!!(e.addons || {})[g.id] || !!(e.declined || {})[g.id]));
+            : (g.required === false ? true : (!!(e.addons || {})[g.id] || !!(e.declined || {})[g.id])); // addon question blocks Continue unless EXPLICITLY optional (required:false) — same default as choice groups + staff side; a legacy/undefined addon must be answered (addon-required-default)
           // Show every group up to and including the first one still awaiting an answer.
           const firstOpen = ordered.findIndex((g) => !isResolved(g));
           const shown = firstOpen === -1 ? ordered : ordered.slice(0, firstOpen + 1);
