@@ -26,6 +26,46 @@ const IS_NATIVE = typeof window !== "undefined" && (
 );
 const API_BASE = IS_NATIVE ? "https://gotvero.com" : "";
 
+// True on iOS — the native app (Capacitor) OR mobile Safari. Decides the sms: body separator
+// below: iOS wants `sms:NUMBER&body=…`, Android/everything-else wants `sms:NUMBER?body=…`.
+const IS_IOS = IS_NATIVE || (typeof navigator !== "undefined" && /iP(hone|ad|od)/.test(navigator.userAgent || ""));
+
+// running-late-taptext: build an `sms:` deep link that PREFILLS the message body, so the barber's
+// own Messages app opens addressed + pre-typed and THEY hit send. Nothing is sent by the system —
+// this deliberately sidesteps SMS opt-out (a human texting from their own phone is not our automated
+// marketing). Pure + platform-EXPLICIT (isIOS passed in, not read from globals) so it's unit-tested
+// in tests/smslink.test.mjs against the exact iOS vs Android strings. US 10-digit numbers normalize
+// to +1 E.164; an already-+ number passes through; an empty/garbage number returns "" so the caller
+// can HIDE the link instead of building a broken `sms:`. The body is always encodeURIComponent'd so
+// a "&", "?" or "#" in the copy can't corrupt the URL.
+function smsLink(number, body, isIOS) {
+  const raw = String(number == null ? "" : number).replace(/[^\d+]/g, "");
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  const to = raw[0] === "+" ? raw
+    : digits.length === 10 ? "+1" + digits
+    : (digits.length === 11 && digits[0] === "1") ? "+" + digits
+    : digits;
+  if (!body) return "sms:" + to;
+  return "sms:" + to + (isIOS ? "&" : "?") + "body=" + encodeURIComponent(body);
+}
+
+// Fill the running-late template's tags for a self-sent text. REUSES the shop's saved wording
+// (business.runningLate.message — the same copy the settings editor edits) so there's one source of
+// truth for the message; falls back to a short default only if the shop cleared it. Handles the four
+// tags the running-late editor documents: {client} {provider} {shop} {range} (+ {business} alias).
+function runningLateText(business, { client, provider, range }) {
+  const tpl = (business && business.runningLate && business.runningLate.message)
+    || "Hi {client}, running about {range} min behind — see you soon!";
+  const shop = (business && business.name) || "the shop";
+  return String(tpl)
+    .replace(/\{client\}/g, client || "there")
+    .replace(/\{provider\}/g, provider || "your barber")
+    .replace(/\{shop\}/g, shop)
+    .replace(/\{business\}/g, shop)
+    .replace(/\{range\}/g, String(range == null ? "" : range));
+}
+
 // Native-only haptic tap (Capacitor Haptics). Dynamically imported like our other native plugins so
 // the web bundle stays lean; a silent no-op on the web (Apple blocks web haptics) and never throws.
 // The physical "tick" on a tap is what makes the installed app feel native rather than like a machine.
@@ -4519,48 +4559,11 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject, ex
   } catch (e) {}
 }
 
-// Actually SEND the running-late heads-up to the next client. This is the real send behind the
-// "Let them know" prompt, which used to only flip a flag + toast "Sent" while nothing left the
-// device. Goes through the SAME /api/notify pipeline as reminders (server-side on-file guard +
-// SMS_LIVE gating). channel:"text" → SMS once 10DLC is live, otherwise it bridges to email.
-// Returns a result so the caller can report HONESTLY (which channel actually sent, or why not).
-async function fireRunningLate({ shopId, business, providers, appt, client, range }) {
-  try {
-    if (!appt || !business) return { ok: false, reason: "missing" };
-    const tpl = (business.runningLate || {}).message;
-    if (!tpl) return { ok: false, reason: "no-template" };
-    const prov = (providers || []).find((p) => p.id === appt.providerId) || {};
-    const email = String((client && client.email) || appt.email || "").trim();
-    const phone = String((client && client.phone) || appt.phone || "").replace(/\D/g, "");
-    if (!email && !phone) return { ok: false, reason: "no-contact", email, phone };
-    const ctx = {
-      client: String((client && client.name) || appt.name || "there").split(" ")[0],
-      provider: prov.name || appt.providerName || "your barber",
-      shop: business.name || "the shop", business: business.name || "the shop",
-      range: String(range),
-    };
-    const r = await fetch(API_BASE + "/api/notify", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shop: shopId || _stripeShop, channel: "text", to: { email, phone, smsOptOut: !!(client && client.smsOptOut) }, subject: `${business.name}: running a little behind`, template: tpl, context: ctx }),
-    });
-    const j = await r.json().catch(() => ({}));
-    const results = (j && j.results) || {};
-    const sentVia = results.sms === "sent" ? "text" : results.email === "sent" ? "email" : null;
-    return { ok: !!sentVia, sentVia, results, smsLive: !!(j && j.smsLive), email, phone };
-  } catch (e) { return { ok: false, reason: "network" }; }
-}
-
-// Plain-English reason a running-late heads-up didn't go out — so the toast tells the truth instead
-// of claiming "Sent" when nothing left. Mirrors what /api/notify actually reports back.
-function runningLateFailReason(res) {
-  if (!res) return "it couldn't be delivered";
-  if (res.reason === "no-contact" || (!res.email && !res.phone)) return "no phone or email on file";
-  const rr = res.results || {};
-  if (typeof rr.email === "string" && rr.email.startsWith("error")) return "the email failed to send";
-  if (typeof rr.sms === "string" && rr.sms.startsWith("error")) return "the text failed to send";
-  if (res.smsLive === false && !res.email) return "texting isn't switched on yet and they have no email on file";
-  return "it couldn't be delivered";
-}
+// Running-late is now TAP-TO-TEXT: the "let them know" prompts open the barber's own Messages app,
+// pre-typed, and the barber hits send (smsLink + runningLateText near the top of the file). There is
+// deliberately NO automated send here — that's what sidesteps SMS opt-out (a human texting from their
+// own phone isn't our automated marketing). The old fireRunningLate()/runningLateFailReason() helpers
+// that POSTed to /api/notify were removed with that switch.
 
 // Resolve a team-alert event's channels from business.staffAlerts, honoring BOTH the legacy
 // shape (sa[event] = boolean push-gate, plus emailStaffOnBooking for the booking email) AND the
@@ -10089,18 +10092,27 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 10 }}>
             {minutesLeft} min left with {inChair.name}. {(nextAppt.name || "").split(" ")[0]} is up next at {fmtTime(nextAppt.start)}. Want to give them a heads-up?
           </div>
-          <button onClick={() => {
+          {(() => {
+            // running-late-taptext: this button opens the BARBER's own Messages app, pre-addressed to
+            // the next client and pre-typed from the shop's running-late wording — the barber hits send.
+            // Nothing is sent by the system, so it never touches SMS opt-out (a human texting from their
+            // own phone isn't our automated marketing). Marking notified on tap clears the prompt, same
+            // as the old auto-send button did. No phone on file → no link, just an honest note.
             const lateMin = (business?.runningLate?.defaultMin) || 10;
-            setAppts((cur) => cur.map((a) => a.id === nextAppt.id ? { ...a, lateNotified: lateMin } : a));
             const rec = (clients || []).find((c) => c.id === nextAppt.clientId) || null;
             const first = (nextAppt.name || "there").split(" ")[0];
-            // ACTUALLY send it — text when SMS is live, else email. Toast reflects the real result.
-            fireRunningLate({ business, providers, appt: nextAppt, client: rec, range: lateMin }).then((res) => {
-              if (!showToast) return;
-              if (res && res.ok) showToast(`Heads-up ${res.sentVia === "text" ? "texted" : "emailed"} to ${first} — running ${lateMin} min behind.`);
-              else showToast(`Couldn't reach ${first} — ${runningLateFailReason(res)}. Nothing was sent.`);
-            });
-          }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "9px 16px", borderRadius: 22, fontSize: 13.5, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>LET THEM KNOW</button>
+            const prov = (providers || []).find((p) => p.id === nextAppt.providerId) || {};
+            const phone = String((rec && rec.phone) || nextAppt.phone || "").trim();
+            const href = phone ? smsLink(phone, runningLateText(business, { client: first, provider: prov.name, range: lateMin }), IS_IOS) : "";
+            const markNotified = () => setAppts((cur) => cur.map((a) => a.id === nextAppt.id ? { ...a, lateNotified: lateMin } : a));
+            return href ? (
+              <a href={href} onClick={markNotified} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--gold)", color: "var(--on-gold)", padding: "9px 16px", borderRadius: 22, fontSize: 13.5, letterSpacing: 0.5, fontWeight: 600, border: "none", textDecoration: "none" }}>
+                <MessageSquare size={16} /> Text {first}
+              </a>
+            ) : (
+              <div style={{ fontSize: 13, color: "var(--sub)" }}>No phone on file to text {first}.</div>
+            );
+          })()}
         </div>
       )}
 
@@ -16034,7 +16046,7 @@ function RunningLateEditor({ r, onChange }) {
 
         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
           <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Delay options to offer</div>
-          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>The "how far behind" choices you tap when sending the notice.</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>The "how far behind" choices you tap when you text your next client.</div>
           {ranges.map((rg, i) => (
             <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
               <input value={rg} onChange={(e) => setRange(i, e.target.value)} placeholder="e.g. 5–10" style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
@@ -16046,7 +16058,7 @@ function RunningLateEditor({ r, onChange }) {
 
         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
           <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Message to the client</div>
-          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>Sent as an in-app notification — no text message.</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>This opens pre-typed in your own Messages when you text your next client — you tap send. Nothing is sent automatically.</div>
           <textarea value={r.message || ""} onChange={(e) => set({ message: e.target.value })} rows={4} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", resize: "vertical", lineHeight: 1.5 }} />
           <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.5 }}>Tags you can use: <strong style={{ color: "var(--sub)" }}>{"{client}"}</strong> name, <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> staff member, <strong style={{ color: "var(--sub)" }}>{"{shop}"}</strong>, <strong style={{ color: "var(--sub)" }}>{"{range}"}</strong> minutes behind.</div>
         </div>
@@ -26048,38 +26060,36 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const nextIsWaiting = nextClient && nextClient.status === "checked-in";
   const [lateOpen, setLateOpen] = useState(false);
   const [lateCascade, setLateCascade] = useState(null); // { ci, idx } — asking about laterClients[idx] with band ranges[ci-idx]
+  // running-late-taptext: open THIS barber's Messages app, pre-addressed to the next client and
+  // pre-typed from the shop's running-late wording — the barber taps send. Nothing is sent by the
+  // system, so it never touches SMS opt-out (a human texting from their own phone isn't our automated
+  // marketing). No phone on file → honest toast, no broken sms: link.
+  const openLateText = (target, range) => {
+    const rec = (clients || []).find((c) => c.id === target.clientId) || null;
+    const first = (target.name || "there").split(" ")[0];
+    const prov = (providers || []).find((p) => p.id === target.providerId) || {};
+    const phone = String((rec && rec.phone) || target.phone || "").trim();
+    const href = phone ? smsLink(phone, runningLateText(business, { client: first, provider: prov.name, range }), IS_IOS) : "";
+    if (!href) { showToast(`No phone on file to text ${first}.`); return false; }
+    onUpdate(target.id, { lateNotified: range });
+    if (typeof window !== "undefined") window.location.href = href;
+    return true;
+  };
   const sendRunningLate = (range) => {
     const rl = (business && business.runningLate) || {};
-    if (nextClient) {
-      onUpdate(nextClient.id, { lateNotified: range });
-      const rec = (clients || []).find((c) => c.id === nextClient.clientId) || null;
-      const first = (nextClient.name || "there").split(" ")[0];
-      // ACTUALLY send it (this is the fix): text if SMS is live, otherwise bridge to email. Toast
-      // reports the real result — no more claiming "Sent" when nothing left the phone.
-      fireRunningLate({ shopId, business, providers, appt: nextClient, client: rec, range }).then((res) => {
-        if (res && res.ok) showToast(`Heads-up ${res.sentVia === "text" ? "texted" : "emailed"} to ${first} — running ${range} min behind.`);
-        else showToast(`Couldn't reach ${first} — ${runningLateFailReason(res)}. Nothing was sent.`);
-      });
-    } else {
-      showToast("No next client to notify.");
-    }
+    if (nextClient) openLateText(nextClient, range);
+    else showToast("No next client to notify.");
     // Cascade: offer to warn the client after next, with a lighter band as you catch up — asked one at a time.
     const ranges = (rl.ranges) || ["5–10", "10–15"];
     const ci = ranges.indexOf(range);
     if (laterClients.length > 1 && ci - 1 >= 0) setLateCascade({ ci, idx: 1 });
     else setLateOpen(false);
   };
-  // "Send again" — re-fire the exact same running-late text to the next client, at the band already
-  // recorded. No cascade, no re-picking; just resend the message that was (or should have been) sent.
+  // "Text again" — re-open Messages to the next client at the band already recorded. No cascade,
+  // no re-picking; just re-prefill the same message so the barber can send it again.
   const resendRunningLate = () => {
     if (!nextClient) return;
-    const band = nextClient.lateNotified;
-    const rec = (clients || []).find((c) => c.id === nextClient.clientId) || null;
-    const first = (nextClient.name || "there").split(" ")[0];
-    fireRunningLate({ shopId, business, providers, appt: nextClient, client: rec, range: band }).then((res) => {
-      if (res && res.ok) showToast(`Re-sent to ${first} — running ${band} min behind.`);
-      else showToast(`Couldn't reach ${first} — ${runningLateFailReason(res)}. Nothing was sent.`);
-    });
+    openLateText(nextClient, nextClient.lateNotified);
   };
   const cascadeYes = () => {
     if (!lateCascade) return;
@@ -26087,16 +26097,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     const { ci, idx } = lateCascade;
     const target = laterClients[idx];
     const band = ranges[ci - idx];
-    if (target && band != null) {
-      onUpdate(target.id, { lateNotified: band });
-      const rec = (clients || []).find((c) => c.id === target.clientId) || null;
-      const first = (target.name || "").split(" ")[0];
-      fireRunningLate({ shopId, business, providers, appt: target, client: rec, range: band }).then((res) => {
-        if (!showToast) return;
-        if (res && res.ok) showToast(`Also ${res.sentVia === "text" ? "texted" : "emailed"} ${first} — running ${band} min behind.`);
-        else showToast(`Couldn't reach ${first} — ${runningLateFailReason(res)}.`);
-      });
-    }
+    if (target && band != null) openLateText(target, band);
     // Offer the next one down too, if there is one and you haven't caught up yet.
     const nextIdx = idx + 1;
     if (laterClients[nextIdx] && (ci - nextIdx) >= 0) setLateCascade({ ci, idx: nextIdx });
@@ -26695,7 +26696,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   {!lateCascade ? (
                   <>
                   <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, marginBottom: 4 }}>How far behind?</div>
-                  <div style={{ fontSize: 15, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>We'll send {nextClient ? nextClient.name : "your next client"} an in-app notification — no text message.</div>
+                  <div style={{ fontSize: 15, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>Opens your Messages to text {nextClient ? nextClient.name : "your next client"}, pre-typed — you tap send. Works even if they're not opted in.</div>
                   <div style={{ display: "flex", gap: 10 }}>
                     {((business?.runningLate?.ranges) || ["5–10", "10–15"]).map((r) => (
                       <button key={r} className="lift" onClick={() => sendRunningLate(r)} style={{ flex: 1, background: T.chip, border: `1px solid ${T.line}`, color: T.text, padding: "16px 0", borderRadius: 14, fontSize: 16, fontWeight: 600 }}>{r} min</button>
@@ -26712,12 +26713,12 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   return (
                   <>
                   <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, marginBottom: 4 }}>{lateCascade.idx === 1 ? "Let the client after next know too?" : "And the next one in line?"}</div>
-                  <div style={{ fontSize: 15, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>{target.name} is up at {fmtTime(target.start)}. As you catch up, they'd get a lighter heads-up.</div>
+                  <div style={{ fontSize: 15, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>{target.name} is up at {fmtTime(target.start)}. As you catch up, you can text them a lighter heads-up.</div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
                     <span style={{ fontSize: 16, fontWeight: 500 }}>{target.name}</span>
                     <span style={{ fontSize: 15, color: T.accent, fontWeight: 600 }}>{band} min behind</span>
                   </div>
-                  <button className="lift" onClick={cascadeYes} style={{ width: "100%", background: T.accent, color: T.accentText, border: "none", padding: "15px 0", borderRadius: 14, fontSize: 16.5, fontWeight: 600 }}>Yes, let {tFirst} know</button>
+                  <button className="lift" onClick={cascadeYes} style={{ width: "100%", background: T.accent, color: T.accentText, border: "none", padding: "15px 0", borderRadius: 14, fontSize: 16.5, fontWeight: 600 }}>Text {tFirst}</button>
                   <button onClick={() => { setLateCascade(null); setLateOpen(false); }} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: T.sub, fontSize: 15.5, padding: 8 }}>No, that's all</button>
                   </>
                   );
