@@ -8129,7 +8129,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {ncCapFull && (
               <div style={{ background: "rgba(176,141,87,0.10)", border: "1px solid rgba(176,141,87,0.30)", borderRadius: 12, padding: "13px 16px", marginBottom: 18, display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <AlertCircle size={17} style={{ color: "var(--text)", flexShrink: 0, marginTop: 1 }} />
-                <div style={{ fontSize: 14, lineHeight: 1.5 }}>That day is fully booked for new clients — please pick another day, or choose a specific barber.</div>
+                {/* nc-cap-silent: never reveal the new-client cap to the client — read as a normal full day. */}
+                <div style={{ fontSize: 14, lineHeight: 1.5 }}>That day just filled up — please try another day, or pick a specific barber.</div>
               </div>
             )}
             {overdueExtra > 0 && business.overdueBuffer && (() => {
