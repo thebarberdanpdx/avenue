@@ -9548,7 +9548,6 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   const inChair = todayApptsAll.find((a) => a.start <= nowMin && a.end > nowMin && a.status !== "done");
   const nextAppt = todayApptsAll.find((a) => a.start > nowMin && a.status !== "done");
   const minutesUntil = nextAppt ? (nextAppt.start - nowMin) : null;
-  const minutesLeft = inChair ? (inChair.end - nowMin) : null;
   const minutesInChair = inChair ? (nowMin - inChair.start) : null;
   // Forgotten check-in: a slot that's happening right now but was never started (timer not tapped).
   // Personal / per-barber view only, so "Start" is unambiguous.
@@ -10081,38 +10080,6 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           }} style={{ marginTop: 12, width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: 12, fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
             <span style={{ width: 0, height: 0, borderLeft: "8px solid currentColor", borderTop: "5px solid transparent", borderBottom: "5px solid transparent" }} /> Start the timer
           </button>
-        </div>
-      )}
-
-      {/* RUNNING LATE — surfaces on Pulse when the in-chair appointment is within the threshold of overrunning the next one,
-          so the provider can text the next client without digging through the calendar. */}
-      {inChair && nextAppt && minutesLeft != null && minutesLeft <= ((business?.runningLate?.thresholdMin) || 5) && (business?.runningLate?.enabled !== false) && !nextAppt.lateNotified && (
-        <div style={{ marginBottom: 16, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "14px 16px" }}>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--gold)", marginBottom: 6, fontWeight: 600 }}>RUNNING LATE?</div>
-          <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 10 }}>
-            {minutesLeft} min left with {inChair.name}. {(nextAppt.name || "").split(" ")[0]} is up next at {fmtTime(nextAppt.start)}. Want to give them a heads-up?
-          </div>
-          {(() => {
-            // running-late-taptext: this button opens the BARBER's own Messages app, pre-addressed to
-            // the next client and pre-typed from the shop's running-late wording — the barber hits send.
-            // Nothing is sent by the system, so it never touches SMS opt-out (a human texting from their
-            // own phone isn't our automated marketing). Marking notified on tap clears the prompt, same
-            // as the old auto-send button did. No phone on file → no link, just an honest note.
-            const lateMin = (business?.runningLate?.defaultMin) || 10;
-            const rec = (clients || []).find((c) => c.id === nextAppt.clientId) || null;
-            const first = (nextAppt.name || "there").split(" ")[0];
-            const prov = (providers || []).find((p) => p.id === nextAppt.providerId) || {};
-            const phone = String((rec && rec.phone) || nextAppt.phone || "").trim();
-            const href = phone ? smsLink(phone, runningLateText(business, { client: first, provider: prov.name, range: lateMin }), IS_IOS) : "";
-            const markNotified = () => setAppts((cur) => cur.map((a) => a.id === nextAppt.id ? { ...a, lateNotified: lateMin } : a));
-            return href ? (
-              <a href={href} onClick={markNotified} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--gold)", color: "var(--on-gold)", padding: "9px 16px", borderRadius: 22, fontSize: 13.5, letterSpacing: 0.5, fontWeight: 600, border: "none", textDecoration: "none" }}>
-                <MessageSquare size={16} /> Text {first}
-              </a>
-            ) : (
-              <div style={{ fontSize: 13, color: "var(--sub)" }}>No phone on file to text {first}.</div>
-            );
-          })()}
         </div>
       )}
 
