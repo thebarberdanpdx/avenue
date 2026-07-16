@@ -16841,6 +16841,118 @@ function estimateEarnings(provider, appts, services, ref = new Date(), sales = [
 // ============================================================
 // STAFF MEMBERS — Mangomint-style hub: list → member → sections
 // ============================================================
+// hours-sheet-stable-identity (guard): DayEditSheet + RepeatPopup are MODULE-LEVEL so a background
+// realtime re-render of StaffMembersView can't remount them mid-edit and wipe the in-progress hours
+// draft / reset scroll. Rendered with a key on the target day so they still re-init when the day
+// changes. (They were inline `const X = () => {}` recreated every render — new identity = remount.)
+function DayEditSheet({ dayEdit, person, patchException, patchDay, clearException, setDayEdit, setRepeatFor, showToast }) {
+            const dow = dayEdit.dow;
+            const theDate = dayEdit.date ? new Date(dayEdit.date) : new Date();
+            const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dow];
+            const startVal = effectiveHours(person, theDate) || { on: false, start: 540, end: 1020 };
+            const hadEx = !!(person.hoursOverrides && person.hoursOverrides[dateKey(theDate)]);
+            const [draft, setDraft] = useState({ on: !!startVal.on, start: startVal.start, end: startVal.end });
+            const [scope, setScope] = useState(hadEx ? "date" : "weekly"); // "date" = just this date · "weekly" = recurring
+            const dateLabel = `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} ${MONTHS[theDate.getMonth()].slice(0,3)} ${theDate.getDate()}`;
+            const apply = () => {
+              if (scope === "date") patchException(person.id, theDate, draft);
+              else { patchDay(person.id, dow, draft); if (hadEx) clearException(person.id, theDate); }
+              showToast && showToast(scope === "date" ? `Saved for ${dateLabel}.` : `Saved for every ${dayName}.`);
+              setDayEdit(null);
+            };
+            return (
+              <Sheet open={true} onClose={() => setDayEdit(null)} align="bottom" maxWidth={460}>
+                <div style={{ padding: "6px 2px 8px" }}>
+                  <div style={{ textAlign: "center", marginBottom: 20 }}>
+                    <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>WORK HOURS</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginTop: 6 }}>{dayName}</div>
+                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{dateLabel}</div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
+                    <span style={{ fontSize: 16, fontWeight: 500 }}>{draft.on ? "Working this day" : "Day off"}</span>
+                    <button onClick={() => setDraft((d) => ({ ...d, on: !d.on }))} aria-label={draft.on ? "Working" : "Day off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: draft.on ? "var(--gold)" : "var(--border2)", position: "relative", cursor: "pointer", transition: "background .2s" }}>
+                      <span style={{ position: "absolute", top: 3, left: draft.on ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
+                    </button>
+                  </div>
+
+                  {draft.on && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>START</div>
+                        <TimeScrollPicker value={draft.start} onChange={(v) => setDraft((d) => ({ ...d, start: v, end: Math.max(v + 15, d.end) }))} label={`${dayName} start`} full />
+                      </div>
+                      <span style={{ color: "var(--faint)", fontSize: 15, marginTop: 22 }}>–</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>END</div>
+                        <TimeScrollPicker value={draft.end} onChange={(v) => setDraft((d) => ({ ...d, end: v }))} minMin={draft.start + 15} label={`${dayName} end`} full />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* scope: one-off vs recurring */}
+                  <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "2px 2px 8px" }}>Apply this change to</div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                    {[{ v: "date", t: `Just ${dateLabel.split(" ").slice(0,1)[0]}`, s: `${MONTHS[theDate.getMonth()].slice(0,3)} ${theDate.getDate()} only` }, { v: "weekly", t: `Every ${dayName}`, s: "Going forward" }].map((o) => {
+                      const on = scope === o.v;
+                      return (
+                        <button key={o.v} onClick={() => setScope(o.v)} style={{ flex: 1, borderRadius: 12, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: "var(--text)", padding: "12px 10px", textAlign: "center", cursor: "pointer" }}>
+                          <span style={{ display: "block", fontSize: 14, fontWeight: on ? 600 : 500 }}>{o.t}</span>
+                          <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{o.s}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {draft.on && scope === "weekly" && (
+                    <button onClick={() => { patchDay(person.id, dow, draft); setRepeatFor({ dow, h: draft }); setDayEdit(null); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--gold)", fontSize: 14.5, fontWeight: 500, marginBottom: 12, cursor: "pointer" }}><Repeat size={16} /> Copy these hours to other days</button>
+                  )}
+
+                  {hadEx && scope === "date" && (
+                    <button onClick={() => { clearException(person.id, theDate); showToast && showToast(`${dateLabel} back to the usual ${dayName}.`); setDayEdit(null); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: "0 0 12px", cursor: "pointer" }}>Remove this one-off — use the usual {dayName}</button>
+                  )}
+
+                  <button onClick={apply} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 13.5, letterSpacing: 2, fontWeight: 600, borderRadius: 12, cursor: "pointer" }}>DONE</button>
+                  <button onClick={() => setDayEdit(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 2px", cursor: "pointer" }}>Cancel</button>
+                </div>
+              </Sheet>
+            );
+}
+
+function RepeatPopup({ repeatFor, person, patchDay, setRepeatFor, showToast }) {
+            const [picked, setPicked] = useState(() => new Set([repeatFor.dow]));
+            const toggle = (d) => setPicked((s) => { const n = new Set(s); n.has(d) ? n.delete(d) : n.add(d); return n; });
+            const apply = () => {
+              picked.forEach((d) => patchDay(person.id, d, { on: true, start: repeatFor.h.start, end: repeatFor.h.end }));
+              showToast && showToast(`Hours copied to ${picked.size} day${picked.size === 1 ? "" : "s"}.`);
+              setRepeatFor(null);
+            };
+            return (
+              <Sheet open={true} onClose={() => setRepeatFor(null)} align="center" maxWidth={360}>
+                <div style={{ padding: "4px 0 6px" }}>
+                  <div style={{ textAlign: "center", marginBottom: 6 }}>
+                    <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>REPEAT THESE HOURS</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginTop: 6 }}>{fmtTime(repeatFor.h.start)} – {fmtTime(repeatFor.h.end)}</div>
+                  </div>
+                  <p style={{ fontSize: 13.5, color: "var(--sub)", textAlign: "center", lineHeight: 1.5, marginBottom: 16 }}>Pick the days to copy this shift to.</p>
+                  <div style={{ display: "grid", gap: 7, marginBottom: 16 }}>
+                    {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((dn, di) => {
+                      const on = picked.has(di);
+                      return (
+                        <button key={di} onClick={() => toggle(di)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>
+                          {dn}{di === repeatFor.dow && <span style={{ fontSize: 13, color: "var(--sub)" }}>(this day)</span>}
+                          <span style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button onClick={apply} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 13.5, letterSpacing: 2, fontWeight: 600, borderRadius: 12, cursor: "pointer" }}>COPY TO {picked.size} DAY{picked.size === 1 ? "" : "S"}</button>
+                  <button onClick={() => setRepeatFor(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px" }}>Cancel</button>
+                </div>
+              </Sheet>
+            );
+}
+
 function StaffMembersView({ providers, setProviders, services, setServices, appts, clients, showToast, business, shopId, onBackRef }) {
   const SLUG = shopId || "sanctuary";
   const ORIGIN = (typeof window !== "undefined" && window.location && window.location.origin && !/capacitor|ionic|localhost/.test(window.location.origin)) ? window.location.origin : "https://gotvero.com";
@@ -17216,120 +17328,10 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
 
         {/* Per-day edit sheet — pick hours, then choose whether it's a one-off (this date)
             or the recurring shift (every weekday). Edits buffer locally and apply on Done. */}
-        {dayEdit && (() => {
-          const DayEditSheet = () => {
-            const dow = dayEdit.dow;
-            const theDate = dayEdit.date ? new Date(dayEdit.date) : new Date();
-            const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dow];
-            const startVal = effectiveHours(person, theDate) || { on: false, start: 540, end: 1020 };
-            const hadEx = !!(person.hoursOverrides && person.hoursOverrides[dateKey(theDate)]);
-            const [draft, setDraft] = useState({ on: !!startVal.on, start: startVal.start, end: startVal.end });
-            const [scope, setScope] = useState(hadEx ? "date" : "weekly"); // "date" = just this date · "weekly" = recurring
-            const dateLabel = `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} ${MONTHS[theDate.getMonth()].slice(0,3)} ${theDate.getDate()}`;
-            const apply = () => {
-              if (scope === "date") patchException(person.id, theDate, draft);
-              else { patchDay(person.id, dow, draft); if (hadEx) clearException(person.id, theDate); }
-              showToast && showToast(scope === "date" ? `Saved for ${dateLabel}.` : `Saved for every ${dayName}.`);
-              setDayEdit(null);
-            };
-            return (
-              <Sheet open={true} onClose={() => setDayEdit(null)} align="bottom" maxWidth={460}>
-                <div style={{ padding: "6px 2px 8px" }}>
-                  <div style={{ textAlign: "center", marginBottom: 20 }}>
-                    <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>WORK HOURS</div>
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginTop: 6 }}>{dayName}</div>
-                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{dateLabel}</div>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
-                    <span style={{ fontSize: 16, fontWeight: 500 }}>{draft.on ? "Working this day" : "Day off"}</span>
-                    <button onClick={() => setDraft((d) => ({ ...d, on: !d.on }))} aria-label={draft.on ? "Working" : "Day off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: draft.on ? "var(--gold)" : "var(--border2)", position: "relative", cursor: "pointer", transition: "background .2s" }}>
-                      <span style={{ position: "absolute", top: 3, left: draft.on ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
-                    </button>
-                  </div>
-
-                  {draft.on && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>START</div>
-                        <TimeScrollPicker value={draft.start} onChange={(v) => setDraft((d) => ({ ...d, start: v, end: Math.max(v + 15, d.end) }))} label={`${dayName} start`} full />
-                      </div>
-                      <span style={{ color: "var(--faint)", fontSize: 15, marginTop: 22 }}>–</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>END</div>
-                        <TimeScrollPicker value={draft.end} onChange={(v) => setDraft((d) => ({ ...d, end: v }))} minMin={draft.start + 15} label={`${dayName} end`} full />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* scope: one-off vs recurring */}
-                  <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "2px 2px 8px" }}>Apply this change to</div>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                    {[{ v: "date", t: `Just ${dateLabel.split(" ").slice(0,1)[0]}`, s: `${MONTHS[theDate.getMonth()].slice(0,3)} ${theDate.getDate()} only` }, { v: "weekly", t: `Every ${dayName}`, s: "Going forward" }].map((o) => {
-                      const on = scope === o.v;
-                      return (
-                        <button key={o.v} onClick={() => setScope(o.v)} style={{ flex: 1, borderRadius: 12, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: "var(--text)", padding: "12px 10px", textAlign: "center", cursor: "pointer" }}>
-                          <span style={{ display: "block", fontSize: 14, fontWeight: on ? 600 : 500 }}>{o.t}</span>
-                          <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{o.s}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {draft.on && scope === "weekly" && (
-                    <button onClick={() => { patchDay(person.id, dow, draft); setRepeatFor({ dow, h: draft }); setDayEdit(null); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--gold)", fontSize: 14.5, fontWeight: 500, marginBottom: 12, cursor: "pointer" }}><Repeat size={16} /> Copy these hours to other days</button>
-                  )}
-
-                  {hadEx && scope === "date" && (
-                    <button onClick={() => { clearException(person.id, theDate); showToast && showToast(`${dateLabel} back to the usual ${dayName}.`); setDayEdit(null); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: "0 0 12px", cursor: "pointer" }}>Remove this one-off — use the usual {dayName}</button>
-                  )}
-
-                  <button onClick={apply} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 13.5, letterSpacing: 2, fontWeight: 600, borderRadius: 12, cursor: "pointer" }}>DONE</button>
-                  <button onClick={() => setDayEdit(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 2px", cursor: "pointer" }}>Cancel</button>
-                </div>
-              </Sheet>
-            );
-          };
-          return <DayEditSheet />;
-        })()}
+        {dayEdit && <DayEditSheet key={"de" + dayEdit.dow + "_" + (dayEdit.date || "")} dayEdit={dayEdit} person={person} patchException={patchException} patchDay={patchDay} clearException={clearException} setDayEdit={setDayEdit} setRepeatFor={setRepeatFor} showToast={showToast} />}
 
         {/* Repeat-on-days popup */}
-        {repeatFor && (() => {
-          const RepeatPopup = () => {
-            const [picked, setPicked] = useState(() => new Set([repeatFor.dow]));
-            const toggle = (d) => setPicked((s) => { const n = new Set(s); n.has(d) ? n.delete(d) : n.add(d); return n; });
-            const apply = () => {
-              picked.forEach((d) => patchDay(person.id, d, { on: true, start: repeatFor.h.start, end: repeatFor.h.end }));
-              showToast && showToast(`Hours copied to ${picked.size} day${picked.size === 1 ? "" : "s"}.`);
-              setRepeatFor(null);
-            };
-            return (
-              <Sheet open={true} onClose={() => setRepeatFor(null)} align="center" maxWidth={360}>
-                <div style={{ padding: "4px 0 6px" }}>
-                  <div style={{ textAlign: "center", marginBottom: 6 }}>
-                    <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>REPEAT THESE HOURS</div>
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginTop: 6 }}>{fmtTime(repeatFor.h.start)} – {fmtTime(repeatFor.h.end)}</div>
-                  </div>
-                  <p style={{ fontSize: 13.5, color: "var(--sub)", textAlign: "center", lineHeight: 1.5, marginBottom: 16 }}>Pick the days to copy this shift to.</p>
-                  <div style={{ display: "grid", gap: 7, marginBottom: 16 }}>
-                    {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((dn, di) => {
-                      const on = picked.has(di);
-                      return (
-                        <button key={di} onClick={() => toggle(di)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>
-                          {dn}{di === repeatFor.dow && <span style={{ fontSize: 13, color: "var(--sub)" }}>(this day)</span>}
-                          <span style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <button onClick={apply} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 13.5, letterSpacing: 2, fontWeight: 600, borderRadius: 12, cursor: "pointer" }}>COPY TO {picked.size} DAY{picked.size === 1 ? "" : "S"}</button>
-                  <button onClick={() => setRepeatFor(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px" }}>Cancel</button>
-                </div>
-              </Sheet>
-            );
-          };
-          return <RepeatPopup />;
-        })()}
+        {repeatFor && <RepeatPopup key={"rp" + repeatFor.dow} repeatFor={repeatFor} person={person} patchDay={patchDay} setRepeatFor={setRepeatFor} showToast={showToast} />}
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "2px 18px", marginTop: 16, boxShadow: "var(--shadow-sm)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
