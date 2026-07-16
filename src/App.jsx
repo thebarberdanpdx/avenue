@@ -13266,15 +13266,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   );
 
   // ---- shared premium style idiom (matches ProductsEditor) ----
-  const inpStyle = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
-  const sectionLblStyle = { fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" };
+  const inpStyle = { width: "100%", boxSizing: "border-box", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 16px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY };
+  const sectionLblStyle = { fontSize: 13.5, letterSpacing: 0, textTransform: "none", color: "var(--sub)", fontWeight: 500, margin: "26px 2px 9px" };
   const SectionLbl = ({ children, style }) => <div style={{ ...sectionLblStyle, ...style }}>{children}</div>;
-  const moneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)", boxSizing: "border-box", minWidth: 0 };
-  const moneyInput = { flex: 1, minWidth: 0, boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+  const moneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "var(--panel)", boxSizing: "border-box", minWidth: 0 };
+  const moneyInput = { flex: 1, minWidth: 0, boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: "16px 14px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY };
   const moneyPrefix = { padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 };
   const unitSuffix = { padding: "0 16px 0 0", color: "var(--sub)", fontSize: 14 };
   const chip = (on) => ({ background: on ? "var(--text)" : "transparent", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, color: on ? "var(--bg)" : "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" });
-  const cardStyle = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, boxShadow: "var(--shadow-sm)", boxSizing: "border-box", minWidth: 0 };
+  const cardStyle = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 20, boxShadow: "var(--shadow-sm)", boxSizing: "border-box", minWidth: 0 };
   const pillSwitch = (on) => (
     <span style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0, transition: "background .2s", display: "inline-block" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
   );
@@ -13535,7 +13535,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const staffBody = (
     <>
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Everyone offers this by default. Turn someone off, or give them their own time and price. Blank = the service default ({form.duration || "—"} min · ${form.price || "—"}).</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 13, minWidth: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
         {staffList.map((p) => {
           const e = form.staff[p.id] || { on: true, duration: null, price: null };
           const on = e.on !== false;
@@ -14540,7 +14540,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               {/* section menu — each row drills into its own clean editor */}
               <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden", marginBottom: 20 }}>
                 {menuRows.map((r, idx) => (
-                  <button key={r.target} onClick={() => setSection(r.target)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "none", borderTop: idx ? "1px solid var(--line)" : "none", padding: "13px 14px", minHeight: 62, textAlign: "left", cursor: "pointer" }}>
+                  <button key={r.target} onClick={() => setSection(r.target)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "none", borderTop: idx ? "1px solid var(--line)" : "none", padding: "18px 18px", minHeight: 68, textAlign: "left", cursor: "pointer" }}>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, letterSpacing: "-0.1px", color: "var(--text)" }}>{r.label}</span>
                       <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.sub}</span>
