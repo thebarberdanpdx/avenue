@@ -24,6 +24,17 @@ if (end === -1) throw new Error("visit-stamp.test: end of stampVisitOnClient not
 // eslint-disable-next-line no-new-func
 const stampVisitOnClient = new Function(src.slice(s, end + 2) + "\nreturn stampVisitOnClient;")();
 
+const CS = "function deriveCadenceForClient(appts, clientId, thisAppt) {";
+const cs = src.indexOf(CS);
+if (cs === -1) throw new Error("visit-stamp.test: deriveCadenceForClient not found in src/App.jsx (renamed?) — refusing to pass");
+const ce = src.indexOf("\n}", cs);
+if (ce === -1) throw new Error("visit-stamp.test: end of deriveCadenceForClient not found — refusing to pass");
+// eslint-disable-next-line no-new-func
+const deriveCadenceForClient = new Function(src.slice(cs, ce + 2) + "\nreturn deriveCadenceForClient;")();
+
+// done appts bypass the `< now` date filter (status === "done"), so these are time-independent.
+const done = (clientId, ...isoDates) => isoDates.map((d, i) => ({ id: `a${i}`, clientId, status: "done", bookedFor: d }));
+
 const APPT = (bookedFor) => ({ id: "a1", clientId: "c1", bookedFor });
 
 test("bumps visits by one", () => {
@@ -62,4 +73,41 @@ test("falls back to 'now' when the appt has no bookedFor (still bumps, sets a va
   const out = stampVisitOnClient({ visits: 0 }, { id: "a1", clientId: "c1" });
   assert.equal(out.visits, 1);
   assert.ok(typeof out.lastVisit === "string" && !Number.isNaN(new Date(out.lastVisit).getTime()));
+});
+
+// ─── deriveCadenceForClient: avg gap between visits ──────────────────────────
+test("cadence: two visits 14 days apart → 14", () => {
+  assert.equal(deriveCadenceForClient(done("c1", "2026-06-01T12:00:00.000Z", "2026-06-15T12:00:00.000Z"), "c1"), 14);
+});
+
+test("cadence: averages multiple gaps (7 then 21 → 14)", () => {
+  assert.equal(deriveCadenceForClient(done("c1", "2026-05-01T12:00:00.000Z", "2026-05-08T12:00:00.000Z", "2026-05-29T12:00:00.000Z"), "c1"), 14);
+});
+
+test("cadence: fewer than 2 visits → null (can't form a gap)", () => {
+  assert.equal(deriveCadenceForClient(done("c1", "2026-06-01T12:00:00.000Z"), "c1"), null);
+  assert.equal(deriveCadenceForClient([], "c1"), null);
+});
+
+test("cadence: only counts the given client's visits", () => {
+  const appts = [...done("c1", "2026-06-01T12:00:00.000Z", "2026-06-15T12:00:00.000Z"), ...done("c2", "2026-01-01T12:00:00.000Z")];
+  assert.equal(deriveCadenceForClient(appts, "c1"), 14);
+});
+
+test("cadence: ignores cancelled/block appts", () => {
+  const appts = [
+    { id: "a1", clientId: "c1", status: "done", bookedFor: "2026-06-01T12:00:00.000Z" },
+    { id: "a2", clientId: "c1", status: "cancelled", bookedFor: "2026-06-02T12:00:00.000Z" },
+    { id: "a3", clientId: "c1", status: "done", bookedFor: "2026-06-15T12:00:00.000Z" },
+  ];
+  assert.equal(deriveCadenceForClient(appts, "c1"), 14);
+});
+
+test("cadence: folds in the just-completed appt (dedupes if already present)", () => {
+  // one prior visit + this checkout's appt = two dates → a real gap
+  const prior = done("c1", "2026-06-01T12:00:00.000Z");
+  const thisAppt = { id: "a9", clientId: "c1", status: "in-service", bookedFor: "2026-06-15T12:00:00.000Z" };
+  assert.equal(deriveCadenceForClient(prior, "c1", thisAppt), 14);
+  // idempotent: passing an appt already in the list doesn't create a phantom 0-gap
+  assert.equal(deriveCadenceForClient(done("c1", "2026-06-01T12:00:00.000Z", "2026-06-15T12:00:00.000Z"), "c1", { clientId: "c1", status: "done", bookedFor: "2026-06-15T12:00:00.000Z" }), 14);
 });

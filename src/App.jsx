@@ -77,6 +77,24 @@ function stampVisitOnClient(c, appt) {
   return { ...c, lastVisit: advance, visits: (Number(c && c.visits) || 0) + 1, lastActivity: new Date().toISOString() };
 }
 
+// cadence-auto: derive a client's visit rhythm (avg days between visits) from their appointment
+// history — the SAME formula the client card, checkout rhythm, and the importer already use — so the
+// rebook / overdue radar (which reads client.cadenceDays) fires for clients who never had one set.
+// Needs >=2 visits to form a gap; returns null below that so the caller keeps any existing cadence
+// (never nulls one out). thisAppt is folded in because at checkout it may not yet read as past/done.
+// Pure; unit-tested in tests/visit-stamp.test.mjs.
+function deriveCadenceForClient(appts, clientId, thisAppt) {
+  const now = Date.now();
+  const ds = (appts || [])
+    .filter((a) => a && a.clientId === clientId && a.bookedFor && a.status !== "cancelled" && a.status !== "block" && (new Date(a.bookedFor).getTime() < now || a.status === "done"))
+    .map((a) => new Date(a.bookedFor).getTime());
+  if (thisAppt && thisAppt.bookedFor) { const t = new Date(thisAppt.bookedFor).getTime(); if (!Number.isNaN(t) && !ds.includes(t)) ds.push(t); }
+  ds.sort((a, b) => a - b);
+  if (ds.length < 2) return null;
+  let g = 0; for (let i = 1; i < ds.length; i++) g += (ds[i] - ds[i - 1]) / 86400000;
+  return Math.max(1, Math.round(g / (ds.length - 1)));
+}
+
 // Native-only haptic tap (Capacitor Haptics). Dynamically imported like our other native plugins so
 // the web bundle stays lean; a silent no-op on the web (Apple blocks web haptics) and never throws.
 // The physical "tick" on a tap is what makes the installed app feel native rather than like a machine.
@@ -22316,7 +22334,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     // gated by visitCountedAt), so the rebook / overdue radar builds from real checkouts. Skips the
     // "guest" placeholder; walk-ins have a real client record so they count.
     if (_countVisit && _visitSrc && _visitSrc.clientId && _visitSrc.clientId !== "guest") {
-      setClients((curC) => curC.map((c) => c.id === _visitSrc.clientId ? stampVisitOnClient(c, _visitSrc) : c));
+      const _cad = deriveCadenceForClient(appts, _visitSrc.clientId, _visitSrc);   // cadence-auto: rhythm from visit gaps
+      setClients((curC) => curC.map((c) => c.id === _visitSrc.clientId ? { ...stampVisitOnClient(c, _visitSrc), ...(_cad ? { cadenceDays: _cad } : {}) } : c));
     }
     // "Text a reminder instead" stamps the client HERE, at the same commit moment as the ticket —
     // stamping it after the closing dwell (like the old checkout write) could lose the reminder
@@ -27647,7 +27666,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
     const countVisit = !!(src && !src.visitCountedAt);
     setAppts((cur) => { const next = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), visitCountedAt: a.visitCountedAt || new Date().toISOString() } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
     // visit-stamp: mirror commitCheckout — advance lastVisit + bump visits once per appt (visitCountedAt).
-    if (countVisit && src && src.clientId && src.clientId !== "guest") setClients((curC) => curC.map((c) => c.id === src.clientId ? stampVisitOnClient(c, src) : c));
+    if (countVisit && src && src.clientId && src.clientId !== "guest") { const cad = deriveCadenceForClient(appts, src.clientId, src); setClients((curC) => curC.map((c) => c.id === src.clientId ? { ...stampVisitOnClient(c, src), ...(cad ? { cadenceDays: cad } : {}) } : c)); }
   };
   const finishCheckoutLite = (id, summary) => { commitCheckoutLite(id, summary); setCheckout(null); showToast("Payment recorded."); };
   const sameDayLocal = (iso, ref) => { if (!iso || !ref) return false; const a = new Date(iso); return a.getFullYear() === ref.getFullYear() && a.getMonth() === ref.getMonth() && a.getDate() === ref.getDate(); };
