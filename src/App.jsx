@@ -5919,7 +5919,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     // (setBookErr) instead. book_public is insert-only + server slot-guarded, so a timed-out write that
     // actually landed can't become a double-booking: a retry for the same slot is rejected (slot_taken).
     const bookTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('book_public timed out — backend unreachable')), 25000));
-    Promise.race([supabase.rpc('book_public', { p_shop: shopId, p_client: newClientRow ? newClientRow.data : null, p_appts: newAppts }), bookTimeout])
+    // blocked-online-guard: always hand book_public an identity — even for a returning/looked-up client
+    // (newClientRow is null) — so its server-side blocked-client guard can fire. A blocked client can't
+    // sign in (the login-code lookup excludes them), so they book as "new"; the phone/email lookup then
+    // returns their existing id and we USED to send p_client=null, which slipped straight past the guard
+    // (`if p_client is not null`). book_public is INSERT-ONLY, so passing an existing id can NOT overwrite
+    // their record — it only gives the guard the id/phone/email it needs to match a blocked stored client.
+    const bookClient = newClientRow ? newClientRow.data : (clientId ? { id: clientId, phone: finalPhone, email: finalEmail } : null);
+    Promise.race([supabase.rpc('book_public', { p_shop: shopId, p_client: bookClient, p_appts: newAppts }), bookTimeout])
       .then(({ error }) => {
         setBooking(false);
         if (error) {
@@ -5932,6 +5939,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           // Genuine race — someone grabbed the slot between showing times and this write. Show the
           // friendly "pick another opening" banner (same as the pre-check) rather than a generic error.
           if (emsg.includes("slot_taken")) { setSlot(null); setStep(6); setSlotConflict(true); return; }
+          // blocked-online-guard: the shop blocked this person from booking online — show the discreet
+          // "online booking unavailable" notice. Nothing was written (the guard raises before any insert).
+          if (emsg.includes("client_blocked")) { setBlockedNotice(true); return; }
           setBookErr(true); return; // nothing was held, nothing lost — they can just tap again
         }
         setAppts((cur) => [...cur, ...newAppts]);
