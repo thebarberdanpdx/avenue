@@ -24363,7 +24363,10 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   ); }
 
   if (stage === "rebook") { const first = appt.name ? appt.name.split(" ")[0] : "them"; return screen(
-    <div className="fade-in" style={{ paddingTop: 8 }}>
+    // Centered card (not a bare full-white page) — "front and center" on phone AND iPad, where a
+    // full-screen backdrop otherwise stranded this narrow column in a sea of white. margin:auto
+    // centers it vertically without clipping (screen() scrolls when the card is taller than the view).
+    <div className="fade-in" style={{ margin: "auto", width: "100%", maxWidth: 440, background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 24, boxShadow: "0 12px 40px var(--shadow)", padding: "30px 26px 26px" }}>
       <div style={{ textAlign: "center", marginBottom: 20 }}>
         <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Repeat size={26} style={{ color: "var(--gold)" }} /></div>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, lineHeight: 1.15 }}>Rebook {first}?</h2>
