@@ -1580,6 +1580,37 @@ function EditableNum({ value, onCommit, inputMode = "decimal", prefix, suffix, w
     </div>
   );
 }
+// Inline money editor (checkout-price-currency) — a "$"-prefixed price field that reads like
+// currency instead of a raw number. The draft is sanitized for DISPLAY only: digits + a single
+// decimal, with leading zeros stripped so it never shows "042". The value that actually SAVES is
+// parsed defensively on commit (Math.max(0, Number()) — same as before), so display formatting can
+// never corrupt the stored price. Commits on blur or Enter.
+function PriceEditField({ value, onCommit, autoFocus, wrapStyle, inputStyle }) {
+  const sanitize = (s) => {
+    let t = String(s).replace(/[^0-9.]/g, "");                                 // digits + dot only
+    const i = t.indexOf(".");
+    if (i !== -1) t = t.slice(0, i + 1) + t.slice(i + 1).replace(/\./g, "");    // at most one dot
+    t = t.replace(/^0+(?=\d)/, "");                                             // strip leading zeros ("042" -> "42", keep "0.5")
+    return t;
+  };
+  const [draft, setDraft] = useState(() => sanitize(value == null ? "" : String(value)));
+  const commit = () => onCommit(Math.max(0, Number(draft) || 0));
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 3, ...wrapStyle }}>
+      <span style={{ color: "var(--sub)", fontSize: 15, fontWeight: 500, flexShrink: 0 }}>$</span>
+      <input
+        autoFocus={autoFocus}
+        type="text"
+        inputMode="decimal"
+        value={draft}
+        onChange={(e) => setDraft(sanitize(e.target.value))}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+        style={inputStyle}
+      />
+    </div>
+  );
+}
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 // The shop's home timezone (Oregon = Pacific). Bookings are anchored to THIS wall clock so a
@@ -24622,7 +24653,10 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
             </div>
           </div>
           {editLineId === l.id
-            ? <input autoFocus type="number" inputMode="decimal" defaultValue={l.price} onBlur={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setLines(lines.map((x) => x.id === l.id ? { ...x, price: v } : x)); setEditLineId(null); }} onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }} style={{ width: 92, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 10px", color: "var(--text)", fontSize: 16, textAlign: "right", fontFamily: FONT_BODY }} />
+            ? <PriceEditField value={l.price} autoFocus
+                onCommit={(v) => { setLines(lines.map((x) => x.id === l.id ? { ...x, price: v } : x)); setEditLineId(null); }}
+                wrapStyle={{ width: 100, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 10px" }}
+                inputStyle={{ flex: 1, minWidth: 0, background: "none", border: "none", outline: "none", color: "var(--text)", fontSize: 16, textAlign: "right", fontFamily: FONT_BODY }} />
             : <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 500, flexShrink: 0 }}>{money(Number(l.price) || 0)}</div>}
         </div>
       ); })}
