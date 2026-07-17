@@ -14574,7 +14574,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
   // ---- full-page service editor ----
   if (editing) {
-    const drill = section === "details" || section === "cutstyles" || section === "addons" || section === "questions" || section === "staff" || section === "photos" || section === "timerules" || section === "booking";
+    const drill = section === "details" || section === "cuts" || section === "cutstyles" || section === "addons" || section === "questions" || section === "staff" || section === "photos" || section === "timerules" || section === "booking";
     return (
       <div className="appt-screen" style={{ paddingBottom: 40, textAlign: "left" }}>
         {picker && <PhotoPicker onClose={() => setPicker(null)} onPick={(id) => {
