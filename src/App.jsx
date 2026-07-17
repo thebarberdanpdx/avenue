@@ -1721,6 +1721,7 @@ function cancelWindowMinutes(business) {
 // Duration cascade: per-client override → per-staff default → service default.
 const getStaffEntry = (service, providerId) => (service && service.staff && providerId && service.staff[providerId]) || null;
 const getDuration = (client, service, providerId) => {
+  if (!service) return 0; // null-safe: callers on half-built forms (no service picked yet) must never crash here
   if (client && client.customDurations && client.customDurations[service.id] != null) return client.customDurations[service.id]; // != null so a deliberately-saved 0 min isn't skipped (audit #61)
   const se = getStaffEntry(service, providerId);
   if (se && se.duration != null) return se.duration;
@@ -1741,6 +1742,7 @@ const overdueBufferMin = (client, business) => {
 };
 // Price cascade: per-staff price → service default. (No per-client price.)
 const getPrice = (service, providerId) => {
+  if (!service) return 0; // null-safe: never crash on a half-built form (no service picked yet)
   const se = getStaffEntry(service, providerId);
   if (se && se.price != null) return se.price;
   return service.price;
@@ -22140,8 +22142,11 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   // New model: a picked setsPrice choice style's absolute per-barber price/time REPLACES the base.
   const priceGrp = allOptionGroups.find((g) => g && g.type === "choice" && g.setsPrice && opts[g.id]);
   const priceOpt = priceGrp && (priceGrp.options || []).find((o) => o.id === opts[priceGrp.id]);
-  const baseDur = priceOpt ? choiceStyleDuration(client, service, provId, priceGrp, priceOpt) : getDuration(client, service, provId);
-  const basePrice = priceOpt ? choiceStylePrice(service, provId, priceGrp, priceOpt) : priceWithTimeRules(service, provId, new Date(), startMin);
+  // newappt-null-service: a plain "+ New" opens with NO service picked yet (service === null); these must
+  // stay guarded — getDuration/priceWithTimeRules read service.* and throw on null (the whole New screen
+  // was crashing on open). The `service ?` below is the guard; never call the resolvers unconditionally.
+  const baseDur = !service ? 0 : (priceOpt ? choiceStyleDuration(client, service, provId, priceGrp, priceOpt) : getDuration(client, service, provId));
+  const basePrice = !service ? 0 : (priceOpt ? choiceStylePrice(service, provId, priceGrp, priceOpt) : priceWithTimeRules(service, provId, new Date(), startMin));
   const dur = service ? baseDur + optExtra.m : 0;
   const price = service ? basePrice + optExtra.p : 0;
   const canBook = service && (client || (walkIn && walkInFirst.trim() && walkInLast.trim() && walkInPhone.replace(/\D/g, "").length >= 10));
