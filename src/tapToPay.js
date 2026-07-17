@@ -193,6 +193,32 @@ export async function tapToPayCharge({ amount, description, live, apiBase, authT
   return { id: intent.id };
 }
 
+// ── Tap-then-tip on Tap to Pay on iPhone ─────────────────────────────────────
+// taptopay-tap-then-tip: the SAME two-phase flow as the physical reader (cardReaderAuthorize), but on
+// the iPhone's built-in Tap to Pay reader. Phase 1: authorize the BASE (customer taps) with a
+// MANUAL-capture intent, so the tap only HOLDS the base — nothing is captured yet. Returns { id }; the
+// tip is captured afterward via cardReaderCaptureTip (terminal_capture is reader-agnostic — it just
+// captures the intent by id). If the barber abandons before capture, the hold expires on its own (no
+// charge). Tap to Pay creates the same card_present PaymentIntent as the reader, so tip overcapture (and
+// its tipApplied:false fallback) behaves identically.
+export async function tapToPayAuthorize({ base, description, live, apiBase, authToken, onStatus }) {
+  const { St } = await ensureConnected({ live, apiBase, authToken, onStatus }); // mode defaults to "tap"
+  onStatus && onStatus("Starting…");
+  let intent;
+  try {
+    intent = await postStripe(apiBase, authToken, { action: "terminal_intent", amount: base, description, manualCapture: true }, INTENT_TIMEOUT_MS);
+  } catch (e) {
+    throw new Error("Couldn't start the charge: " + ((e && e.message) || "payment service error."));
+  }
+  if (!intent.clientSecret) throw new Error(intent.error || "Couldn't start the charge.");
+  onStatus && onStatus("Tap card or phone…");
+  // No timeout — this legitimately blocks until the customer taps.
+  await St.collectPaymentMethod({ paymentIntent: intent.clientSecret });
+  onStatus && onStatus("Authorizing…");
+  await St.confirmPaymentIntent(); // manual capture → AUTHORIZES the base; capture happens after the tip
+  return { id: intent.id };
+}
+
 // Charge `amount` dollars on a paired PHYSICAL reader (Bluetooth or internet-connected).
 // Identical intent → collect → confirm flow as Tap to Pay; only reader discovery/connect differs
 // (handled by ensureConnected mode:"reader"). Resolves { id } on success; throws on failure/cancel.

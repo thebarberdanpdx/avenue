@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from './supabaseClient'
-import { tapToPayCharge, cardReaderCharge, cardReaderAuthorize, cardReaderCaptureTip } from './tapToPay'
+import { tapToPayCharge, tapToPayAuthorize, cardReaderCharge, cardReaderAuthorize, cardReaderCaptureTip } from './tapToPay'
 import * as Sentry from '@sentry/react'
 import {
   Calendar, Phone, Check, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MessageSquare, Bell, User, Camera,
@@ -24449,9 +24449,10 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     setPayErr("");
     setPendingMethod(m);
     setReaderAuth(null);
-    // Tap-then-tip on the card reader: TAP FIRST to authorize the base, THEN show the tip screen,
-    // then capture base+tip. Only the reader reorders; every other method keeps tip-before-charge.
-    if (m === "reader" && tipCfg.enabled && !noNewTip) { setStage("tapPay"); runCardReaderAuth(); return; }
+    // taptopay-tap-then-tip: TAP FIRST to authorize the base, THEN show the tip screen, then capture
+    // base+tip — for Tap to Pay on iPhone AND the card reader. Both in-person card methods reorder; every
+    // other method (card on file, manual) keeps tip-before-charge.
+    if ((m === "reader" || m === "tap") && tipCfg.enabled && !noNewTip) { setStage("tapPay"); (m === "reader" ? runCardReaderAuth() : runTapToPayAuth()); return; }
     if (tipCfg.enabled && !noNewTip) { setStage("tipPick"); }
     else { if (m === "cof") setStage("charging"); executeCharge(m); }
   };
@@ -24493,6 +24494,21 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       setStage("tipPick"); // card is HELD for the base — pick the tip, then capture base+tip
     } catch (e) {
       setPayErr((e && e.message) || "The reader didn't complete. Try again or pick another way.");
+    }
+  };
+  // Tap-then-tip phase 1, Tap to Pay on iPhone: authorize the base (customer taps), then the tip screen.
+  // Sets the SAME readerAuth as the reader, so the tip screen's capture path (captureReaderTip) runs unchanged.
+  const runTapToPayAuth = async () => {
+    setPayErr(""); setTapStatus("Starting…"); setReaderAuth(null);
+    try {
+      await ensureFreshSession();
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess && sess.session && sess.session.access_token;
+      const res = await tapToPayAuthorize({ base: netDue, description: `Vero — ${appt.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
+      setReaderAuth({ id: res && res.id, base: netDue });
+      setStage("tipPick"); // card is HELD for the base — pick the tip, then capture base+tip
+    } catch (e) {
+      setPayErr((e && e.message) || "Tap to Pay didn't complete. Try again or pick another way.");
     }
   };
   // Tap-then-tip phase 2: capture the held authorization for base + the chosen tip.
@@ -25450,6 +25466,22 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
       setPayErr((e && e.message) || "The reader didn't complete. Try again or pick another way.");
     }
   };
+  // Tap-then-tip phase 1, Tap to Pay on iPhone (Register): authorize the base (customer taps), then the
+  // tip screen. Sets the SAME readerAuth as the reader so the capture path (captureReaderTip) is unchanged.
+  const runTapToPayAuth = async () => {
+    setPayErr(""); setTapStatus("Starting…"); setReaderAuth(null);
+    try {
+      await ensureFreshSession();
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess && sess.session && sess.session.access_token;
+      const res = await tapToPayAuthorize({ base: total, description: `Vero sale — ${client?.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
+      setReaderAuth({ id: res && res.id, base: total });
+      setTipPct((p) => (p == null ? (tipCfg.smartDefault ?? (tipCfg.presets && tipCfg.presets[0]) ?? 20) : p));
+      setStage("tip"); // card is HELD for the base — pick the tip, then capture base+tip
+    } catch (e) {
+      setPayErr((e && e.message) || "Tap to Pay didn't complete. Try again or pick another way.");
+    }
+  };
   // Tap-then-tip phase 2: capture the held authorization for base + the chosen tip. Records the ACTUAL
   // captured amount (and zeroes the tip if the card couldn't take it) so reports never overstate.
   const captureReaderTip = async () => {
@@ -25487,7 +25519,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
     setReaderAuth(null);
     // Tap-then-tip on the card reader: TAP FIRST to authorize the base, THEN show the tip screen,
     // then capture base+tip. Only the reader reorders; every other method keeps tip-before-charge.
-    if (m === "reader" && tipCfg.enabled) { setStage("tapPay"); runCardReaderAuth(); return; }
+    if ((m === "reader" || m === "tap") && tipCfg.enabled) { setStage("tapPay"); (m === "reader" ? runCardReaderAuth() : runTapToPayAuth()); return; }
     if (tipCfg.enabled) {
       setTipPct((p) => (p == null ? (tipCfg.smartDefault ?? (tipCfg.presets && tipCfg.presets[0]) ?? 20) : p));
       setStage("tip");
