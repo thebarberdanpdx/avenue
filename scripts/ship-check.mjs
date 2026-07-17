@@ -250,6 +250,29 @@ try {
   record(false, "No TDZ in Services editor (backBar before cutsScreen)", "check error: " + e.message);
 }
 
+// 6c) Reachability guard for the service-editor drill-in sections. The editor renders sub-screens as
+//     `{drill ? (section === "X" ? Xscreen : …) : mainForm}`. If a section is DISPATCHED but missing
+//     from the `drill` OR-chain, tapping into it silently re-renders the main form and the editor is
+//     unreachable. Shipped once on 2026-07-17: the "Offers cut styles → Edit" button set section
+//     "cuts", the dispatch mapped "cuts" → cutsScreen, but `drill` omitted "cuts" — so cut styles
+//     couldn't be edited at all. Build + eslint both passed (it's a logic gap, not a syntax/undef bug).
+//     This asserts every dispatched section is also permitted by the gate.
+try {
+  const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
+  const drillLine = app.split("\n").find((l) => l.includes("const drill = section ===")) || "";
+  const drillSections = [...drillLine.matchAll(/section === "([a-z]+)"/g)].map((m) => m[1]);
+  const start = app.indexOf("{drill ? (");
+  const dispatch = start !== -1 ? app.slice(start, start + 600) : "";
+  const dispatchSections = [...dispatch.matchAll(/section === "([a-z]+)"/g)].map((m) => m[1]);
+  const unreachable = dispatchSections.filter((s) => !drillSections.includes(s));
+  const ok = drillLine && dispatch && unreachable.length === 0 && drillSections.includes("cuts");
+  record(ok, "Service-editor sections reachable (drill gate covers dispatch)",
+    ok ? "every dispatched sub-screen is permitted by the drill gate (incl. 'cuts')"
+       : (unreachable.length ? `dispatched but not in drill gate — unreachable: ${unreachable.join(", ")}` : "drill gate / dispatch not found or missing 'cuts' — the cut-styles editor may be unreachable"));
+} catch (e) {
+  record(false, "Service-editor sections reachable (drill gate covers dispatch)", "check error: " + e.message);
+}
+
 // 7) No out-of-scope variable references (eslint no-undef). This is the EXACT class of bug
 //    that crashed the Settings tab on 2026-07-11 — a variable used where it isn't in scope
 //    (a prop not passed down). `npm run build` does NOT catch it: it only throws when that
