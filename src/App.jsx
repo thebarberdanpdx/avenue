@@ -1849,10 +1849,12 @@ const recomputeChoiceAbsolutes = (form, staffIds) => {
     const se = { ...(staff[pid] || { on: true, duration: null, price: null }) };
     const bT = (se.duration != null && se.duration !== "") ? Number(se.duration) : baseDur;
     const cp = { ...(se.choicePrice || {}) }, cd = { ...(se.choiceDur || {}) };
+    const ad = (se.answerDur && se.answerDur[g.id]) || {}; // per-barber TIME add (staff.answerDur); price add is shared (o.price)
     const cpg = {}, cdg = {};
     (g.options || []).forEach((o) => {
       cpg[o.id] = Math.max(0, base + (Number(o.price) || 0));
-      cdg[o.id] = Math.max(0, bT + (Number(o.min) || 0));
+      const tAdd = (ad[o.id] != null && ad[o.id] !== "") ? Number(ad[o.id]) : (Number(o.min) || 0);
+      cdg[o.id] = Math.max(0, bT + tAdd);
     });
     cp[g.id] = cpg; cd[g.id] = cdg;
     staff[pid] = { ...se, choicePrice: cp, choiceDur: cd };
@@ -1883,7 +1885,12 @@ const deriveCutBaseAndAdds = (svc) => {
   pids.forEach((pid) => {
     const cd = (staff[pid].choiceDur && staff[pid].choiceDur[g.id]) || {};
     const baseT = cd[baseOpt.id] != null ? Number(cd[baseOpt.id]) : refBaseDur;
-    newStaff[pid] = { ...staff[pid], duration: baseT };
+    // Per-barber TIME add = this barber's own delta from their base → the open→save round-trip is now
+    // EXACT for time too (no drift), and a barber whose extra time differs (e.g. Heather's skin fade) is kept.
+    const ad = { ...((staff[pid].answerDur && staff[pid].answerDur[g.id]) || {}) };
+    opts.forEach((o) => { ad[o.id] = Math.max(0, (Number(cd[o.id]) || 0) - baseT); });
+    const answerDur = { ...(staff[pid].answerDur || {}), [g.id]: ad };
+    newStaff[pid] = { ...staff[pid], duration: baseT, answerDur };
   });
   return { ...svc, price: basePrice, staff: newStaff, addonGroups };
 };
@@ -14345,8 +14352,9 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     const baseTime = (pid) => { const se = form.staff[pid] || {}; return (se.duration != null && se.duration !== "") ? Number(se.duration) : (Number(form.duration) || 0); };
     // cut-base-adds-model: the editor is base + a shared "+add" per style; save (recomputeChoiceAbsolutes)
     // turns that into the per-barber absolute totals the engine reads, so pricing is untouched.
-    const exOpt = cutOpts.find((o) => (Number(o.price) || 0) > 0 || (Number(o.min) || 0) > 0) || cutOpts[0];
+    const exOpt = cutOpts.find((o) => (Number(o.price) || 0) > 0) || cutOpts[cutOpts.length > 1 ? 1 : 0] || cutOpts[0];
     const exBarber = staffList[0];
+    const exAdd = (exBarber && exOpt) ? (() => { const a = ((form.staff[exBarber.id] || {}).answerDur || {})[cutGroup.id]; const v = a && a[exOpt.id]; return (v != null && v !== "") ? Number(v) : (Number(exOpt.min) || 0); })() : 0;
     return (
     <>
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18 }}>Set your base once, then add a little for the fancier styles — the app does the math. Times read in hours &amp; minutes.</p>
@@ -14406,9 +14414,27 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
               <span style={{ fontSize: 11.5, color: "var(--faint)", fontWeight: 700, letterSpacing: 0.4, flexShrink: 0 }}>ADDS</span>
-              <EditableNum value={o.price ?? 0} inputMode="decimal" onCommit={(v) => setCutOpt(oi, { price: v === "" ? 0 : v })} prefix={<span style={{ padding: "0 0 0 11px", color: "var(--sub)", fontSize: 14 }}>+$</span>} wrapStyle={{ ...moneyWrap, width: 92 }} inputStyle={{ ...moneyInput, padding: "11px 8px", fontSize: 15 }} />
-              <HrMinPick plus value={Number(o.min) || 0} minVal={0} maxVal={180} zeroLabel="No extra time" onChange={(m) => setCutOpt(oi, { min: m })} style={{ flex: 1, background: "var(--panel)", border: "1.5px solid var(--border2)", borderRadius: 13, padding: "11px 12px", color: (Number(o.min) || 0) ? "var(--text)" : "var(--sub)", fontSize: 15, fontWeight: 700, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap", textAlign: "center" }} />
+              <EditableNum value={o.price ?? 0} inputMode="decimal" onCommit={(v) => setCutOpt(oi, { price: v === "" ? 0 : v })} prefix={<span style={{ padding: "0 0 0 11px", color: "var(--sub)", fontSize: 14 }}>+$</span>} wrapStyle={{ ...moneyWrap, width: 96 }} inputStyle={{ ...moneyInput, padding: "11px 8px", fontSize: 15 }} />
+              <span style={{ fontSize: 12.5, color: "var(--faint)" }}>price · same for both</span>
             </div>
+            {staffList.length > 0 && (
+              <div style={{ marginTop: 9 }}>
+                <span style={{ fontSize: 11.5, color: "var(--faint)", fontWeight: 700, letterSpacing: 0.4 }}>ADDS TIME · each barber</span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 7 }}>
+                  {staffList.map((p, pi) => {
+                    const se = form.staff[p.id] || {};
+                    const tAdd = (se.answerDur && se.answerDur[cutGroup.id] && se.answerDur[cutGroup.id][o.id] != null && se.answerDur[cutGroup.id][o.id] !== "") ? Number(se.answerDur[cutGroup.id][o.id]) : (Number(o.min) || 0);
+                    return (
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7, flex: "1 1 44%", minWidth: 130 }}>
+                        <Avatar size={22} photo={p.photo} initial={(p.name || "?").charAt(0).toUpperCase()} color={AV[pi % AV.length]} fontSize={10} />
+                        <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--sub)", flexShrink: 0 }}>{(p.name || "").split(" ")[0]}</span>
+                        <HrMinPick plus value={tAdd} minVal={0} maxVal={180} zeroLabel="+0" onChange={(m) => setStaffAnswerDur(p.id, cutGroup.id, o.id, m)} style={{ marginLeft: "auto", background: "var(--panel)", border: "1.5px solid var(--border2)", borderRadius: 11, padding: "8px 12px", color: tAdd ? "var(--text)" : "var(--sub)", fontSize: 14, fontWeight: 700, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 9 }}>
               {isBase ? <span style={{ fontSize: 12, color: "#3E6F63", fontWeight: 600 }}>Included — your base price &amp; time</span> : <span />}
               <button onClick={() => removeCutStyle(oi)} style={{ background: "none", border: "none", color: "#C2392B", fontSize: 12.5, fontWeight: 500, cursor: "pointer", padding: 0 }}>Remove</button>
@@ -14422,7 +14448,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         <div style={{ background: "var(--text)", color: "var(--bg)", borderRadius: 16, padding: "15px 17px", marginTop: 18 }}>
           <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", opacity: 0.62, fontWeight: 700 }}>What a client would get</div>
           <div style={{ fontSize: 16.5, fontWeight: 700, marginTop: 6 }}>{exOpt.label || "This style"} with {(exBarber.name || "").split(" ")[0]}</div>
-          <div style={{ fontSize: 14, opacity: 0.78, marginTop: 3 }}>{fmtDurLong(baseTime(exBarber.id) + (Number(exOpt.min) || 0))} · ${baseP + (Number(exOpt.price) || 0)}</div>
+          <div style={{ fontSize: 14, opacity: 0.78, marginTop: 3 }}>{fmtDurLong(baseTime(exBarber.id) + exAdd)} · ${baseP + (Number(exOpt.price) || 0)}</div>
         </div>
       )}
 
