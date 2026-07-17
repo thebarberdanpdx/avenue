@@ -12677,6 +12677,26 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       setBusiness({ ...business, _libConsolidated: true });
     }
   }, [dataLoaded, services, business]);
+  // promote-inline-addons: SELF-HEALING (not one-time) — folds any hand-built inline ADD-ON into the
+  // shared Add-ons library so it shows in the one list and is attachable to any service, and so a new
+  // inline add-on the owner builds auto-joins on the next load. Add-on-only (never touches the cut-style
+  // group), preserves price/time + per-barber overrides, backs up _preAddonLib. No-op when nothing inline.
+  const addonPromoteRef = useRef(false);
+  useEffect(() => {
+    if (addonPromoteRef.current) return;
+    if (!dataLoaded || !business) return;
+    if (!Array.isArray(services) || services.length === 0) return;
+    // Run only AFTER the one-time broad consolidation has completed (it also setServices from the same
+    // base — running both in one commit would let the last setServices clobber the other). Once
+    // _libConsolidated is set, this promotion owns add-on folding going forward.
+    if (!business._libConsolidated) return;
+    addonPromoteRef.current = true;
+    const result = promoteInlineAddOns(services, business);
+    if (result) {
+      setServices(result.services);
+      setBusiness({ ...business, addOnsLibrary: result.addOnsLibrary });
+    }
+  }, [dataLoaded, services, business]);
   const [rebookSeed, setRebookSeed] = useState(null); // { clientId, serviceId, providerId } → opens the new-appointment form prefilled on the calendar
   const [pulseOpenApptId, setPulseOpenApptId] = useState(null); // tapping a Pulse card → open that appt's sheet on the calendar (reuses the deep-link path)
   const [activeClient, setActiveClient] = useState(null);
@@ -19789,7 +19809,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
     if (item) { setForm(JSON.parse(JSON.stringify(item))); setEditing(item.id); }
     onOpened && onOpened();
   }, [openId]);
-  const blank = () => ({ id: "ao-" + Date.now(), name: "", price: "", extraMin: "", desc: "", photo: "", required: false, services: [], yesLabel: "", noLabel: "" });
+  const blank = () => ({ id: "ao-" + Date.now(), name: "", prompt: "", price: "", extraMin: "", desc: "", photo: "", required: false, services: [], yesLabel: "", noLabel: "" });
   const svcList = (services || []);
   const svcName = (id) => (svcList.find((s) => s.id === id) || {}).name || id;
 
@@ -19797,7 +19817,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
     setServices(svcList.map((s) => {
       const keep = (s.addonGroups || []).filter((g) => !String(g.id || "").startsWith("lib-"));
       const mine = nextLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({
-        id: "lib-" + a.id, type: "addon", label: a.name, photo: a.photo || "", required: !!a.required,
+        id: "lib-" + a.id, type: "addon", label: a.prompt || a.name, photo: a.photo || "", required: !!a.required,
         yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(),
         item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 },
       }));
@@ -19842,6 +19862,10 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
 
         <div style={aoSectionLbl}>Name</div>
         <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Hot Towel Finish" style={aoInp} />
+
+        <div style={aoSectionLbl}>Prompt clients see · optional</div>
+        <input value={form.prompt || ""} onChange={(e) => setForm({ ...form, prompt: e.target.value })} placeholder={form.name ? `Defaults to "${form.name}"` : "e.g. Hot towel finish?"} style={aoInp} />
+        <div style={{ fontSize: 12.5, color: "var(--faint)", margin: "6px 2px 0", lineHeight: 1.4 }}>The question shown while booking. Leave blank to just use the name.</div>
 
         <div style={{ display: "flex", gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -20095,6 +20119,11 @@ function consolidateBookingLibraries(services, business) {
       const id = String(g.id || "");
       if (g.type === "choice") {
         if (id.startsWith("libq-")) return;
+        // NEVER fold the cut-style group into the generic Questions library: id "cutchoice" and any
+        // setsPrice choice group carry the per-barber ABSOLUTE cut pricing (staff.choicePrice/choiceDur
+        // + setsPrice). Materializing it as a plain "libq-" question drops setsPrice and the pricing →
+        // every cut silently reprices. Leave it inline, owned by the dedicated cut-styles editor.
+        if (id === "cutchoice" || g.setsPrice) return;
         touched = true;
         const sig = qSig(g);
         let entry = qIndex[sig];
@@ -20120,10 +20149,82 @@ function consolidateBookingLibraries(services, business) {
   if (!touched) return null; // everything already library-managed
   const nextServices = (services || []).map((s) => {
     const libQ = qLib.filter((q) => (q.services || []).includes(s.id)).map((q) => ({ id: "libq-" + q.id, type: "choice", label: q.label, required: !!q.required, options: (q.options || []).map((o) => ({ id: o.id, label: o.label, desc: o.desc || "", price: Number(o.price) || 0, min: Number(o.min) || 0, photos: Array.isArray(o.photos) ? o.photos : [] })) }));
-    const libA = aLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.name, photo: a.photo || "", required: !!a.required, yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(), item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 } }));
+    const libA = aLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.prompt || a.name, photo: a.photo || "", required: !!a.required, yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(), item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 } }));
     return { ...s, _preLib: (s._preLib || s.addonGroups || []), addonGroups: [...libQ, ...libA] };
   });
   return { services: nextServices, questionsLibrary: qLib, addOnsLibrary: aLib };
+}
+
+// ============================================================
+// promote-inline-addons — SELF-HEALING, ADD-ON-ONLY promotion. Any hand-built inline add-on group
+// (type "addon", id not "lib-…") built inside a single service is folded into the master
+// business.addOnsLibrary so it shows in the one Add-ons list and can be attached to any service —
+// the owner's rule "an add-on listed anywhere should show up in the shared list." Runs on every
+// owner load (idempotent: returns null when there's nothing inline), so a NEW inline add-on the owner
+// builds auto-joins the list on the next load. UNLIKE consolidateBookingLibraries this NEVER touches
+// choice groups, so the cut-style group (cutchoice / setsPrice, per-barber cut pricing) is untouched.
+// Money-safe: it preserves price / extra-time / desc / photo, and REMAPS the per-barber overrides
+// (staff.addonPrice / addonDur) from the old inline id → the new "lib-…" id so a barber's custom
+// price/time can't be orphaned. Keeps a per-service `_preAddonLib` backup so it's reversible.
+function promoteInlineAddOns(services, business) {
+  const norm = (s) => (s || "").toString().trim().toLowerCase();
+  const rid = () => Math.random().toString(36).slice(2, 9);
+  const aLib = (business.addOnsLibrary || []).map((a) => ({ ...a, services: [...(a.services || [])] }));
+  const aIndex = {}; aLib.forEach((a) => { aIndex[norm(a.name)] = a; });
+  const remaps = {}; // serviceId -> { oldInlineId: "lib-<newLibId>" }
+  let touched = false;
+  (services || []).forEach((s) => {
+    (s.addonGroups || []).forEach((g) => {
+      if (!g || g.type !== "addon") return;          // choice groups (incl. cutchoice) are never touched
+      const id = String(g.id || "");
+      if (id.startsWith("lib-")) return;             // already library-managed
+      touched = true;
+      const it = g.item || {};
+      const nm = it.name || g.label || "Add-on";
+      let entry = aIndex[norm(nm)];
+      if (!entry) {
+        // The library model has one `name`; keep the inline PROMPT ("Hot towel finish?") separately as
+        // `prompt` so the client-facing question wording is preserved (materialize uses prompt || name).
+        const prompt = (g.label && norm(g.label) !== norm(nm)) ? g.label : "";
+        entry = { id: "ao" + Date.now() + rid(), name: nm, prompt, price: Number(it.price) || 0, extraMin: Number(it.min) || 0, desc: it.desc || "", photo: g.photo || it.photo || "", required: !!g.required, yesLabel: (g.yesLabel || "").trim(), noLabel: (g.noLabel || "").trim(), services: [] };
+        aIndex[norm(nm)] = entry; aLib.push(entry);
+      }
+      if (!entry.services.includes(s.id)) entry.services.push(s.id);
+      (remaps[s.id] = remaps[s.id] || {})[id] = "lib-" + entry.id;
+    });
+  });
+  if (!touched) return null; // no inline add-ons anywhere — nothing to do
+  const libById = {}; aLib.forEach((a) => { libById["lib-" + a.id] = a; });
+  const nextServices = (services || []).map((s) => {
+    const rm = remaps[s.id];
+    if (!rm) return s;
+    // Replace each inline add-on group IN PLACE with its library-materialized form (position + every
+    // other group, incl. the cut-style group, preserved). Choice groups pass straight through.
+    const addonGroups = (s.addonGroups || []).map((g) => {
+      if (!g || g.type !== "addon") return g;
+      const id = String(g.id || "");
+      const newId = rm[id];
+      if (!newId) return g; // already lib- (or not remapped)
+      const a = libById[newId] || {};
+      return { id: newId, type: "addon", label: a.prompt || a.name, photo: a.photo || "", required: !!a.required, yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(), item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 } };
+    });
+    // Re-key per-barber overrides from the old inline id → the new lib- id so custom prices/times survive.
+    const staff = {};
+    for (const [pid, se] of Object.entries(s.staff || {})) {
+      const copy = { ...se };
+      for (const key of ["addonPrice", "addonDur"]) {
+        if (!se[key]) continue;
+        const m = { ...se[key] }; let changed = false;
+        for (const [oldId, newId] of Object.entries(rm)) {
+          if (m[oldId] != null) { m[newId] = m[oldId]; delete m[oldId]; changed = true; }
+        }
+        if (changed) copy[key] = m;
+      }
+      staff[pid] = copy;
+    }
+    return { ...s, _preAddonLib: (s._preAddonLib || s.addonGroups || []), addonGroups, staff };
+  });
+  return { services: nextServices, addOnsLibrary: aLib };
 }
 
 // ============================================================
@@ -21825,7 +21926,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   const serviceGroups = (service && Array.isArray(service.addonGroups)) ? service.addonGroups : [];
   const libraryGroups = [
     ...((business.questionsLibrary || []).map((q) => ({ id: "libq-" + q.id, type: "choice", label: q.label, options: q.options || [] }))),
-    ...((business.addOnsLibrary || []).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.name, item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, min: Number(a.extraMin) || 0, addsPrice: true, addsTime: true } }))),
+    ...((business.addOnsLibrary || []).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.prompt || a.name, item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, min: Number(a.extraMin) || 0, addsPrice: true, addsTime: true } }))),
   ];
   const groupName = (g) => String((g && (g.type === "choice" ? g.label : ((g.item && g.item.name) || g.label))) || "").trim().toLowerCase();
   const serviceNames = new Set(serviceGroups.map(groupName));
