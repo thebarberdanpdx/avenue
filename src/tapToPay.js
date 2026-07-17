@@ -213,6 +213,35 @@ export async function cardReaderCharge({ amount, description, live, apiBase, aut
   return { id: intent.id };
 }
 
+// ── Tap-then-tip on a physical reader ────────────────────────────────────────
+// Phase 1: authorize the BASE on the reader (customer taps). Creates a MANUAL-capture intent so
+// the tap only HOLDS the base — nothing is captured yet. Returns { id } to capture once the tip is
+// chosen. If the barber abandons before capture, the hold expires on its own (no charge).
+export async function cardReaderAuthorize({ base, description, live, apiBase, authToken, onStatus }) {
+  const { St } = await ensureConnected({ live, apiBase, authToken, onStatus, mode: "reader" });
+  onStatus && onStatus("Starting…");
+  let intent;
+  try {
+    intent = await postStripe(apiBase, authToken, { action: "terminal_intent", amount: base, description, manualCapture: true }, INTENT_TIMEOUT_MS);
+  } catch (e) {
+    throw new Error("Couldn't start the charge: " + ((e && e.message) || "payment service error."));
+  }
+  if (!intent.clientSecret) throw new Error(intent.error || "Couldn't start the charge.");
+  onStatus && onStatus("Insert, tap, or swipe on the reader…");
+  await St.collectPaymentMethod({ paymentIntent: intent.clientSecret });
+  onStatus && onStatus("Authorizing…");
+  await St.confirmPaymentIntent(); // manual capture → this AUTHORIZES the base; capture happens after the tip
+  return { id: intent.id };
+}
+
+// Phase 2: capture the authorized reader charge for the final total (base + tip). Returns
+// { id, tipApplied, captured } — tipApplied:false means only the base could be taken on the card
+// (overcapture unavailable) and the tip must be collected another way. captured is in CENTS.
+export async function cardReaderCaptureTip({ id, total, base, apiBase, authToken }) {
+  const out = await postStripe(apiBase, authToken, { action: "terminal_capture", id, amount: total, baseAmount: base }, INTENT_TIMEOUT_MS);
+  return { id: out.id, tipApplied: out.tipApplied !== false, captured: out.captured };
+}
+
 export async function tapToPayDisconnect() {
   try { const { St } = await loadPlugin(); await St.disconnectReader(); } catch (e) {}
   _initialized = false;

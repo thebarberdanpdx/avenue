@@ -33,7 +33,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 // they're also called from the public booking page, where there is no login.
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const STAFF_ONLY = new Set(["charge", "refund", "connection_token", "terminal_intent", "terminal_location", "payouts", "payout_detail", "transactions", "instant_payout"]);
+const STAFF_ONLY = new Set(["charge", "refund", "connection_token", "terminal_intent", "terminal_capture", "terminal_location", "payouts", "payout_detail", "transactions", "instant_payout"]);
 // Money-OUT actions must ALSO belong to the caller's shop, not just any valid
 // session. `charge` pulls a saved card; `refund` sends money out. On top of the
 // staff-session gate above, the signed-in email must match a provider of the
@@ -318,7 +318,7 @@ async function handler(req, res) {
     // collects and confirms when the client taps their card/phone. `amount` is
     // in dollars. Auto-captures so the sale completes on tap.
     if (action === "terminal_intent") {
-      const { amount, description } = body;
+      const { amount, description, manualCapture } = body;
       if (!validAmount(amount)) {
         return res.status(400).json({ error: "Invalid amount." });
       }
@@ -326,10 +326,38 @@ async function handler(req, res) {
         amount: Math.round(Number(amount) * 100),
         currency: "usd",
         payment_method_types: ["card_present"],
-        capture_method: "automatic",
+        // manualCapture (tap-then-tip): the tap only AUTHORIZES the base; the tip is added on the
+        // iPad afterward and the final total is captured via terminal_capture. A card-present
+        // authorization that is never captured EXPIRES on its own — so a failure between the tap
+        // and the tip can never charge the client. Default stays automatic (tip-before, one tap).
+        capture_method: manualCapture ? "manual" : "automatic",
         description: description || "Vero — Tap to Pay",
       });
       return res.status(200).json({ clientSecret: pi.client_secret, id: pi.id });
+    }
+
+    // --- Tap-then-tip: capture a reader authorization for the final total (base + tip) --------
+    // The reader authorizes the base on tap (terminal_intent manualCapture); the barber adds a tip
+    // on the iPad; we capture base+tip here. If Stripe won't capture ABOVE the authorized amount
+    // (overcapture not enabled on the account), fall back to capturing just the base so the sale
+    // still completes — never more than authorized — and report tipApplied:false so the app can
+    // tell the barber the tip didn't go on the card. Money-in; staff-only.
+    if (action === "terminal_capture") {
+      const { id, amount, baseAmount } = body;
+      if (!id || !validAmount(amount)) return res.status(400).json({ error: "Invalid capture." });
+      const cents = Math.round(Number(amount) * 100);
+      try {
+        const pi = await stripe.paymentIntents.capture(id, { amount_to_capture: cents });
+        return res.status(200).json({ id: pi.id, status: pi.status, captured: pi.amount_received, tipApplied: true });
+      } catch (e) {
+        try {
+          const baseCents = validAmount(baseAmount) ? Math.round(Number(baseAmount) * 100) : undefined;
+          const pi2 = await stripe.paymentIntents.capture(id, baseCents ? { amount_to_capture: baseCents } : {});
+          return res.status(200).json({ id: pi2.id, status: pi2.status, captured: pi2.amount_received, tipApplied: false, tipError: (e && e.message) || "tip could not be added on the card" });
+        } catch (e2) {
+          return res.status(400).json({ error: (e2 && e2.message) || "capture failed" });
+        }
+      }
     }
 
     // --- Payouts, balance & payout schedule (read-only) ----------------------
