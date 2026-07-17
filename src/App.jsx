@@ -1514,6 +1514,34 @@ function DurPick({ value, defaultMin, onChange, step = 5, maxMin = 240 }) {
     </>
   );
 }
+// A number field that can be freely CLEARED and retyped even when its `value` is a
+// *derived fallback* (e.g. a per-barber cut price that snaps back to a computed default
+// when no override is saved). Plain controlled inputs can't hold "" in that case: the
+// moment you delete the digits, the store reverts and the old number reappears, so you
+// can never type a new one (the exact bug Dan hit on the cut-style editor). While focused
+// this shows exactly what was typed — including empty — and only falls back to `value`
+// once you leave the field. onCommit fires every keystroke with the raw string ("" when
+// cleared) so nothing is lost and the caller decides how to persist it.
+function EditableNum({ value, onCommit, inputMode = "decimal", prefix, suffix, wrapStyle, inputStyle }) {
+  const [draft, setDraft] = useState(null); // null = not editing → mirror `value`
+  const asStr = (v) => (v == null || v === "" ? "" : String(v));
+  const shown = draft != null ? draft : asStr(value);
+  return (
+    <div style={wrapStyle}>
+      {prefix}
+      <input
+        type="number"
+        inputMode={inputMode}
+        value={shown}
+        onFocus={() => setDraft(asStr(value))}
+        onChange={(e) => { setDraft(e.target.value); onCommit(e.target.value); }}
+        onBlur={() => setDraft(null)}
+        style={inputStyle}
+      />
+      {suffix}
+    </div>
+  );
+}
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 // The shop's home timezone (Oregon = Pacific). Bookings are anchored to THIS wall clock so a
@@ -14239,8 +14267,9 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                           <Avatar size={24} photo={p.photo} initial={(p.name || "?").charAt(0).toUpperCase()} color={AV[pi % AV.length]} fontSize={11} />
                           <span style={{ fontSize: 15, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(p.name || "").split(" ")[0]}</span>
                         </span>
-                        <div style={{ ...moneyWrap, flex: 1 }}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input type="number" inputMode="decimal" value={pVal} onChange={(ev) => setStaffChoicePrice(p.id, gid, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 10px", fontSize: 15 }} /></div>
-                        <div style={{ ...moneyWrap, flex: 1 }}><input type="number" inputMode="numeric" value={dVal} onChange={(ev) => setStaffChoiceDur(p.id, gid, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 10px", fontSize: 15 }} /><span style={{ padding: "0 10px 0 0", color: "var(--sub)", fontSize: 12.5 }}>min</span></div>
+                        {/* menu-num-clearable: per-barber cut price/time must stay CLEARABLE — value falls back to a computed default, so a raw controlled input snaps back the instant you delete a digit (you can never retype). EditableNum holds an empty draft while focused. Never revert these to <input value={pVal/dVal}>. */}
+                        <EditableNum value={pVal} inputMode="decimal" onCommit={(v) => setStaffChoicePrice(p.id, gid, o.id, v === "" ? null : v)} prefix={<span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span>} wrapStyle={{ ...moneyWrap, flex: 1 }} inputStyle={{ ...moneyInput, padding: "12px 10px", fontSize: 15 }} />
+                        <EditableNum value={dVal} inputMode="numeric" onCommit={(v) => setStaffChoiceDur(p.id, gid, o.id, v === "" ? null : v)} suffix={<span style={{ padding: "0 10px 0 0", color: "var(--sub)", fontSize: 12.5 }}>min</span>} wrapStyle={{ ...moneyWrap, flex: 1 }} inputStyle={{ ...moneyInput, padding: "12px 10px", fontSize: 15 }} />
                       </div>
                     );
                   })}
