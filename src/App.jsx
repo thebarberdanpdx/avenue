@@ -1725,6 +1725,39 @@ const choiceStyleDuration = (client, service, providerId, group, opt) => {
   if (opt && opt.min != null) return Number(opt.min) || 0;
   return getDuration(client, service, providerId);
 };
+// Migrate ONE service's cut-choice group from the increment model → the ABSOLUTE per-barber model.
+// Fills staff[pid].choicePrice/choiceDur[gid][optId] with each barber's CURRENT effective total (their
+// base + the option's increment, or their answerPrice/answerDur override) and flags the group setsPrice,
+// so the pricing engine switches to absolute for this service. Non-destructive (keeps old answerPrice/
+// answerDur) and idempotent (a setsPrice group returns unchanged) — the numbers don't move, they're just
+// stored as totals so the editor shows/types totals and the doubling bug can never recur.
+const migrateCutStylesToAbsolute = (form, staffIds) => {
+  if (!form || !Array.isArray(form.addonGroups)) return form;
+  const gi = form.addonGroups.findIndex((g) => g && g.type === "choice" && String(g.id) === "cutchoice");
+  if (gi < 0) return form;
+  const g = form.addonGroups[gi];
+  if (g.setsPrice) return form;
+  const base = Number(form.price) || 0, baseDur = Number(form.duration) || 0;
+  const staff = { ...(form.staff || {}) };
+  const ids = (Array.isArray(staffIds) && staffIds.length) ? staffIds : Object.keys(staff);
+  ids.forEach((pid) => {
+    const se = { ...(staff[pid] || { on: true, duration: null, price: null }) };
+    const sbP = (se.price != null && se.price !== "") ? Number(se.price) : base;
+    const sbD = (se.duration != null && se.duration !== "") ? Number(se.duration) : baseDur;
+    const cp = { ...(se.choicePrice || {}) }, cpg = { ...(cp[g.id] || {}) };
+    const cd = { ...(se.choiceDur || {}) }, cdg = { ...(cd[g.id] || {}) };
+    (g.options || []).forEach((o) => {
+      const incrP = (se.answerPrice && se.answerPrice[g.id] && se.answerPrice[g.id][o.id] != null) ? Number(se.answerPrice[g.id][o.id]) : (Number(o.price) || 0);
+      const incrD = (se.answerDur && se.answerDur[g.id] && se.answerDur[g.id][o.id] != null) ? Number(se.answerDur[g.id][o.id]) : (Number(o.min) || 0);
+      if (cpg[o.id] == null) cpg[o.id] = Math.max(0, sbP + incrP);
+      if (cdg[o.id] == null) cdg[o.id] = Math.max(0, sbD + incrD);
+    });
+    cp[g.id] = cpg; cd[g.id] = cdg;
+    staff[pid] = { ...se, choicePrice: cp, choiceDur: cd };
+  });
+  const addonGroups = form.addonGroups.map((x, k) => (k === gi ? { ...x, setsPrice: true } : x));
+  return { ...form, addonGroups, staff };
+};
 // Per-add-on time cascade — how many minutes a chosen add-on adds for this barber.
 // per-barber override (staff.addonDur[groupId], absolute minutes) → the add-on's own item.min.
 // Mirrors cutDur so a master's "hot towel" can run longer than a junior's.
@@ -13252,6 +13285,27 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     if (Object.keys(grp).length) answerPrice[gid] = grp; else delete answerPrice[gid];
     return { ...f, staff: { ...f.staff, [pid]: { ...cur, answerPrice } } };
   });
+  // NEW MENU MODEL — per-barber ABSOLUTE cut-style price/time: staff[pid].choicePrice[gid][optId] /
+  // choiceDur[gid][optId]. Unlike answerPrice/answerDur (increments on a base), these ARE the total for
+  // that barber's version of that style. Read by choiceStylePrice/choiceStyleDuration when the group is
+  // flagged setsPrice. Blank clears (falls back to the option's own price → getPrice). The editor types
+  // and shows totals, so no "extra" can be mistaken for a full price (the doubling bug can't recur).
+  const setStaffChoicePrice = (pid, gid, oid, val) => setForm((f) => {
+    const cur = (f.staff && f.staff[pid]) || { on: true, duration: null, price: null };
+    const choicePrice = { ...(cur.choicePrice || {}) };
+    const grp = { ...(choicePrice[gid] || {}) };
+    if (val == null || val === "") delete grp[oid]; else grp[oid] = Math.max(0, Number(val) || 0);
+    if (Object.keys(grp).length) choicePrice[gid] = grp; else delete choicePrice[gid];
+    return { ...f, staff: { ...f.staff, [pid]: { ...cur, choicePrice } } };
+  });
+  const setStaffChoiceDur = (pid, gid, oid, val) => setForm((f) => {
+    const cur = (f.staff && f.staff[pid]) || { on: true, duration: null, price: null };
+    const choiceDur = { ...(cur.choiceDur || {}) };
+    const grp = { ...(choiceDur[gid] || {}) };
+    if (val == null || val === "") delete grp[oid]; else grp[oid] = Math.max(0, Number(val) || 0);
+    if (Object.keys(grp).length) choiceDur[gid] = grp; else delete choiceDur[gid];
+    return { ...f, staff: { ...f.staff, [pid]: { ...cur, choiceDur } } };
+  });
   const setBooking = (patch) => setForm((f) => ({ ...f, booking: { ...(f.booking || defaultBooking()), ...patch } }));
 
   const openNew = () => { setSection(null); setTplPick(true); };
@@ -13282,9 +13336,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       if (e.addonPrice && Object.keys(e.addonPrice).length) cleanStaff[pid].addonPrice = e.addonPrice; else delete cleanStaff[pid].addonPrice;
       if (e.answerDur && Object.keys(e.answerDur).length) cleanStaff[pid].answerDur = e.answerDur; else delete cleanStaff[pid].answerDur;
       if (e.answerPrice && Object.keys(e.answerPrice).length) cleanStaff[pid].answerPrice = e.answerPrice; else delete cleanStaff[pid].answerPrice;
+      // NEW model: per-barber ABSOLUTE cut-style price/time (choicePrice/choiceDur). Preserve on save.
+      if (e.choicePrice && Object.keys(e.choicePrice).length) cleanStaff[pid].choicePrice = e.choicePrice; else delete cleanStaff[pid].choicePrice;
+      if (e.choiceDur && Object.keys(e.choiceDur).length) cleanStaff[pid].choiceDur = e.choiceDur; else delete cleanStaff[pid].choiceDur;
     });
     const photos = Array.isArray(form.photos) ? form.photos.filter(Boolean) : [];
-    const clean = { ...form, price: Math.min(100000, priceNum), duration: Math.max(5, Math.min(600, Number(form.duration) || 30)), staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false };
+    // NEW MENU MODEL: on save, migrate this service's cut styles to ABSOLUTE per-barber pricing — fills
+    // each (barber, style) with its current effective total and flags the group setsPrice. Same numbers,
+    // now doubling-proof. Idempotent + a no-op for services without cut styles.
+    const clean = migrateCutStylesToAbsolute({ ...form, price: Math.min(100000, priceNum), duration: Math.max(5, Math.min(600, Number(form.duration) || 30)), staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false }, staffList.map((p) => p.id));
     if (editing === "new") {
       // A new service MUST get a defined order (appended to the end). Blank orders were the
       // root cause of the reorder-doesn't-stick saga: an undefined order sorts unpredictably
@@ -14123,8 +14183,16 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       <div>
         {cutOpts.map((o, oi) => {
           const open = openCutId === o.id;
-          const pd = Number(o.price) || 0, md = Number(o.min) || 0;
-          const summary = (pd || md) ? `Adds ${pd ? `$${pd}` : ""}${pd && md ? " · " : ""}${md ? `${md} min` : ""}` : "No extra charge";
+          // Collapsed summary shows the first barber's TOTAL for this style (saved absolute, else current
+          // effective) — no more "Adds $X", since a style is now its own price, not an add-on.
+          const _sp = (staffList[0] && form.staff && form.staff[staffList[0].id]) || {};
+          const _bP = (_sp.price != null && _sp.price !== "") ? Number(_sp.price) : (Number(form.price) || 0);
+          const _bD = (_sp.duration != null && _sp.duration !== "") ? Number(_sp.duration) : (Number(form.duration) || 0);
+          const _savedP = _sp.choicePrice && _sp.choicePrice[cutGroup.id] && _sp.choicePrice[cutGroup.id][o.id];
+          const _savedD = _sp.choiceDur && _sp.choiceDur[cutGroup.id] && _sp.choiceDur[cutGroup.id][o.id];
+          const _sumP = _savedP != null ? _savedP : _bP + ((_sp.answerPrice && _sp.answerPrice[cutGroup.id] && _sp.answerPrice[cutGroup.id][o.id] != null) ? Number(_sp.answerPrice[cutGroup.id][o.id]) : (Number(o.price) || 0));
+          const _sumD = _savedD != null ? _savedD : _bD + ((_sp.answerDur && _sp.answerDur[cutGroup.id] && _sp.answerDur[cutGroup.id][o.id] != null) ? Number(_sp.answerDur[cutGroup.id][o.id]) : (Number(o.min) || 0));
+          const summary = `$${_sumP} · ${_sumD} min`;
           return (
             <div key={o.id} style={{ borderTop: oi ? "1px solid var(--line)" : "none" }}>
               <button onClick={() => setOpenCutId(open ? null : o.id)} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "flex-start", gap: 14, background: "none", border: "none", padding: "20px 2px", textAlign: "left", cursor: "pointer" }}>
@@ -14141,50 +14209,39 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   <input value={o.label || ""} onChange={(e) => setCutOpt(oi, { label: e.target.value })} placeholder="e.g. Skin Fade" style={inpStyle} />
                   <SectionLbl>Description — the pop-up clients read</SectionLbl>
                   <textarea value={o.desc || ""} onChange={(e) => setCutOpt(oi, { desc: e.target.value })} rows={3} placeholder="What this style is — shown on the confirm pop-up." style={{ ...inpStyle, resize: "vertical", minHeight: 64, lineHeight: 1.5 }} />
-                  <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <SectionLbl>Adds to price</SectionLbl>
-                      <div style={moneyWrap}><span style={moneyPrefix}>$</span><input type="number" inputMode="decimal" value={o.price ?? ""} onChange={(e) => setCutOpt(oi, { price: e.target.value === "" ? 0 : Number(e.target.value) })} placeholder="0" style={{ ...moneyInput, width: "100%" }} /></div>
+                  {staffList.length > 0 && (
+                    <div style={{ marginTop: 22 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
+                        <span style={{ width: 64, flexShrink: 0 }} />
+                        <span style={{ flex: 1, textAlign: "center", fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Price</span>
+                        <span style={{ flex: 1, textAlign: "center", fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Time</span>
+                      </div>
+                      {staffList.map((p) => {
+                        const se = form.staff[p.id] || {};
+                        const gid = cutGroup.id;
+                        // NEW model: each barber's OWN price + time for this style — the full TOTAL, not an add-on.
+                        // Show the saved absolute if this service is migrated, else the current effective total
+                        // (base + increment) so an un-migrated service starts on real numbers. Editing writes the
+                        // absolute (choicePrice/choiceDur); saving flips the service onto the doubling-proof model.
+                        const bP = (se.price != null && se.price !== "") ? Number(se.price) : (Number(form.price) || 0);
+                        const bD = (se.duration != null && se.duration !== "") ? Number(se.duration) : (Number(form.duration) || 0);
+                        const savedP = se.choicePrice && se.choicePrice[gid] && se.choicePrice[gid][o.id];
+                        const savedD = se.choiceDur && se.choiceDur[gid] && se.choiceDur[gid][o.id];
+                        const effP = bP + ((se.answerPrice && se.answerPrice[gid] && se.answerPrice[gid][o.id] != null) ? Number(se.answerPrice[gid][o.id]) : (Number(o.price) || 0));
+                        const effD = bD + ((se.answerDur && se.answerDur[gid] && se.answerDur[gid][o.id] != null) ? Number(se.answerDur[gid][o.id]) : (Number(o.min) || 0));
+                        const pVal = savedP != null ? savedP : effP;
+                        const dVal = savedD != null ? savedD : effD;
+                        return (
+                          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+                            <span style={{ width: 64, flexShrink: 0, fontSize: 15, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(p.name || "").split(" ")[0]}</span>
+                            <div style={{ ...moneyWrap, flex: 1 }}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input type="number" inputMode="decimal" value={pVal} onChange={(ev) => setStaffChoicePrice(p.id, gid, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 10px", fontSize: 15 }} /></div>
+                            <div style={{ ...moneyWrap, flex: 1 }}><input type="number" inputMode="numeric" value={dVal} onChange={(ev) => setStaffChoiceDur(p.id, gid, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 10px", fontSize: 15 }} /><span style={{ padding: "0 10px 0 0", color: "var(--sub)", fontSize: 12.5 }}>min</span></div>
+                          </div>
+                        );
+                      })}
+                      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.45, margin: "10px 0 0" }}>Each barber's own price and time for this style — the full total, not an add-on.</p>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <SectionLbl>Adds time</SectionLbl>
-                      <div style={moneyWrap}><input type="number" inputMode="numeric" value={o.min ?? ""} onChange={(e) => setCutOpt(oi, { min: e.target.value === "" ? 0 : Number(e.target.value) })} placeholder="0" style={{ ...moneyInput, width: "100%", paddingLeft: 16 }} /><span style={unitSuffix}>min</span></div>
-                    </div>
-                  </div>
-                  {staffList.length > 0 ? (
-                    <div style={{ marginTop: 20, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
-                      <button onClick={() => setCutAdvOpen((s) => ({ ...s, [o.id]: !s[o.id] }))} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--sub)", fontSize: 13.5, fontWeight: 600 }}>
-                        <span>Per-barber extra <span style={{ color: "var(--faint)", fontWeight: 400 }}>· on top of base</span></span>
-                        {cutAdvOpen[o.id] ? <ChevronUp size={16} style={{ color: "var(--faint)" }} /> : <ChevronDown size={16} style={{ color: "var(--faint)" }} />}
-                      </button>
-                      {cutAdvOpen[o.id] ? (
-                        <div style={{ marginTop: 14 }}>
-                          {staffList.map((p) => {
-                            const se = form.staff[p.id] || {};
-                            const pv = (se.answerPrice && se.answerPrice[cutGroup.id] && se.answerPrice[cutGroup.id][o.id] != null) ? se.answerPrice[cutGroup.id][o.id] : "";
-                            const dv = (se.answerDur && se.answerDur[cutGroup.id] && se.answerDur[cutGroup.id][o.id] != null) ? se.answerDur[cutGroup.id][o.id] : "";
-                            // Show the RESULTING total for this barber so an "extra" can't be mistaken for a full price
-                            // (the $89-instead-of-$47 skin-fade bug, 2026-07-17): total = this barber's base + the extra.
-                            const bP = (se.price != null && se.price !== "") ? Number(se.price) : (Number(form.price) || 0);
-                            const bD = (se.duration != null && se.duration !== "") ? Number(se.duration) : (Number(form.duration) || 0);
-                            const totP = bP + (pv !== "" ? (Number(pv) || 0) : (Number(o.price) || 0));
-                            const totD = bD + (dv !== "" ? (Number(dv) || 0) : (Number(o.min) || 0));
-                            return (
-                              <div key={p.id} style={{ marginBottom: 12 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                                  <span style={{ width: 64, flexShrink: 0, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(p.name || "").split(" ")[0]}</span>
-                                  <div style={{ ...moneyWrap, flex: 1 }}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>+$</span><input type="number" inputMode="decimal" value={pv} placeholder={String(Number(o.price) || 0)} onChange={(ev) => setStaffAnswerPrice(p.id, cutGroup.id, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 12px", fontSize: 15 }} /></div>
-                                  <div style={{ ...moneyWrap, flex: 1 }}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>+</span><input type="number" inputMode="numeric" value={dv} placeholder={String(Number(o.min) || 0)} onChange={(ev) => setStaffAnswerDur(p.id, cutGroup.id, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 12px", fontSize: 15 }} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13 }}>min</span></div>
-                                </div>
-                                <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 4, paddingLeft: 73 }}>{(p.name || "").split(" ")[0]}'s total: <strong style={{ color: "var(--sub)" }}>${totP} · {totD} min</strong></div>
-                              </div>
-                            );
-                          })}
-                          <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.45, margin: "4px 0 0" }}>Each barber's <strong>extra</strong> on top of the base — <strong>not</strong> the full price. Blank uses the style's default. The total for each barber is shown under their row.</p>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
+                  )}
                   <div style={{ marginTop: 18, textAlign: "right" }}>
                     <button onClick={() => removeCutStyle(oi)} style={{ background: "none", border: "none", color: "#C2392B", fontSize: 13.5, fontWeight: 500, cursor: "pointer", padding: 0 }}>Remove style</button>
                   </div>

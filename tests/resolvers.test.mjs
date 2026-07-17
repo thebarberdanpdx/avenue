@@ -44,7 +44,7 @@ if (pEnd === -1) throw new Error("resolvers.test: could not find end of lockedAp
 const block2 = src.slice(ps, pEnd);
 
 const NAMES = ["cancelWindowMinutes","getStaffEntry","getDuration","overdueBufferMin","getPrice",
-  "byServiceOrder","cutStylePrice","cutStyleDuration","choiceStylePrice","choiceStyleDuration","addonDuration","addonPriceFor",
+  "byServiceOrder","cutStylePrice","cutStyleDuration","choiceStylePrice","choiceStyleDuration","migrateCutStylesToAbsolute","addonDuration","addonPriceFor",
   "cleanServiceLabel","answerDuration","answerPriceFor","priceWithTimeRules","lockedApptPrice"];
 for (const n of NAMES) {
   const inBlock1 = new RegExp(`(const|function)\\s+${n}\\b`).test(block);
@@ -167,6 +167,29 @@ test("choiceStyleDuration: per-barber ABSOLUTE replaces the base", () => {
   assert.equal(R.choiceStyleDuration(null, svc, "dan", group, opt), 70);          // absolute — NOT 35+10
   assert.equal(R.choiceStyleDuration(null, svc, "jr", group, opt), 10);           // option's own absolute min
   assert.equal(R.choiceStyleDuration(null, svc, "jr", group, { id: "x" }), 45);   // no option min → service default
+});
+test("migrateCutStylesToAbsolute: fills each barber's effective TOTAL + flags setsPrice (numbers don't move)", () => {
+  const form = {
+    id: "cut", price: 42, duration: 45,
+    addonGroups: [{ id: "cutchoice", type: "choice", options: [{ id: "standard", price: 0, min: 0 }, { id: "skinfade", price: 5, min: 10 }] }],
+    staff: {
+      dan: { duration: 35, answerPrice: { cutchoice: { skinfade: 5 } }, answerDur: { cutchoice: { skinfade: 10 } } },
+      heather: { duration: 45 },
+    },
+  };
+  const out = R.migrateCutStylesToAbsolute(form, ["dan", "heather"]);
+  assert.equal(out.addonGroups[0].setsPrice, true);
+  assert.equal(out.staff.dan.choicePrice.cutchoice.standard, 42);   // 42 + 0
+  assert.equal(out.staff.dan.choiceDur.cutchoice.standard, 35);     // 35 + 0
+  assert.equal(out.staff.dan.choicePrice.cutchoice.skinfade, 47);   // 42 + 5 (answerPrice override)
+  assert.equal(out.staff.dan.choiceDur.cutchoice.skinfade, 45);     // 35 + 10
+  assert.equal(out.staff.heather.choicePrice.cutchoice.skinfade, 47); // 42 + option's own 5
+  assert.equal(out.staff.heather.choiceDur.cutchoice.skinfade, 55);   // 45 + option's own 10
+  assert.equal(R.migrateCutStylesToAbsolute(out, ["dan"]), out);    // idempotent — setsPrice group returned unchanged
+});
+test("migrateCutStylesToAbsolute: a service with no cut-choice group is returned unchanged", () => {
+  const form = { id: "beard", price: 30, duration: 30, addonGroups: [], staff: { dan: {} } };
+  assert.equal(R.migrateCutStylesToAbsolute(form, ["dan"]), form);
 });
 
 // ─── cancelWindowMinutes: the leadTimeMin:0 bug guard ──────────────────────
