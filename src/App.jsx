@@ -23828,6 +23828,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [tapStatus, setTapStatus] = useState(""); // live status text while the Tap to Pay reader runs
   const [readerAuth, setReaderAuth] = useState(null); // tap-then-tip: { id, base } after the reader AUTHORIZES the base, captured (base+tip) once the tip is chosen
   const [paidRec, setPaidRec] = useState(null);     // the ledger record written on success
+  const [receiptState, setReceiptState] = useState("idle"); // idle | sending | sent | error — the optional post-pay email receipt
   const [checkoutDiscount, setCheckoutDiscount] = useState(appt.discount || null); // applied discount preset (from the appt or chosen here)
   const [showDiscPick, setShowDiscPick] = useState(false);
   // Money math (subtotal, booking credits, discount, tip, balance, charge base, card-on-file
@@ -23922,14 +23923,40 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt;
     return { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, discount: discountAmt, discountName: reopen ? ((appt.paid && appt.paid.discountName) || null) : (checkoutDiscount ? checkoutDiscount.name : null), rebookJump: (rebookOutcome && rebookOutcome.kind === "calendar") ? { date: rebookOutcome.date, label: rebookOutcome.label } : null, bookReminder: (rebookOutcome && rebookOutcome.kind === "reminder") ? { at: rebookOutcome.at, label: rebookOutcome.label } : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null };
   };
+  // Optional post-payment receipt — a REAL email to the client's on-file address, sent only when the
+  // owner taps "Email receipt" on the Paid screen (Dan, 2026-07-17). Best-effort: we confirm the
+  // server actually sent before reporting success, and never block the rebook flow on it.
+  const receiptEmail = ((liveClient && liveClient.email) || appt.email || "").trim();
+  const emailReceipt = async () => {
+    if (!receiptEmail || receiptState === "sending") return;
+    setReceiptState("sending");
+    const amt = paidRec ? paidRec.amount : total;
+    const ctx = {
+      client: String((liveClient && liveClient.name) || appt.name || "there").split(" ")[0],
+      business: business?.name || "your shop",
+      service: (service && service.name) || appt.serviceName || appt.title || "your visit",
+      amount: money(amt),
+      date: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric" }),
+    };
+    const body = "Hi {client}, thanks for coming in to {business}! Here's your receipt for today: {service} — {amount} on {date}. See you next time!";
+    try {
+      const r = await fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel: "email", to: { email: receiptEmail }, subject: `${business?.name || "Vero"} — your receipt`, template: body, context: ctx }) });
+      const j = await r.json().catch(() => ({}));
+      const ok = r.ok && (!j.results || j.results.email === "sent");
+      setReceiptState(ok ? "sent" : "error");
+      if (showToast) showToast(ok ? `Receipt emailed to ${receiptEmail}` : "Couldn't email the receipt — try again from the client's profile.");
+    } catch (e) {
+      setReceiptState("error");
+      if (showToast) showToast("Couldn't email the receipt — try again from the client's profile.");
+    }
+  };
   useEffect(() => {
     if (stage === "approved") {
-      // Commit the moment payment succeeds — don't wait for rebook / "All done". If the app
+      // Commit the moment payment succeeds — don't wait for the receipt/rebook taps. If the app
       // backgrounds here, the ticket is already done+paid on the server (Edward Ochs / $1 deposit bug).
+      // No auto-advance: the Paid screen now waits for the owner to choose receipt + rebook.
       const summary = buildCheckoutSummary();
       if (onCommit) onCommit(appt.id, summary);
-      const t = setTimeout(() => setStage(((!reopen || rebookOnReopen) && rebookCfg.enabled) ? "rebook" : "done"), 1300);
-      return () => clearTimeout(t);
     }
     if (stage === "done") {
       const summary = buildCheckoutSummary();
@@ -24236,8 +24263,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     const selAmt = customTip != null ? +Number(customTip).toFixed(2) : +(subtotal * tipPct / 100).toFixed(2);
     const chargeNow = () => {
       // Tap-then-tip reader: the card is ALREADY authorized for the base — capture base+tip now
-      // instead of tapping again. Every other method charges here as before.
-      if (readerAuth && readerAuth.id) { setStage("charging"); captureReaderTip(); return; }
+      // instead of tapping again. Route through the tapPay screen (spinner + error + Try again);
+      // "charging" has no reader branch and would silently fall through to the done screen on failure.
+      if (readerAuth && readerAuth.id) { setStage("tapPay"); captureReaderTip(); return; }
       setStage("charging"); executeCharge(pendingMethod);
     };
     return screen(
@@ -24312,16 +24340,30 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     <CardChargeInline amount={chargeBase} appt={appt} onCancel={() => { setPayErr(""); setStage(tipCfg.enabled && !reopen ? "tipPick" : "method"); }} onPaid={(payRes) => { recordSale(makeRec("card", payRes, chargeBase)); setStage("approved"); }} money={money} />);
 
 
-  if (stage === "approving" || stage === "approved") return screen(
+  if (stage === "approving" || stage === "approved") {
+    const afterPaid = ((!reopen || rebookOnReopen) && rebookCfg.enabled) ? "rebook" : "done";
+    return screen(
     <div className="fade-in" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
       <div style={{ width: 96, height: 96, borderRadius: "50%", background: "var(--live, var(--gold))", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24, animation: "popIn .4s var(--ease) both", boxShadow: "var(--glow)" }}><Check size={48} style={{ color: "var(--on-gold)" }} strokeWidth={3} /></div>
       <div style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 8 }}>Paid</div>
-      <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300 }}>{money(paidRec ? paidRec.amount : total)}{paidRec ? ` · ${payMethodLabel(paidRec).toLowerCase()}${payIsCard(paidRec) && paidRec.last4 ? ` ··${paidRec.last4}` : ""}` : ""}</p>
+      <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300, marginBottom: 40 }}>{money(paidRec ? paidRec.amount : total)}{paidRec ? ` · ${payMethodLabel(paidRec).toLowerCase()}${payIsCard(paidRec) && paidRec.last4 ? ` ··${paidRec.last4}` : ""}` : ""}</p>
+      {/* Email receipt — optional, to the client's on-file email. Fires a real send (toast confirms),
+          then moves straight to rebook. No email on file → just a Continue button. */}
+      <div style={{ width: "100%", maxWidth: 340, display: "grid", gap: 12 }}>
+        {receiptEmail ? (
+          <>
+            <button className="lift" onClick={() => { emailReceipt(); setStage(afterPaid); }} style={{ ...goldBtn, display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}><Mail size={18} /> EMAIL RECEIPT</button>
+            <button onClick={() => setStage(afterPaid)} style={{ width: "100%", background: "transparent", border: "none", color: "var(--sub)", padding: 14, fontSize: 14.5, fontWeight: 500, letterSpacing: 0.5, cursor: "pointer" }}>No thanks</button>
+          </>
+        ) : (
+          <button className="lift" onClick={() => setStage(afterPaid)} style={{ ...goldBtn }}>CONTINUE</button>
+        )}
+      </div>
     </div>
-  );
+  ); }
 
-  if (stage === "rebook") { const first = appt.name ? appt.name.split(" ")[0] : "them"; return sheet(
-    <div style={{ padding: "28px 24px 32px" }}>
+  if (stage === "rebook") { const first = appt.name ? appt.name.split(" ")[0] : "them"; return screen(
+    <div className="fade-in" style={{ paddingTop: 8 }}>
       <div style={{ textAlign: "center", marginBottom: 20 }}>
         <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Repeat size={26} style={{ color: "var(--gold)" }} /></div>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, lineHeight: 1.15 }}>Rebook {first}?</h2>
@@ -24380,36 +24422,29 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       )}
       <button onClick={() => { setRebookOutcome(null); setStage("done"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 8 }}>NO THANKS</button>
     </div>
-  , undefined, false); }
+  ); }
 
-  return sheet(
-    <div className="fade-in" style={{ padding: "56px 28px 64px", textAlign: "center" }}>
-      <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px" }}><Check size={34} style={{ color: "var(--gold)" }} /></div>
-      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 8 }}>All done</div>
-      <p style={{ color: "var(--sub)", fontSize: 15.5, fontWeight: 300 }}>{money(total)} charged for today’s visit · receipt sent to {appt.name || "the client"}.</p>
-
-      {rebookOutcome && (
-        <div style={{ marginTop: 24, textAlign: "left", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "18px 20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-            {rebookOutcome.kind === "reminder" ? <Bell size={18} style={{ color: "var(--gold)" }} /> : <Repeat size={18} style={{ color: "var(--gold)" }} />}
-            <div style={{ fontSize: 15.5, fontWeight: 600 }}>{rebookOutcome.kind === "reminder" ? `Reminder set · in ${rebookOutcome.label}` : "Heading to the calendar"}</div>
-          </div>
-          {(rebookOutcome.kind === "reminder" ? [
-            [MessageSquare, `We'll text ${appt.name ? appt.name.split(" ")[0] : "the client"} on ${fmtDay(new Date(rebookOutcome.at))} with your booking link`],
-            [Check, "Nothing else to do today"],
-          ] : [
-            [Calendar, `The calendar opens${rebookOutcome.label ? ` on ${rebookOutcome.label}` : ""} — the whole day, open spots and all`],
-            [Check, `Tap any open time — ${appt.name ? appt.name.split(" ")[0] : "the client"}'s appointment is pre-filled`],
-          ]).map(([Ico, txt], i) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "6px 0" }}>
-              <Ico size={15} style={{ color: "var(--sub)", marginTop: 2, flexShrink: 0 }} />
-              <span style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.45 }}>{txt}</span>
-            </div>
-          ))}
-        </div>
+  // Final bridge — the Paid screen already showed the ONE checkmark, so this is a clean, checkmark-free
+  // hand-off (opening the calendar / reminder set) before onDone closes the sheet ~1.2s later.
+  return screen(
+    <div className="fade-in" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+      {rebookOutcome && rebookOutcome.kind === "reminder" ? (
+        <>
+          <Bell size={40} style={{ color: "var(--gold)", marginBottom: 18 }} />
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, marginBottom: 8 }}>Reminder set</div>
+          <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.5, maxWidth: 300 }}>We’ll text {appt.name ? appt.name.split(" ")[0] : "the client"} on {fmtDay(new Date(rebookOutcome.at))} with your booking link.</p>
+        </>
+      ) : rebookOutcome && rebookOutcome.kind === "calendar" ? (
+        <>
+          <Calendar size={40} style={{ color: "var(--gold)", marginBottom: 18 }} />
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, marginBottom: 8 }}>Opening the calendar…</div>
+          <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.5, maxWidth: 300 }}>Tap any open time — {appt.name ? appt.name.split(" ")[0] : "the client"}’s appointment is pre-filled.</p>
+        </>
+      ) : (
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500 }}>All set</div>
       )}
     </div>
-  , undefined, false);
+  );
 }
 function CheckoutRow({ label, val, bold }) {
   return (
@@ -24866,8 +24901,9 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
   const [customTip, setCustomTip] = useState(null);
   const [tapStatus, setTapStatus] = useState("");
   const [payErr, setPayErr] = useState("");
+  const [readerAuth, setReaderAuth] = useState(null); // tap-then-tip: { id, base } after the reader AUTHORIZES the base; captured (base+tip) once the tip is chosen
 
-  useEffect(() => { if (open) { setItems([]); setDiscount(""); setCustomOpen(false); setCName(""); setCPrice(""); setPayMode(null); setTendered(""); setClient(null); setClientPick(false); setClientQuery(""); setDone(null); setOnfileBusy(false); setOnfileErr(""); setStage("build"); setPendingMethod(null); setTipPct(null); setCustomTip(null); setTapStatus(""); setPayErr(""); } }, [open]);
+  useEffect(() => { if (open) { setItems([]); setDiscount(""); setCustomOpen(false); setCName(""); setCPrice(""); setPayMode(null); setTendered(""); setClient(null); setClientPick(false); setClientQuery(""); setDone(null); setOnfileBusy(false); setOnfileErr(""); setStage("build"); setPendingMethod(null); setTipPct(null); setCustomTip(null); setTapStatus(""); setPayErr(""); setReaderAuth(null); } }, [open]);
 
   // A client can put a card on file by booking online moments before staff rings them up, so the
   // dashboard's clients list (loaded at app start, no realtime) may not carry it yet — which showed
@@ -24959,6 +24995,41 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
       setPayErr((e && e.message) || "The reader didn't complete. Try again or pick another way.");
     }
   };
+  // Tap-then-tip phase 1: authorize the base (pre-tip) on the reader — customer taps — then show the tip screen.
+  const runCardReaderAuth = async () => {
+    setPayErr(""); setTapStatus("Starting…"); setReaderAuth(null);
+    try {
+      await ensureFreshSession();
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess && sess.session && sess.session.access_token;
+      const res = await cardReaderAuthorize({ base: total, description: `Vero sale — ${client?.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
+      setReaderAuth({ id: res && res.id, base: total });
+      setTipPct((p) => (p == null ? (tipCfg.smartDefault ?? (tipCfg.presets && tipCfg.presets[0]) ?? 20) : p));
+      setStage("tip"); // card is HELD for the base — pick the tip, then capture base+tip
+    } catch (e) {
+      setPayErr((e && e.message) || "The reader didn't complete. Try again or pick another way.");
+    }
+  };
+  // Tap-then-tip phase 2: capture the held authorization for base + the chosen tip. Records the ACTUAL
+  // captured amount (and zeroes the tip if the card couldn't take it) so reports never overstate.
+  const captureReaderTip = async () => {
+    setPayErr(""); setTapStatus("Finishing…");
+    try {
+      await ensureFreshSession();
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess && sess.session && sess.session.access_token;
+      const res = await cardReaderCaptureTip({ id: readerAuth.id, total: chargeTotal, base: readerAuth.base, apiBase: API_BASE, authToken: token });
+      const capturedDollars = (res && typeof res.captured === "number") ? +(res.captured / 100).toFixed(2) : chargeTotal;
+      const tipCaptured = (res && res.tipApplied === false) ? 0 : tipAmt;
+      recordSale({ method: "card", paymentIntentId: (res && res.id) || null, amount: capturedDollars, tip: tipCaptured });
+      setReaderAuth(null);
+      setDone({ amount: capturedDollars, method: "card", change: 0 });
+      if (res && res.tipApplied === false) showToast(`Charged ${fm(capturedDollars)} — the tip couldn't be added on the card. Collect the tip another way.`);
+      else showToast(`Charged ${fm(capturedDollars)} to card.`);
+    } catch (e) {
+      setPayErr((e && e.message) || "Couldn't finish the charge — the hold will expire on its own. Try again.");
+    }
+  };
   const executeMethod = (m) => {
     if (m === "tap") { setStage("tapPay"); runTapToPay(); return; }
     if (m === "reader") { setStage("tapPay"); runCardReader(); return; }
@@ -24973,6 +25044,10 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
   const startMethod = (m) => {
     setPayErr("");
     setPendingMethod(m);
+    setReaderAuth(null);
+    // Tap-then-tip on the card reader: TAP FIRST to authorize the base, THEN show the tip screen,
+    // then capture base+tip. Only the reader reorders; every other method keeps tip-before-charge.
+    if (m === "reader" && tipCfg.enabled) { setStage("tapPay"); runCardReaderAuth(); return; }
     if (tipCfg.enabled) {
       setTipPct((p) => (p == null ? (tipCfg.smartDefault ?? (tipCfg.presets && tipCfg.presets[0]) ?? 20) : p));
       setStage("tip");
@@ -25134,7 +25209,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
                 )}
                 {tipCfg.allowNoTip !== false && <button onClick={() => setCustomTip(0)} style={{ flex: 1, background: "var(--panel)", border: `1px solid ${customTip === 0 ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: 14, fontSize: 14.5, color: customTip === 0 ? "var(--gold)" : "var(--text2)", fontWeight: 500, cursor: "pointer" }}>No tip</button>}
               </div>
-              <button onClick={() => executeMethod(pendingMethod)} className="lift" style={{ ...goldBtn, marginTop: 20 }}>{`CHARGE ${fm(chargeTotal)}`}</button>
+              <button onClick={() => { if (readerAuth && readerAuth.id) { setStage("tapPay"); captureReaderTip(); } else { executeMethod(pendingMethod); } }} className="lift" style={{ ...goldBtn, marginTop: 20 }}>{`CHARGE ${fm(chargeTotal)}`}</button>
             </>
           )}
 
