@@ -6947,7 +6947,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             const a = { ...(cur.addons || {}) }; const dec = { ...(cur.declined || {}) };
             if (yes) { a[g.id] = true; delete dec[g.id]; } else { delete a[g.id]; dec[g.id] = true; }
             putEntry({ ...cur, addons: a, declined: dec });
-            if (yes) { const it = g.item || {}; const ph = g.photo ? [g.photo] : []; if ((it.desc && String(it.desc).trim()) || ph.length) { setConfIdx(0); setPickConfirm({ name: it.name || g.label, desc: it.desc || "", photos: ph }); } }
+            // addon-no-autosheet (owner ask, 2026-07-17): tapping Yes on an ADD-ON never auto-opens the
+            // read-first pickConfirm modal — the client answers inline, exactly like a bare add-on ("Want a
+            // facial?"). The selection is already recorded above, so this popup was purely informational and
+            // removing it changes nothing that's charged. The description still shows inline with an opt-in
+            // "more info" link. The read-first sheet stays for CUT STYLES (pickChoice), which must be read.
           };
           const renderGroup = (g, idx) => {
             const gap = idx === 0 ? 26 : 32;
