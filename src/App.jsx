@@ -7927,13 +7927,37 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const usualSvc = lastAppt ? services.find((s) => s.id === lastAppt.serviceId) : null;
           const usualProv = providers.find((p) => p.id === (lastAppt?.providerId || who.provider)) || providers[1];
           if (!usualSvc) { setShowUsual(false); setStep(1); return null; }
-          const dur = getDuration(who, usualSvc, usualProv && usualProv.id !== "anyone" ? usualProv.id : "dan");
           const usualLine2 = lastAppt && lastAppt.lineItems && lastAppt.lineItems[0] ? lastAppt.lineItems[0] : null;
           const lastPhoto = (who.gallery && who.gallery.length) ? who.gallery[who.gallery.length - 1].photo : null;
-          // Build the cart entry for their usual (used by both actions).
-          const usualEntry = { service: usualSvc, addons: usualLine2?.addons || {}, cutType: usualLine2?.cutType || null, beardType: usualLine2?.beardType || null, provider: usualProv };
-          // Soonest opening with THEIR barber (any day/time).
+          // Build the cart entry for their usual (used by every action). Re-validate the saved cut style /
+          // add-on answers against the service's CURRENT groups so a since-removed option can't linger.
+          const validAddons = {};
+          (usualLine2?.addons ? Object.keys(usualLine2.addons) : []).forEach((gid) => {
+            const grp = (usualSvc.addonGroups || []).find((g) => g.id === gid);
+            if (!grp) return;
+            const val = usualLine2.addons[gid];
+            if (grp.type === "choice") { if ((grp.options || []).some((o) => o.id === val)) validAddons[gid] = val; }
+            else if (val) validAddons[gid] = val;
+          });
+          const usualEntry = { service: usualSvc, addons: validAddons, cutType: usualLine2?.cutType || null, beardType: usualLine2?.beardType || null, provider: usualProv };
+          // usual-full-duration: size the offered slot to the WHOLE visit (base + cut style + add-ons +
+          // overdue courtesy), NOT just the base service length — otherwise the opening we show can be too
+          // short for what actually gets booked (the real reservation uses effMin, which includes these).
+          const dur = Math.max(5, lineTotal(usualEntry).min + (overdueExtra || 0));
+          const usualPicks = optsFor(usualEntry);
+          // Soonest opening with THEIR barber (any day/time), sized to the full visit.
           const nextAvail = findNextAvailable(usualProv, dur);
+          // Change-or-add: seed their usual into the guided selection so they can swap the style or add an
+          // extra (e.g. the facial); duration re-sizes automatically as they change it.
+          const startUsualEdit = () => {
+            setDraft(usualSvc); setDraftAddons({ ...validAddons }); setCutType(usualEntry.cutType); setBeardType(usualEntry.beardType);
+            setSimpleChange(null); setCutConfirm(null); setDescConfirmed(false); setConfirmSheet(null); setAddonFlow(null);
+            setCart([usualEntry]); setCutFlow(null); setCameFromUsual(true); setShowUsual(false);
+            const groups = usualSvc.addonGroups || [];
+            if (groups.some((g) => g.type === "choice" || g.type === "addon")) setCutFlow({ phase: "cut" });
+            else if (usualSvc.usesCutStyles !== false && (usualSvc.cutTypes || []).length) { setCutPhase("type"); setStep(2); }
+            else startAddons(usualEntry);
+          };
           // Warm rhythm line: how long since their last visit, vs their known cadence.
           let rhythmLine = "Good to have you back.";
           const lastVisitIso = who.lastVisit || (lastAppt && lastAppt.bookedFor);
@@ -7963,7 +7987,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <div style={{ padding: "22px 20px", textAlign: "center" }}>
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--text)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your usual</div>
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.2, lineHeight: 1.2, color: "var(--text)" }}>{usualSvc.name}</div>
-                  {usualProv && usualProv.id !== "anyone" ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginTop: 8 }}>with {usualProv.name}</div> : null}
+                  {usualPicks.length ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.5 }}>{usualPicks.join(" · ")}</div> : null}
+                  {usualProv && usualProv.id !== "anyone" ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginTop: 6 }}>with {usualProv.name} · about {fmtDurLong(lineTotal(usualEntry).min)}</div> : <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginTop: 6 }}>about {fmtDurLong(lineTotal(usualEntry).min)}</div>}
                 </div>
               </div>
 
@@ -7979,7 +8004,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <div style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "16px 18px", marginBottom: 12, fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>No open times with {usualProv.name} in the next two weeks — pick a different time below.</div>
               )}
 
-              <button onClick={() => { setCart([usualEntry]); setCameFromUsual(true); setShowUsual(false); setStep(6); }} style={{ width: "100%", textAlign: "center", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 10, padding: "15px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>Pick a different time</button>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={startUsualEdit} style={{ flex: 1, textAlign: "center", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 10, padding: "15px 8px", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 600, letterSpacing: 0.6, textTransform: "uppercase", cursor: "pointer" }}>Change or add</button>
+                <button onClick={() => { setCart([usualEntry]); setCameFromUsual(true); setShowUsual(false); setStep(6); }} style={{ flex: 1, textAlign: "center", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 10, padding: "15px 8px", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 600, letterSpacing: 0.6, textTransform: "uppercase", cursor: "pointer" }}>Different time</button>
+              </div>
 
               <button onClick={() => { setShowUsual(false); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setStep(0); setSimpleStep("what"); }} style={{ width: "100%", textAlign: "center", background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", padding: "16px 0 4px", fontSize: 13, letterSpacing: 0.3, cursor: "pointer" }}>Book something different</button>
             </div>
