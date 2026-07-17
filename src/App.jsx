@@ -8462,7 +8462,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               return (
                 <div style={{ background: "var(--text)", borderRadius: 18, padding: "18px 20px", textAlign: "center", margin: "10px 0 24px", boxShadow: "0 14px 32px -16px rgba(0,0,0,0.5)" }}>
                   <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.2, color: "var(--bg)" }}>{lbl} · {fmtTime(slot)}</div>
-                  <div style={{ fontSize: 13.5, color: "color-mix(in srgb, var(--bg) 72%, var(--text))", marginTop: 5, lineHeight: 1.45 }}>{!hasFull ? `${dateFull} · ` : ""}{cart.map((e) => describeEntry(e)).join(" · ")} · ${selfie ? Math.max(0, cartAdjTotal - 5) : cartAdjTotal}{selfie ? " · $5 off" : ""} · with {provider.name}</div>
+                  <div style={{ fontSize: 13.5, color: "color-mix(in srgb, var(--bg) 72%, var(--text))", marginTop: 5, lineHeight: 1.45 }}>{!hasFull ? `${dateFull} · ` : ""}{cart.map((e) => describeEntry(e)).join(" · ")} · ${selfie ? Math.max(0, cartAdjTotal - 5) : cartAdjTotal}{effMin ? ` · ${effMin} min` : ""}{selfie ? " · $5 off" : ""} · with {provider.name}</div>
                   <div style={{ height: 1, background: "color-mix(in srgb, var(--bg) 22%, transparent)", margin: "14px 0" }} />
                   <button onClick={() => setWantEarlier(!wantEarlier)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, width: "100%", textAlign: "left", cursor: "pointer" }}>
                     <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--bg)" : "color-mix(in srgb, var(--bg) 28%, transparent)", position: "relative", flexShrink: 0, transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: wantEarlier ? "var(--text)" : "var(--bg)", transition: "left .2s" }} /></span>
@@ -8799,7 +8799,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           </div>
         )}
 
-        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} provider={provider} selectedDate={selectedDate} slot={slot}
+        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} mins={effMin} provider={provider} selectedDate={selectedDate} slot={slot}
           noteOn={business?.booking?.askNote !== false} photoOn={business?.bookingPhotos?.mode !== "off"}
           clientNote={clientNote} setClientNote={setClientNote} photoList={photos} setPhotos={setPhotos} clientPhotoRef={clientPhotoRef} onPhotoPick={onPhotoPick}
           selfie={selfie} selfieRef={selfieRef} onSelfiePick={onSelfiePick} onClearSelfie={clearSelfie} selfieEligible={!((clients.find((c) => c.id === bookedClientId) || {}).photo)}
@@ -8911,7 +8911,7 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
   );
 }
 
-function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider, selectedDate, slot, noteOn, photoOn, clientNote, setClientNote, photoList, setPhotos, clientPhotoRef, onPhotoPick, selfie, selfieRef, onSelfiePick, onClearSelfie, selfieEligible, saveState, onManage, onExit }) {
+function ConfirmationScreen({ business, cart, describeEntry, cartPrice, mins, provider, selectedDate, slot, noteOn, photoOn, clientNote, setClientNote, photoList, setPhotos, clientPhotoRef, onPhotoPick, selfie, selfieRef, onSelfiePick, onClearSelfie, selfieEligible, saveState, onManage, onExit }) {
   const F = FONT_BODY; // this screen is intentionally single-font (all Jost)
   const relDate = relativeDate(selectedDate);
   const relPlus = relDate.includes(",") ? relDate : `${relDate}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
@@ -8940,7 +8940,7 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
       <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 16px", marginBottom: 26 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: "var(--text)", lineHeight: 1.25 }}>{relPlus} · {fmtTime(slot)}</div>
-          <div style={{ fontFamily: F, fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{cart.map(describeEntry).join(", ")} · with {provider.name}</div>
+          <div style={{ fontFamily: F, fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{cart.map(describeEntry).join(", ")}{mins ? ` · ${mins} min` : ""} · with {provider.name}</div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           {selfie && <div style={{ fontFamily: F, fontSize: 13, color: "var(--faint)", textDecoration: "line-through" }}>${cartPrice}</div>}
