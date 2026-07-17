@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from './supabaseClient'
-import { tapToPayCharge, cardReaderCharge } from './tapToPay'
+import { tapToPayCharge, cardReaderCharge, cardReaderAuthorize, cardReaderCaptureTip } from './tapToPay'
 import * as Sentry from '@sentry/react'
 import {
   Calendar, Phone, Check, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MessageSquare, Bell, User, Camera,
@@ -23826,6 +23826,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [payErr, setPayErr] = useState("");
   const [pendingMethod, setPendingMethod] = useState(null); // chosen on the method screen; charged after tip
   const [tapStatus, setTapStatus] = useState(""); // live status text while the Tap to Pay reader runs
+  const [readerAuth, setReaderAuth] = useState(null); // tap-then-tip: { id, base } after the reader AUTHORIZES the base, captured (base+tip) once the tip is chosen
   const [paidRec, setPaidRec] = useState(null);     // the ledger record written on success
   const [checkoutDiscount, setCheckoutDiscount] = useState(appt.discount || null); // applied discount preset (from the appt or chosen here)
   const [showDiscPick, setShowDiscPick] = useState(false);
@@ -23983,6 +23984,10 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const startMethod = (m) => {
     setPayErr("");
     setPendingMethod(m);
+    setReaderAuth(null);
+    // Tap-then-tip on the card reader: TAP FIRST to authorize the base, THEN show the tip screen,
+    // then capture base+tip. Only the reader reorders; every other method keeps tip-before-charge.
+    if (m === "reader" && tipCfg.enabled && !noNewTip) { setStage("tapPay"); runCardReaderAuth(); return; }
     if (tipCfg.enabled && !noNewTip) { setStage("tipPick"); }
     else { if (m === "cof") setStage("charging"); executeCharge(m); }
   };
@@ -24010,6 +24015,37 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       setStage("approved");
     } catch (e) {
       setPayErr((e && e.message) || "The reader didn't complete. Try again or pick another way.");
+    }
+  };
+  // Tap-then-tip phase 1: authorize the base on the reader (customer taps), then go to the tip screen.
+  const runCardReaderAuth = async () => {
+    setPayErr(""); setTapStatus("Starting…"); setReaderAuth(null);
+    try {
+      await ensureFreshSession();
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess && sess.session && sess.session.access_token;
+      const res = await cardReaderAuthorize({ base: netDue, description: `Vero — ${appt.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
+      setReaderAuth({ id: res && res.id, base: netDue });
+      setStage("tipPick"); // card is HELD for the base — pick the tip, then capture base+tip
+    } catch (e) {
+      setPayErr((e && e.message) || "The reader didn't complete. Try again or pick another way.");
+    }
+  };
+  // Tap-then-tip phase 2: capture the held authorization for base + the chosen tip.
+  const captureReaderTip = async () => {
+    setPayErr(""); setTapStatus("Finishing…");
+    try {
+      await ensureFreshSession();
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess && sess.session && sess.session.access_token;
+      const res = await cardReaderCaptureTip({ id: readerAuth.id, total: chargeBase, base: readerAuth.base, apiBase: API_BASE, authToken: token });
+      const capturedDollars = (res && typeof res.captured === "number") ? +(res.captured / 100).toFixed(2) : chargeBase;
+      recordSale(makeRec("card", { id: res && res.id }, capturedDollars));
+      setReaderAuth(null);
+      if (res && res.tipApplied === false && showToast) showToast("Card charged for the service — the tip couldn't be added on the card. Collect the tip another way.");
+      setStage("approved");
+    } catch (e) {
+      setPayErr((e && e.message) || "Couldn't finish the charge — the hold will expire on its own. Try again.");
     }
   };
   const executeCharge = (m) => {
@@ -24198,7 +24234,12 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     const isCof = pendingMethod === "cof";
     const finalFor = (tAmt) => { const t = +(subtotal + tAmt).toFixed(2); return isCof && scOn ? +(t * (1 + scPct / 100)).toFixed(2) : t; };
     const selAmt = customTip != null ? +Number(customTip).toFixed(2) : +(subtotal * tipPct / 100).toFixed(2);
-    const chargeNow = () => { setStage("charging"); executeCharge(pendingMethod); };
+    const chargeNow = () => {
+      // Tap-then-tip reader: the card is ALREADY authorized for the base — capture base+tip now
+      // instead of tapping again. Every other method charges here as before.
+      if (readerAuth && readerAuth.id) { setStage("charging"); captureReaderTip(); return; }
+      setStage("charging"); executeCharge(pendingMethod);
+    };
     return screen(
       <>
         <Header title="Tip" onBack={() => setStage("method")} />
