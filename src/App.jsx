@@ -3160,7 +3160,21 @@ function App() {
   // cross-device-sync — SERVER MIRROR: authoritative copy via api/sync-pull (service-role read
   // after JWT membership check). sync-pull allows read for valid login on small shops.
   // When idle, REPLACE local state with server — never client-merge (server-authoritative-sync).
-  const applyServerAuthoritative = (payload) => {
+  const applyServerAuthoritative = (payload, guardSince) => {
+    // [status-revert-guard] A server mirror is a point-in-time READ. If a local write LANDED or is
+    // PENDING after this mirror STARTED fetching, its snapshot is stale — replacing with it rolls a
+    // just-saved status (checked-in / in-service) back to "confirmed" (Dan: "status reverts too much").
+    // Only the MIRROR passes guardSince; the SAVE path applies its own fresh authoritative copy without
+    // it. tableHasUnsavedWork catches "tapped, not yet saved"; lastSaveAt > guardSince catches
+    // "tapped + saved + baseline cleared" (a commit newer than this read). A dropped stale mirror is
+    // harmless: the next heartbeat/foreground/realtime mirror starts after the write and reconverges.
+    if (guardSince != null &&
+        (tableHasUnsavedWork("appointments") || tableHasUnsavedWork("clients") ||
+         (lastSaveAt.current.appointments || 0) > guardSince ||
+         (lastSaveAt.current.clients || 0) > guardSince)) {
+      setSyncHealth((h) => ({ ...h, pulling: false }));
+      return;
+    }
     const serverCl = Array.isArray(payload.clients) ? payload.clients : [];
     const serverAp = Array.isArray(payload.appointments) ? payload.appointments : [];
     lastRemoteRef.current.clients = serverCl;
@@ -3202,6 +3216,7 @@ function App() {
     if ((apSv && apSv.running) || (clSv && clSv.running)) return false;
     if (tableHasUnsavedWork("appointments") || tableHasUnsavedWork("clients")) return false;
     if (mirrorInFlightRef.current) return mirrorInFlightRef.current;
+    const startedAt = Date.now(); // [status-revert-guard] moment this READ begins — anything saved after it is newer
     const run = (async () => {
       let mirrorSettled = false;
       // [outage-honest-menu] Whole-mirror hang watchdog. A compute-exhausted backend hangs ANY call in
@@ -3234,7 +3249,7 @@ function App() {
         if (r.ok && (body.ok || Array.isArray(body.clients) || Array.isArray(body.appointments))) {
           markAuthorized(body.email || session?.user?.email || null); // remember this email is a real member
           setAccessDenied(false);
-          applyServerMirror({ ...body, ok: true, via: "api" });
+          applyServerMirror({ ...body, ok: true, via: "api" }, startedAt);
           return true;
         }
         // GUARD: access-lockdown — a 403 means canAccessShop rejected this signed-in email; it isn't a shop
@@ -3269,7 +3284,7 @@ function App() {
         clients: (clRes.data || []).map((row) => row.data),
         appointments: (apRes.data || []).map((row) => row.data),
         via: "direct",
-      });
+      }, startedAt);
       return true;
       } finally { mirrorSettled = true; clearTimeout(mirrorWatchdog); }
     })();
@@ -4360,33 +4375,60 @@ function Landing({ business, onPick }) {
   );
 }
 
-// ============================================================
-// PHOTO PICKER MODAL — library + "upload your own"
-// ============================================================
-function PhotoPicker({ onClose, onPick }) {
-  const [cat, setCat] = useState("Haircuts");
-  const [tab, setTab] = useState("library");
-  const fileRef = useRef(null);
-  const handleFile = (e) => {
-    const file = e.target.files && e.target.files[0];
-    e.target.value = "";
-    if (!file) return;
+// Memory-safe photo import for the iOS WKWebView (photo-import-safe). The old path read the FULL
+// iPhone photo into a giant base64 string and decoded it at full resolution before downsizing — a
+// 12–48MP shot is tens/hundreds of MB held at once, which jetsam-kills the webview process (white
+// screen, uncatchable by any error boundary). This decodes the File directly (no base64), downsizes,
+// and guards EVERY failure so it can never throw into React. Calls onResult(dataUrl) on success,
+// onError() on any failure, and is a no-op if the picker was cancelled.
+function importImageFile(file, onResult, opts) {
+  const { max = 1000, q = 0.72, onError } = opts || {};
+  if (!file) return;
+  const fail = (e) => { try { console.warn("[vero] photo import failed", e); } catch (x) {} onError && onError(e); };
+  const fit = (w, h) => (w > h && w > max) ? [max, Math.round(h * max / w)]
+                      : (h >= w && h > max) ? [Math.round(w * max / h), max] : [w, h];
+  const draw = (src, w, h) => {
+    try {
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const ctx = c.getContext("2d");
+      if (!ctx) return fail(new Error("no 2d context"));
+      ctx.drawImage(src, 0, 0, w, h);
+      onResult(c.toDataURL("image/jpeg", q));
+    } catch (e) { fail(e); }
+  };
+  if (typeof createImageBitmap === "function") { // iOS 15+ — low-memory decode straight from the File
+    createImageBitmap(file).then((bmp) => {
+      const [w, h] = fit(bmp.width, bmp.height);
+      draw(bmp, w, h);
+      try { bmp.close(); } catch (x) {}
+    }).catch(fail);
+    return;
+  }
+  try { // guarded fallback for older engines
     const fr = new FileReader();
+    fr.onerror = fail;
     fr.onload = (ev) => {
       const img = new Image();
-      img.onload = () => {
-        const max = 900; let w = img.width, h = img.height;
-        if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
-        else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        onPick(canvas.toDataURL("image/jpeg", 0.72));
-        onClose();
-      };
+      img.onerror = fail;
+      img.onload = () => { const [w, h] = fit(img.width, img.height); draw(img, w, h); };
       img.src = ev.target.result;
     };
     fr.readAsDataURL(file);
+  } catch (e) { fail(e); }
+}
+
+// ============================================================
+// PHOTO PICKER MODAL — library + "upload your own"
+// ============================================================
+function PhotoPicker({ onClose, onPick, onFail, startTab }) {
+  const [cat, setCat] = useState("Haircuts");
+  const [tab, setTab] = useState(startTab || "library");
+  const camRef = useRef(null);
+  const libRef = useRef(null);
+  const handleFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    importImageFile(file, (url) => { onPick(url); onClose(); }, { max: 900, onError: () => { onClose(); onFail && onFail(); } });
   };
   return (
     <Sheet open={true} onClose={onClose} maxWidth={560}>
@@ -4423,8 +4465,12 @@ function PhotoPicker({ onClose, onPick }) {
               <div style={{ fontSize: 15, marginBottom: 6 }}>Upload your own photo</div>
               <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300 }}>Your photos always take priority over the library.</p>
             </div>
-            <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
-            <button className="lift" onClick={() => fileRef.current && fileRef.current.click()} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>CHOOSE FILE</button>
+            <input ref={camRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleFile} />
+            <input ref={libRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="lift" onClick={() => camRef.current && camRef.current.click()} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Camera size={16} /> Take photo</button>
+              <button className="lift" onClick={() => libRef.current && libRef.current.click()} style={{ flex: 1, background: "var(--panel2)", color: "var(--text)", border: "1px solid var(--border)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><ImageIcon size={16} /> Library</button>
+            </div>
             <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>Photos are resized automatically so your booking page stays fast.</p>
           </div>
         )}
@@ -4433,29 +4479,14 @@ function PhotoPicker({ onClose, onPick }) {
 }
 
 // Profile-picture picker for staff members: portrait grid + simulated upload.
-function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
-  const [tab, setTab] = useState("library");
-  const fileRef = useRef(null);
+function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto, onFail, startTab }) {
+  const [tab, setTab] = useState(startTab || "library");
+  const camRef = useRef(null);
+  const libRef = useRef(null);
   const handleFile = (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
-    if (!file) return;
-    const fr = new FileReader();
-    fr.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const max = 500; let w = img.width, h = img.height;
-        if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
-        else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        onPick(canvas.toDataURL("image/jpeg", 0.72));
-        onClose();
-      };
-      img.src = ev.target.result;
-    };
-    fr.readAsDataURL(file);
+    importImageFile(file, (url) => { onPick(url); onClose(); }, { max: 600, onError: () => { onClose(); onFail && onFail(); } });
   };
   return (
     <Sheet open={true} onClose={onClose} maxWidth={560}>
@@ -4487,8 +4518,12 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
             <div style={{ fontSize: 15, marginBottom: 6 }}>Upload a profile picture</div>
             <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300 }}>A clear, front-facing headshot works best.</p>
           </div>
-          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
-          <button className="lift" onClick={() => fileRef.current && fileRef.current.click()} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>CHOOSE FILE</button>
+          <input ref={camRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleFile} />
+          <input ref={libRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="lift" onClick={() => camRef.current && camRef.current.click()} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Camera size={16} /> Take photo</button>
+            <button className="lift" onClick={() => libRef.current && libRef.current.click()} style={{ flex: 1, background: "var(--panel2)", color: "var(--text)", border: "1px solid var(--border)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><ImageIcon size={16} /> Library</button>
+          </div>
           <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>Photos are resized automatically.</p>
         </div>
       )}
@@ -10056,25 +10091,12 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
     e.target.value = "";
     const a = photoTargetRef.current;
     if (!file || !a) return;
-    const fr = new FileReader();
-    fr.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const max = 800; let w = img.width, h = img.height;
-        if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
-        else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
-        setClients((cur) => cur.map((c) => c.id === a.clientId ? { ...c, gallery: [...(c.gallery || []), { id: "g" + Date.now(), photo: dataUrl, note: "", date: new Date().toISOString() }] } : c));
-        setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, hasPhotos: true, photos: (x.photos || 0) + 1 } : x));
-        if (showToast) showToast("Photo added to their timeline.");
-        photoTargetRef.current = null;
-      };
-      img.src = ev.target.result;
-    };
-    fr.readAsDataURL(file);
+    importImageFile(file, (dataUrl) => {
+      setClients((cur) => cur.map((c) => c.id === a.clientId ? { ...c, gallery: [...(c.gallery || []), { id: "g" + Date.now(), photo: dataUrl, note: "", date: new Date().toISOString() }] } : c));
+      setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, hasPhotos: true, photos: (x.photos || 0) + 1 } : x));
+      if (showToast) showToast("Photo added to their timeline.");
+      photoTargetRef.current = null;
+    }, { max: 800, q: 0.6, onError: () => { photoTargetRef.current = null; if (showToast) showToast("Couldn't use that photo — please try again."); } });
   };
   const openGoalEditor = (which) => {
     if (isShopView || !viewedProvider) return; // goals are personal; not editable in shop view
@@ -22199,7 +22221,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   // search by first name, last name, OR any part of the phone number (digits only)
   const qd = q.replace(/\D/g, "");
   const matches = q.trim() ? clients.filter((c) => {
-    const nameHit = c.name.toLowerCase().includes(q.trim().toLowerCase());
+    const nameHit = (c.name || "").toLowerCase().includes(q.trim().toLowerCase());
     const phoneHit = qd.length > 0 && (c.phone || "").replace(/\D/g, "").includes(qd);
     return nameHit || phoneHit;
   }) : clients;
@@ -22461,7 +22483,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
       {/* sticky footer — Cancel (left) and Book (right) pinned to the viewport bottom; safe-area padding keeps the iOS Safari toolbar from covering it */}
       <div style={{ flexShrink: 0, background: "var(--bg)", borderTop: "1px solid var(--line)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "11px 18px 0" }}>
-          <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.3 }}>Notify {client ? client.name.split(" ")[0] : "the client"} <span style={{ color: "var(--sub)" }}>· confirmation text/email</span></div>
+          <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.3 }}>Notify {client ? (client.name || "the client").split(" ")[0] : "the client"} <span style={{ color: "var(--sub)" }}>· confirmation text/email</span></div>
           <button onClick={() => setNotifyClient((v) => !v)} aria-label={notifyClient ? "On" : "Off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: notifyClient ? "var(--gold)" : "var(--border2)", position: "relative", cursor: "pointer", transition: "background .2s" }}>
             <span style={{ position: "absolute", top: 3, left: notifyClient ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
           </button>
@@ -23524,7 +23546,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const nextFreeSlot = (providerId) => earliestOpenSlot(providerId, selectedDate, 30);
 
   return (
-    <div ref={calFrameRef} className="fade-up" style={{ maxWidth: 1320, margin: "0 auto", height: calFrameH ? calFrameH : "calc(100dvh - 84px)", display: "flex", flexDirection: "column" }}>
+    <div ref={calFrameRef} className="fade-in" style={{ maxWidth: 1320, margin: "0 auto", height: calFrameH ? calFrameH : "calc(100dvh - 84px)", display: "flex", flexDirection: "column" }}>
       {showWaitlistPanel && (
         <div onClick={() => setShowWaitlistPanel(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg)", borderBottomLeftRadius: 22, borderBottomRightRadius: 22, maxHeight: "85vh", overflowY: "auto", padding: "calc(20px + env(safe-area-inset-top)) 22px 30px", boxShadow: "0 20px 40px rgba(0,0,0,0.4)" }}>
@@ -23611,9 +23633,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
             <div>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>STATUS COLORS</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 9, fontSize: 14, color: "var(--text)" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: STATUS_COLORS["checked-in"] }} /> Checked in</span>
-                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: STATUS_COLORS["in-service"] }} /> In service</span>
-                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, border: "1px solid var(--border2)", background: "var(--panel2)" }} /> Done</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: "#A6DDD6" }} /> Confirmed</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: "#D6C6F4" }} /> In lobby (checked in)</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: "#F6C1CE" }} /> In service</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: "#CBCFD4" }} /> Done / paid</span>
               </div>
             </div>
           </div>
@@ -23646,7 +23669,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
             {!sameDay(selectedDate.toISOString(), today) && <button onClick={() => setDayOffset(0)} style={{ background: "var(--panel)", color: "var(--gold)", border: "1px solid var(--border)", padding: "0 13px", height: 38, borderRadius: 12, fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY }}>Today</button>}
             <button onClick={() => setRegisterOpen(true)} aria-label="New sale" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 38, height: 38, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}><DollarSign size={17} style={{ color: "var(--text2)" }} /></button>
             <button onClick={() => setCalMenuOpen(true)} aria-label="More actions" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 38, height: 38, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><MoreHorizontal size={18} />{(hasOpeningMatches || waitlist.length > 0) && <span style={{ position: "absolute", top: 7, right: 7, width: hasOpeningMatches ? 9 : 7, height: hasOpeningMatches ? 9 : 7, borderRadius: "50%", background: hasOpeningMatches ? "#16A34A" : "var(--text)", boxShadow: hasOpeningMatches ? "0 0 0 2px var(--panel)" : "none" }} />}</button>
-            <button onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--text)", color: "var(--bg)", padding: "0 15px", height: 38, borderRadius: 12, fontSize: 13, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} strokeWidth={2} /> New</button>
+            <button onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0] || {}).id; if (!pid) { showToast("Add a staff member first."); return; } setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--text)", color: "var(--bg)", padding: "0 15px", height: 38, borderRadius: 12, fontSize: 13, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} strokeWidth={2} /> New</button>
           </div>
         </div>
         {(() => {
@@ -23820,8 +23843,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 const nowM = today.getHours() * 60 + today.getMinutes();
                 if (nowM < DAY_START || nowM > DAY_END) return null;
                 return (
-                  <div style={{ position: "absolute", top: (nowM - DAY_START) * PPM, left: 0, right: 0, height: 0, borderTop: "2px solid var(--gold)", zIndex: 25, pointerEvents: "none" }}>
-                    <span style={{ position: "absolute", left: -4, top: -5, width: 10, height: 10, borderRadius: "50%", background: "var(--gold)" }} />
+                  <div style={{ position: "absolute", top: (nowM - DAY_START) * PPM, left: 0, right: 0, height: 0, borderTop: "2px solid #E5484D", zIndex: 25, pointerEvents: "none" }}>
+                    <span style={{ position: "absolute", left: -4, top: -5, width: 10, height: 10, borderRadius: "50%", background: "#E5484D" }} />
                   </div>
                 );
               })()}
@@ -23838,25 +23861,17 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 const live = a.status === "in-service";
                 const checked = a.status === "checked-in";
                 const blockBg = "repeating-linear-gradient(45deg, var(--panel2), var(--panel2) 7px, var(--line) 7px, var(--line) 14px)";
-                // Color cascade: an explicitly-picked cut/service color paints the tile (soft tint);
-                // "No color" (or unset) falls back to the STEEL default. Status overrides win:
-                // checked-in stays PURPLE · in-service = premium COPPER (steel's warm complement) ·
-                // done = neutral + faded · block = stripes.
-                const _svc = services.find((s) => s.id === a.serviceId);
-                const _ctId = a.lineItems && a.lineItems[0] && a.lineItems[0].cutType;
-                const _ct = (_ctId && _svc && _svc.cutTypes) ? _svc.cutTypes.find((c) => c.id === _ctId) : null;
-                const _cutColor = (_ct && _ct.libId) ? ((cutLibrary || []).find((e) => e.id === _ct.libId) || {}).color : null;
-                const _colorId = _cutColor || (_svc && _svc.color);
-                const custom = _colorId && _colorId !== "none" ? hexById(_colorId) : null;
-                const blkBg = isBlock ? blockBg
-                  : isDone ? "var(--panel2)"
-                  : live ? "#96621E"
-                  : checked ? `color-mix(in srgb, ${STATUS_COLORS["checked-in"]} 30%, var(--panel))`
-                  : custom ? `color-mix(in srgb, ${custom} 40%, var(--panel))`
-                  : "#DDE6F0";
-                const steelTile = !isBlock && !isDone && !live && !checked && !custom;
-                const nameOn = live ? "#FFFFFF" : steelTile ? "#1A2536" : "var(--text)";
-                const subOn = live ? "rgba(255,255,255,0.78)" : steelTile ? "#64748B" : "var(--sub)";
+                // Mangomint-style STATUS colors (calendar-status-colors): the tile fill tells you the
+                // appointment's state at a glance, like Mango — TEAL = confirmed · PURPLE = in the lobby
+                // (checked in) · PINK = in the chair (in service) · GREY = done/paid. Fixed pastels (their
+                // own colored island in any theme); the per-service color no longer paints the tile.
+                const tileC = isDone ? { bg: "#CBCFD4", name: "#454B54", sub: "#6B7280" }
+                  : live ? { bg: "#F6C1CE", name: "#3A1420", sub: "#9E4E64" }
+                  : checked ? { bg: "#D6C6F4", name: "#241A45", sub: "#6A57A3" }
+                  : { bg: "#A6DDD6", name: "#0F2E2A", sub: "#3C7B73" };
+                const blkBg = isBlock ? blockBg : tileC.bg;
+                const nameOn = isBlock ? "var(--text)" : tileC.name;
+                const subOn = isBlock ? "var(--sub)" : tileC.sub;
                 // Horizontal lane positioning — full width when alone, split into N equal lanes when overlapping.
                 const laneCount = a._laneCount || 1;
                 const lane = a._lane || 0;
@@ -23880,7 +23895,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     onClick={() => { const d = dragRef.current; if (d && (d.didDrag || d.scrolled)) return; setOpen(a); }}
                     onMouseDown={(e) => startDrag(e, a)} onTouchStart={(e) => startDrag(e, a)}
                     className={isDragging ? "" : "lift"}
-                    style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: isDone ? 0.6 : 1, border: "none", borderRadius: 3, padding: height > 48 ? "10px 14px 6px" : "5px 14px", color: nameOn, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
+                    style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: 1, border: "none", borderRadius: 4, padding: height > 48 ? "10px 14px 6px" : "5px 14px", color: nameOn, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
                     {/* service — small-caps eyebrow above the name on tall-enough tiles (service only, clean) */}
                     {height > 48 && <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{svcTop}</span>}
                     {/* client name — compact & airy, sized to FIT the full name like Mango (Dan-approved). */}
@@ -26804,12 +26819,17 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
                   {(() => {
                     const canOpen = client && onOpenClient;
-                    const openProfile = () => { if (canOpen) { onClose(); onOpenClient(client); } };
+                    // client-name-tap: open the card for a saved client; for a walk-in/guest appt (no
+                    // saved client record) say so instead of a silent dead tap (Dan: "nothing happens").
+                    const openProfile = () => {
+                      if (canOpen) { onClose(); onOpenClient(client); }
+                      else if (onOpenClient) { showToast && showToast("Walk-in / guest — no saved client card for this one."); }
+                    };
                     return (
                       <>
-                        <button onClick={openProfile} disabled={!canOpen} style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden", background: client?.avatarColor || "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 600, flexShrink: 0, border: "none", padding: 0, cursor: canOpen ? "pointer" : "default" }}>{client?.photo ? <img src={imgUrl(client.photo, 120)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials}</button>
+                        <button onClick={openProfile} disabled={!onOpenClient} style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden", background: client?.avatarColor || "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 600, flexShrink: 0, border: "none", padding: 0, cursor: onOpenClient ? "pointer" : "default" }}>{client?.photo ? <img src={imgUrl(client.photo, 120)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials}</button>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <button onClick={openProfile} disabled={!canOpen} style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: canOpen ? "pointer" : "default", color: "inherit", display: "flex", alignItems: "center", gap: 5 }}>
+                          <button onClick={openProfile} disabled={!onOpenClient} style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: onOpenClient ? "pointer" : "default", color: "inherit", display: "flex", alignItems: "center", gap: 5 }}>
                             <span style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.1, color: T.text }}>{apptDisplayName(appt, clients)}</span>
                             {canOpen && <ChevronRight size={17} style={{ color: T.faint, flexShrink: 0 }} />}
                           </button>
@@ -28468,8 +28488,8 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         ); })}
       </div>
 
-      {picker && <StaffPhotoPicker hasPhoto={!!live.photo} onClose={() => setPicker(false)} onPick={setClientPhoto} onRemove={removeClientPhoto} />}
-      {galPicker && <PhotoPicker onClose={() => setGalPicker(false)} onPick={addGalleryPhoto} />}
+      {picker && <StaffPhotoPicker hasPhoto={!!live.photo} startTab="upload" onFail={() => showToast && showToast("Couldn't use that photo — please try again.")} onClose={() => setPicker(false)} onPick={setClientPhoto} onRemove={removeClientPhoto} />}
+      {galPicker && <PhotoPicker startTab="upload" onFail={() => showToast && showToast("Couldn't use that photo — please try again.")} onClose={() => setGalPicker(false)} onPick={addGalleryPhoto} />}
 
       {/* ============ TIMELINE — pinned preferences + upcoming + one chronological feed ============ */}
       {pfTab === "timeline" && <div style={{ paddingBottom: 24 }}>
