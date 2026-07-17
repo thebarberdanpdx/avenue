@@ -1704,6 +1704,27 @@ const cutStyleDuration = (client, service, providerId, ctId) => {
   const ct = ((service && service.cutTypes) || []).find((c) => c.id === ctId);
   return getDuration(client, service, providerId) + ((ct && ct.min) ? ct.min : 0);
 };
+// ── Per-CHOICE-STYLE ABSOLUTE cascades (new "each cut its own price/time" menu model) ───────────
+// Used ONLY for a choice group flagged `setsPrice:true`: the SELECTED option's price/time REPLACE the
+// base (no base, no add-on increments — each cut style is its own total, per barber). Cascade —
+//   price:  per-barber absolute staff.choicePrice[gid][optId] → the option's own price → getPrice
+//   length: per-barber absolute staff.choiceDur[gid][optId]   → the option's own min   → getDuration
+// A choice group WITHOUT `setsPrice` keeps the legacy increment path (answerPriceFor/answerDuration),
+// so this is completely inert until a service is migrated onto the new model.
+const choiceStylePrice = (service, providerId, group, opt) => {
+  const se = getStaffEntry(service, providerId);
+  const g = se && se.choicePrice && group && se.choicePrice[group.id];
+  if (g && opt && g[opt.id] != null && g[opt.id] !== "") return Number(g[opt.id]) || 0;
+  if (opt && opt.price != null) return Number(opt.price) || 0;
+  return getPrice(service, providerId);
+};
+const choiceStyleDuration = (client, service, providerId, group, opt) => {
+  const se = getStaffEntry(service, providerId);
+  const g = se && se.choiceDur && group && se.choiceDur[group.id];
+  if (g && opt && g[opt.id] != null && g[opt.id] !== "") return Number(g[opt.id]) || 0;
+  if (opt && opt.min != null) return Number(opt.min) || 0;
+  return getDuration(client, service, providerId);
+};
 // Per-add-on time cascade — how many minutes a chosen add-on adds for this barber.
 // per-barber override (staff.addonDur[groupId], absolute minutes) → the add-on's own item.min.
 // Mirrors cutDur so a master's "hot towel" can run longer than a junior's.
@@ -5194,9 +5215,20 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       const bt = entry.service.beardTypes.find((b) => b.id === entry.beardType);
       if (bt) { m += (bt.min || 0); }
     }
+    // New model: a choice group flagged `setsPrice` — its selected style IS the price/time (absolute
+    // per-barber), REPLACING the base. Resolve it first (order-safe) so add-ons still stack on top.
+    // The client's own custom price/duration still wins. Inert until a group carries setsPrice.
+    const priceGroup = (entry.service.addonGroups || []).find((g) => g && g.type === "choice" && g.setsPrice && entry.addons[g.id]);
+    if (priceGroup) {
+      const opt = (priceGroup.options || []).find((o) => o.id === entry.addons[priceGroup.id]);
+      if (opt) {
+        if (!hasCustomPrice) p = choiceStylePrice(entry.service, provId, priceGroup, opt);
+        if (!hasCustomDur) m = choiceStyleDuration(dc, entry.service, provId, priceGroup, opt);
+      }
+    }
     (entry.service.addonGroups || []).forEach((g) => {
       const sel = entry.addons[g.id];
-      if (g.type === "choice" && sel) { const opt = g.options.find((o) => o.id === sel); if (opt) { p += answerPriceFor(entry.service, provId, g, opt); m += answerDuration(entry.service, provId, g, opt); } }
+      if (g.type === "choice" && sel && !g.setsPrice) { const opt = g.options.find((o) => o.id === sel); if (opt) { p += answerPriceFor(entry.service, provId, g, opt); m += answerDuration(entry.service, provId, g, opt); } }
       if (g.type === "addon" && sel) { if (g.item.addsPrice !== false) p += addonPriceFor(entry.service, provId, g); if (g.item.addsTime !== false) m += addonDuration(entry.service, provId, g); }
     });
     return { price: p, min: m };
@@ -21720,12 +21752,22 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   };
   const optExtra = (() => {
     let p = 0, m = 0; const labels = [];
-    allOptionGroups.forEach((g) => { const sel = opts[g.id]; if (!sel) return; const a = groupAmount(g, sel); p += a.p; m += a.m; const lbl = a.label && cleanServiceLabel(a.label); if (lbl) labels.push(lbl); });
+    allOptionGroups.forEach((g) => {
+      const sel = opts[g.id]; if (!sel) return;
+      // A setsPrice choice style REPLACES the base (handled below) — don't add it here, just label it.
+      if (g.type === "choice" && g.setsPrice) { const o = (g.options || []).find((x) => x.id === sel); const lbl = o && o.label && cleanServiceLabel(o.label); if (lbl) labels.push(lbl); return; }
+      const a = groupAmount(g, sel); p += a.p; m += a.m; const lbl = a.label && cleanServiceLabel(a.label); if (lbl) labels.push(lbl);
+    });
     return { p, m, labels };
   })();
   const fmtHM = (m) => fmtTime(m);
-  const dur = service ? getDuration(client, service, provId) + optExtra.m : 0;
-  const price = service ? priceWithTimeRules(service, provId, new Date(), startMin) + optExtra.p : 0;
+  // New model: a picked setsPrice choice style's absolute per-barber price/time REPLACES the base.
+  const priceGrp = allOptionGroups.find((g) => g && g.type === "choice" && g.setsPrice && opts[g.id]);
+  const priceOpt = priceGrp && (priceGrp.options || []).find((o) => o.id === opts[priceGrp.id]);
+  const baseDur = priceOpt ? choiceStyleDuration(client, service, provId, priceGrp, priceOpt) : getDuration(client, service, provId);
+  const basePrice = priceOpt ? choiceStylePrice(service, provId, priceGrp, priceOpt) : priceWithTimeRules(service, provId, new Date(), startMin);
+  const dur = service ? baseDur + optExtra.m : 0;
+  const price = service ? basePrice + optExtra.p : 0;
   const canBook = service && (client || (walkIn && walkInFirst.trim() && walkInLast.trim() && walkInPhone.replace(/\D/g, "").length >= 10));
   const dateLabel = (() => { const d = selectedDate || new Date(); return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })();
   const stepTime = (delta) => setStartMin((m) => Math.max(6 * 60, Math.min(21 * 60, m + delta)));
@@ -22848,14 +22890,18 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     const id = "a" + Date.now() + Math.floor(Math.random() * 1000); // collision-proof string id
     // + overdue "welcome back" buffer (audit #27): a returning client past the threshold auto-gets a
     // few free extra minutes. No price change — the buffer only ever touches duration.
-    const dur = getDuration(client, service, providerId) + (Number(optAddMin) || 0) + overdueBufferMin(client, business);
+    // New model: a picked setsPrice choice style's absolute per-barber price/time REPLACES the base
+    // (same rule as the storefront + booking form). Inert unless the chosen group carries setsPrice.
+    const _pg = service && (service.addonGroups || []).find((g) => g && g.type === "choice" && g.setsPrice && addons && addons[g.id]);
+    const _po = _pg && (_pg.options || []).find((o) => o.id === addons[_pg.id]);
+    const dur = (_po ? choiceStyleDuration(client, service, providerId, _pg, _po) : getDuration(client, service, providerId)) + (Number(optAddMin) || 0) + overdueBufferMin(client, business);
     // calendar-custom-price (guard): a client's own custom price must win HERE too — duration already
     // threads `client` above, but price used to ignore customPrices and lock the DEFAULT onto the appt,
     // which then charged wrong at checkout. Match the storefront (~5142): a custom price is a flat
     // override (skips time-of-day rules, exactly like the storefront); otherwise use time-rule pricing.
     const _cp = client && client.customPrices ? client.customPrices[service.id] : null;
     const _hasCP = _cp != null && _cp !== "";
-    const price = (_hasCP ? Number(_cp) : priceWithTimeRules(service, providerId, selectedDate, useStart)) + (Number(optAddPrice) || 0);
+    const price = (_hasCP ? Number(_cp) : (_po ? choiceStylePrice(service, providerId, _pg, _po) : priceWithTimeRules(service, providerId, selectedDate, useStart))) + (Number(optAddPrice) || 0);
     // Stamp the appointment with the day currently shown on the calendar, or it can't be placed on any date.
     const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(useStart / 60), useStart % 60, 0, 0);
 
@@ -25852,9 +25898,13 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     const labels = [];
     if (it.cutType) { const ct = (s.cutTypes || []).find((c) => c.id === it.cutType); if (ct) { price = cutStylePrice(s, pid, it.cutType); min = cutStyleDuration(null, s, pid, it.cutType); labels.push(ct.label); } }
     if (it.beardType) { const bt = (s.beardTypes || []).find((b) => b.id === it.beardType); if (bt) { min += Number(bt.min) || 0; labels.push(bt.label); } }
+    // New model: a setsPrice choice style's absolute per-barber price/time REPLACES the base.
+    const _pg = (s.addonGroups || []).find((g) => g && g.type === "choice" && g.setsPrice && it.addons && it.addons[g.id]);
+    if (_pg) { const opt = (_pg.options || []).find((o) => o.id === it.addons[_pg.id]); if (opt) { price = choiceStylePrice(s, pid, _pg, opt); min = choiceStyleDuration(null, s, pid, _pg, opt); } }
     (s.addonGroups || []).forEach((g) => {
       const sel = it.addons && it.addons[g.id];
       if (!sel) return;
+      if (g.type === "choice" && g.setsPrice) { const opt = (g.options || []).find((o) => o.id === sel); if (opt && opt.label) labels.push(opt.label); return; }
       if (g.type === "choice") { const opt = (g.options || []).find((o) => o.id === sel); if (opt) { price += answerPriceFor(s, pid, g, opt); min += answerDuration(s, pid, g, opt); if (opt.label) labels.push(opt.label); } }
       else { price += addonPriceFor(s, pid, g); min += addonDuration(s, pid, g); if (g.item && g.item.name) labels.push(g.item.name); }
     });
