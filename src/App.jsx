@@ -13230,7 +13230,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const defaultBooking = () => ({ available: true, description: "", promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false });
   const blank = { id: "", name: "", price: "", duration: "", color: "sage", photo: "", photos: [], category: cats[0], addonGroups: [], staff: {}, booking: defaultBooking(), usesCutStyles: false };
   const [form, setForm] = useState(blank);
-  const [openCutId, setOpenCutId] = useState(null);   // which cut style is expanded in the clean editor
+  const [openCutId, setOpenCutId] = useState(null);   // which cut style has its note/photo editor open
+  const [cutPhotoOi, setCutPhotoOi] = useState(null); // which cut style's photo picker is open (option index)
   const [cutAdvOpen, setCutAdvOpen] = useState({});   // per-style: is the per-barber advanced row open
   const dragId = useRef(null);
 
@@ -14179,74 +14180,75 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   };
   const cutsBody = cutGroup ? (
     <>
-      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 22 }}>Clients choose one when they book, and read its description on a pop-up first. Price &amp; time add on top of the base ({form.price ? `$${form.price}` : "—"} · {form.duration || "—"} min). Shared across your haircut services — edit once here.</p>
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>Each barber sets their own price and time for each style — the full total, no adding. Clients read the note when they pick it.</p>
+      {cutPhotoOi != null && <PhotoPicker onClose={() => setCutPhotoOi(null)} onPick={(id) => { setCutOpt(cutPhotoOi, { photos: [id], photo: id }); setCutPhotoOi(null); }} />}
       <div>
         {cutOpts.map((o, oi) => {
           const open = openCutId === o.id;
-          // Collapsed summary shows the first barber's TOTAL for this style (saved absolute, else current
-          // effective) — no more "Adds $X", since a style is now its own price, not an add-on.
-          const _sp = (staffList[0] && form.staff && form.staff[staffList[0].id]) || {};
-          const _bP = (_sp.price != null && _sp.price !== "") ? Number(_sp.price) : (Number(form.price) || 0);
-          const _bD = (_sp.duration != null && _sp.duration !== "") ? Number(_sp.duration) : (Number(form.duration) || 0);
-          const _savedP = _sp.choicePrice && _sp.choicePrice[cutGroup.id] && _sp.choicePrice[cutGroup.id][o.id];
-          const _savedD = _sp.choiceDur && _sp.choiceDur[cutGroup.id] && _sp.choiceDur[cutGroup.id][o.id];
-          const _sumP = _savedP != null ? _savedP : _bP + ((_sp.answerPrice && _sp.answerPrice[cutGroup.id] && _sp.answerPrice[cutGroup.id][o.id] != null) ? Number(_sp.answerPrice[cutGroup.id][o.id]) : (Number(o.price) || 0));
-          const _sumD = _savedD != null ? _savedD : _bD + ((_sp.answerDur && _sp.answerDur[cutGroup.id] && _sp.answerDur[cutGroup.id][o.id] != null) ? Number(_sp.answerDur[cutGroup.id][o.id]) : (Number(o.min) || 0));
-          const summary = `$${_sumP} · ${_sumD} min`;
+          const photo = (Array.isArray(o.photos) && o.photos[0]) || o.photo || null;
+          const AV = ["#161616", "#7C6A8F", "#A67C33", "#3E6F63"]; // barber circles (Dan ink, Heather orchid, …)
           return (
-            <div key={o.id} style={{ borderTop: oi ? "1px solid var(--line)" : "none" }}>
-              <button onClick={() => setOpenCutId(open ? null : o.id)} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "flex-start", gap: 14, background: "none", border: "none", padding: "20px 2px", textAlign: "left", cursor: "pointer" }}>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 17, fontWeight: 600, color: "var(--text)", letterSpacing: "-0.2px" }}>{o.label || "Untitled style"}</span>
-                  {o.desc ? <span style={{ display: "block", fontSize: 14, color: "var(--sub)", marginTop: 6, lineHeight: 1.5 }}>{o.desc}</span> : null}
-                  <span style={{ display: "block", fontSize: 13, color: "var(--faint)", marginTop: 9, fontVariantNumeric: "tabular-nums" }}>{summary}</span>
-                </span>
-                {open ? <ChevronUp size={19} style={{ color: "var(--faint)", flexShrink: 0, marginTop: 3 }} /> : <ChevronDown size={19} style={{ color: "var(--faint)", flexShrink: 0, marginTop: 3 }} />}
-              </button>
-              {open ? (
-                <div style={{ padding: "0 0 22px" }}>
-                  <SectionLbl>Style name</SectionLbl>
-                  <input value={o.label || ""} onChange={(e) => setCutOpt(oi, { label: e.target.value })} placeholder="e.g. Skin Fade" style={inpStyle} />
-                  <SectionLbl>Description — the pop-up clients read</SectionLbl>
-                  <textarea value={o.desc || ""} onChange={(e) => setCutOpt(oi, { desc: e.target.value })} rows={3} placeholder="What this style is — shown on the confirm pop-up." style={{ ...inpStyle, resize: "vertical", minHeight: 64, lineHeight: 1.5 }} />
-                  {staffList.length > 0 && (
-                    <div style={{ marginTop: 22 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
-                        <span style={{ width: 64, flexShrink: 0 }} />
-                        <span style={{ flex: 1, textAlign: "center", fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Price</span>
-                        <span style={{ flex: 1, textAlign: "center", fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Time</span>
+            <div key={o.id} style={{ border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: 14, marginBottom: 14 }}>
+              <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}>
+                {photo
+                  ? <img src={imgUrl(photo, 180)} alt="" onClick={() => setCutPhotoOi(oi)} style={{ width: 58, height: 58, borderRadius: 13, objectFit: "cover", flexShrink: 0, cursor: "pointer" }} />
+                  : <div onClick={() => setCutPhotoOi(oi)} style={{ width: 58, height: 58, borderRadius: 13, flexShrink: 0, border: "1.5px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--faint)", fontSize: 24, cursor: "pointer" }}>+</div>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {open ? (
+                    <>
+                      <input value={o.label || ""} onChange={(e) => setCutOpt(oi, { label: e.target.value })} placeholder="Style name" style={{ ...inpStyle, marginBottom: 8 }} />
+                      <textarea value={o.desc || ""} onChange={(e) => setCutOpt(oi, { desc: e.target.value })} rows={2} placeholder="Description — the pop-up clients read" style={{ ...inpStyle, resize: "vertical", minHeight: 54, lineHeight: 1.5 }} />
+                      <div style={{ display: "flex", gap: 18, marginTop: 8 }}>
+                        <button onClick={() => setCutPhotoOi(oi)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 12.5, fontWeight: 600, padding: 0, cursor: "pointer" }}>{photo ? "Change photo" : "Add photo"}</button>
+                        <button onClick={() => setOpenCutId(null)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 700, padding: 0, cursor: "pointer" }}>Done</button>
                       </div>
-                      {staffList.map((p) => {
-                        const se = form.staff[p.id] || {};
-                        const gid = cutGroup.id;
-                        // NEW model: each barber's OWN price + time for this style — the full TOTAL, not an add-on.
-                        // Show the saved absolute if this service is migrated, else the current effective total
-                        // (base + increment) so an un-migrated service starts on real numbers. Editing writes the
-                        // absolute (choicePrice/choiceDur); saving flips the service onto the doubling-proof model.
-                        const bP = (se.price != null && se.price !== "") ? Number(se.price) : (Number(form.price) || 0);
-                        const bD = (se.duration != null && se.duration !== "") ? Number(se.duration) : (Number(form.duration) || 0);
-                        const savedP = se.choicePrice && se.choicePrice[gid] && se.choicePrice[gid][o.id];
-                        const savedD = se.choiceDur && se.choiceDur[gid] && se.choiceDur[gid][o.id];
-                        const effP = bP + ((se.answerPrice && se.answerPrice[gid] && se.answerPrice[gid][o.id] != null) ? Number(se.answerPrice[gid][o.id]) : (Number(o.price) || 0));
-                        const effD = bD + ((se.answerDur && se.answerDur[gid] && se.answerDur[gid][o.id] != null) ? Number(se.answerDur[gid][o.id]) : (Number(o.min) || 0));
-                        const pVal = savedP != null ? savedP : effP;
-                        const dVal = savedD != null ? savedD : effD;
-                        return (
-                          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
-                            <span style={{ width: 64, flexShrink: 0, fontSize: 15, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(p.name || "").split(" ")[0]}</span>
-                            <div style={{ ...moneyWrap, flex: 1 }}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input type="number" inputMode="decimal" value={pVal} onChange={(ev) => setStaffChoicePrice(p.id, gid, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 10px", fontSize: 15 }} /></div>
-                            <div style={{ ...moneyWrap, flex: 1 }}><input type="number" inputMode="numeric" value={dVal} onChange={(ev) => setStaffChoiceDur(p.id, gid, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 10px", fontSize: 15 }} /><span style={{ padding: "0 10px 0 0", color: "var(--sub)", fontSize: 12.5 }}>min</span></div>
-                          </div>
-                        );
-                      })}
-                      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.45, margin: "10px 0 0" }}>Each barber's own price and time for this style — the full total, not an add-on.</p>
-                    </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.2px" }}>{o.label || "Untitled style"}</div>
+                      {o.desc ? <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.45 }}>{o.desc}</div> : null}
+                      <button onClick={() => setOpenCutId(o.id)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 12.5, fontWeight: 600, padding: "8px 0 0", cursor: "pointer", opacity: 0.72 }}>&#9998; Edit note &amp; photo</button>
+                    </>
                   )}
-                  <div style={{ marginTop: 18, textAlign: "right" }}>
-                    <button onClick={() => removeCutStyle(oi)} style={{ background: "none", border: "none", color: "#C2392B", fontSize: 13.5, fontWeight: 500, cursor: "pointer", padding: 0 }}>Remove style</button>
-                  </div>
                 </div>
-              ) : null}
+              </div>
+              {staffList.length > 0 && (
+                <>
+                  <div style={{ height: 1, background: "var(--line)", margin: "13px 0 11px" }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
+                    <span style={{ width: 96, flexShrink: 0 }} />
+                    <span style={{ flex: 1, textAlign: "center", fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Price</span>
+                    <span style={{ flex: 1, textAlign: "center", fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Time</span>
+                  </div>
+                  {staffList.map((p, pi) => {
+                    const se = form.staff[p.id] || {};
+                    const gid = cutGroup.id;
+                    // Each barber's OWN price + time for this style — the full TOTAL. Show the saved absolute if
+                    // migrated, else the current effective total so an un-migrated service starts on real numbers.
+                    const bP = (se.price != null && se.price !== "") ? Number(se.price) : (Number(form.price) || 0);
+                    const bD = (se.duration != null && se.duration !== "") ? Number(se.duration) : (Number(form.duration) || 0);
+                    const savedP = se.choicePrice && se.choicePrice[gid] && se.choicePrice[gid][o.id];
+                    const savedD = se.choiceDur && se.choiceDur[gid] && se.choiceDur[gid][o.id];
+                    const effP = bP + ((se.answerPrice && se.answerPrice[gid] && se.answerPrice[gid][o.id] != null) ? Number(se.answerPrice[gid][o.id]) : (Number(o.price) || 0));
+                    const effD = bD + ((se.answerDur && se.answerDur[gid] && se.answerDur[gid][o.id] != null) ? Number(se.answerDur[gid][o.id]) : (Number(o.min) || 0));
+                    const pVal = savedP != null ? savedP : effP;
+                    const dVal = savedD != null ? savedD : effD;
+                    return (
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+                        <span style={{ width: 96, flexShrink: 0, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                          <Avatar size={24} photo={p.photo} initial={(p.name || "?").charAt(0).toUpperCase()} color={AV[pi % AV.length]} fontSize={11} />
+                          <span style={{ fontSize: 15, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(p.name || "").split(" ")[0]}</span>
+                        </span>
+                        <div style={{ ...moneyWrap, flex: 1 }}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input type="number" inputMode="decimal" value={pVal} onChange={(ev) => setStaffChoicePrice(p.id, gid, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 10px", fontSize: 15 }} /></div>
+                        <div style={{ ...moneyWrap, flex: 1 }}><input type="number" inputMode="numeric" value={dVal} onChange={(ev) => setStaffChoiceDur(p.id, gid, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 10px", fontSize: 15 }} /><span style={{ padding: "0 10px 0 0", color: "var(--sub)", fontSize: 12.5 }}>min</span></div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button onClick={() => removeCutStyle(oi)} style={{ background: "none", border: "none", color: "#C2392B", fontSize: 12.5, fontWeight: 500, cursor: "pointer", padding: "4px 0 0" }}>Remove style</button>
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
