@@ -13754,12 +13754,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           const pbOpen = !!answerTimeOpen[gid];
           const pbMoney = (val, ph, onCh) => (
             <div style={{ ...G_BOX_ON("var(--panel2)"), flex: 1, minWidth: 0, marginBottom: 0, display: "flex", alignItems: "center", padding: "10px 12px" }}>
-              <span style={{ color: "var(--sub)", fontSize: 15, marginRight: 3 }}>$</span>
+              <span style={{ color: "var(--sub)", fontSize: 15, marginRight: 3 }}>+$</span>
               <input type="number" inputMode="decimal" value={val} placeholder={ph} onChange={(ev) => onCh(ev.target.value === "" ? null : ev.target.value)} style={{ ...G_INPUT, minWidth: 0, fontSize: 15 }} />
             </div>
           );
           const pbMin = (val, ph, onCh) => (
             <div style={{ ...G_BOX_ON("var(--panel2)"), flex: 1, minWidth: 0, marginBottom: 0, display: "flex", alignItems: "center", padding: "10px 12px" }}>
+              <span style={{ color: "var(--sub)", fontSize: 15, marginRight: 3 }}>+</span>
               <input type="number" inputMode="numeric" value={val} placeholder={ph} onChange={(ev) => onCh(ev.target.value === "" ? null : ev.target.value)} style={{ ...G_INPUT, minWidth: 0, fontSize: 15 }} />
               <span style={{ color: "var(--sub)", fontSize: 13, marginLeft: 3 }}>min</span>
             </div>
@@ -13776,7 +13777,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               {staffList.length > 0 && (
                 <div style={{ borderTop: "1px solid var(--line)" }}>
                   <button onClick={() => setAnswerTimeOpen((m) => ({ ...m, [gid]: !pbOpen }))} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "none", border: "none", padding: "12px 16px", cursor: "pointer", color: "var(--text)" }}>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>Prices &amp; times per barber</span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>Extra per barber <span style={{ color: "var(--faint)", fontWeight: 400 }}>· added on top of base</span></span>
                     <ChevronDown size={16} style={{ color: "var(--faint)", transform: pbOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
                   </button>
                   {pbOpen && (
@@ -14121,7 +14122,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   {staffList.length > 0 ? (
                     <div style={{ marginTop: 20, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
                       <button onClick={() => setCutAdvOpen((s) => ({ ...s, [o.id]: !s[o.id] }))} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--sub)", fontSize: 13.5, fontWeight: 600 }}>
-                        <span>Per-barber price &amp; time <span style={{ color: "var(--faint)", fontWeight: 400 }}>· optional</span></span>
+                        <span>Per-barber extra <span style={{ color: "var(--faint)", fontWeight: 400 }}>· on top of base</span></span>
                         {cutAdvOpen[o.id] ? <ChevronUp size={16} style={{ color: "var(--faint)" }} /> : <ChevronDown size={16} style={{ color: "var(--faint)" }} />}
                       </button>
                       {cutAdvOpen[o.id] ? (
@@ -14130,15 +14131,24 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                             const se = form.staff[p.id] || {};
                             const pv = (se.answerPrice && se.answerPrice[cutGroup.id] && se.answerPrice[cutGroup.id][o.id] != null) ? se.answerPrice[cutGroup.id][o.id] : "";
                             const dv = (se.answerDur && se.answerDur[cutGroup.id] && se.answerDur[cutGroup.id][o.id] != null) ? se.answerDur[cutGroup.id][o.id] : "";
+                            // Show the RESULTING total for this barber so an "extra" can't be mistaken for a full price
+                            // (the $89-instead-of-$47 skin-fade bug, 2026-07-17): total = this barber's base + the extra.
+                            const bP = (se.price != null && se.price !== "") ? Number(se.price) : (Number(form.price) || 0);
+                            const bD = (se.duration != null && se.duration !== "") ? Number(se.duration) : (Number(form.duration) || 0);
+                            const totP = bP + (pv !== "" ? (Number(pv) || 0) : (Number(o.price) || 0));
+                            const totD = bD + (dv !== "" ? (Number(dv) || 0) : (Number(o.min) || 0));
                             return (
-                              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
-                                <span style={{ width: 64, flexShrink: 0, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(p.name || "").split(" ")[0]}</span>
-                                <div style={{ ...moneyWrap, flex: 1 }}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input type="number" inputMode="decimal" value={pv} placeholder={String(Number(o.price) || 0)} onChange={(ev) => setStaffAnswerPrice(p.id, cutGroup.id, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 12px", fontSize: 15 }} /></div>
-                                <div style={{ ...moneyWrap, flex: 1 }}><input type="number" inputMode="numeric" value={dv} placeholder={String(Number(o.min) || 0)} onChange={(ev) => setStaffAnswerDur(p.id, cutGroup.id, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 12px", fontSize: 15 }} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13 }}>min</span></div>
+                              <div key={p.id} style={{ marginBottom: 12 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                                  <span style={{ width: 64, flexShrink: 0, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(p.name || "").split(" ")[0]}</span>
+                                  <div style={{ ...moneyWrap, flex: 1 }}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>+$</span><input type="number" inputMode="decimal" value={pv} placeholder={String(Number(o.price) || 0)} onChange={(ev) => setStaffAnswerPrice(p.id, cutGroup.id, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 12px", fontSize: 15 }} /></div>
+                                  <div style={{ ...moneyWrap, flex: 1 }}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>+</span><input type="number" inputMode="numeric" value={dv} placeholder={String(Number(o.min) || 0)} onChange={(ev) => setStaffAnswerDur(p.id, cutGroup.id, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, padding: "12px 12px", fontSize: 15 }} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13 }}>min</span></div>
+                                </div>
+                                <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 4, paddingLeft: 73 }}>{(p.name || "").split(" ")[0]}'s total: <strong style={{ color: "var(--sub)" }}>${totP} · {totD} min</strong></div>
                               </div>
                             );
                           })}
-                          <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.45, margin: "4px 0 0" }}>Blank uses the price &amp; time above — this is each barber's own for this style.</p>
+                          <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.45, margin: "4px 0 0" }}>Each barber's <strong>extra</strong> on top of the base — <strong>not</strong> the full price. Blank uses the style's default. The total for each barber is shown under their row.</p>
                         </div>
                       ) : null}
                     </div>
