@@ -13157,7 +13157,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} />
         <div style={{ width: 40 }} />
       </div>
-      <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
+      <div style={{ width: "100%", margin: "0 auto", padding: tab === "calendar" ? "24px 10px 0" : "24px 10px 120px" }}>
         {/* Per-tab crash containment: a render error in ONE tab shows a recoverable "something went
             wrong here" panel instead of white-screening the whole app. The bottom tab bar lives
             outside this div, so it stays alive — the owner can switch tabs and keep working. Keyed by
@@ -22710,6 +22710,34 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   useLayoutEffect(() => { scrollStripToWeek("auto"); didStripMount.current = true; }, []);
   useEffect(() => { if (didStripMount.current) scrollStripToWeek("smooth"); }, [dayOffset]); // eslint-disable-line
 
+  // ── Locked calendar frame (calendar-locked-header) ─────────────────────────
+  // The date strip + staff names must stay pinned at the top while ONLY the
+  // appointment grid scrolls underneath (Mango-style). Document-level
+  // position:sticky proved unreliable inside the iOS app — the strip drifted
+  // mid-scroll and grid content bled ABOVE it. Fix: give the calendar a fixed
+  // height (from its own top down to the viewport bottom) and scroll the grid
+  // inside its OWN container. That makes the header physically un-scrollable —
+  // nothing can ever appear above it — on every engine, momentum included.
+  const calFrameRef = useRef(null);
+  const [calFrameH, setCalFrameH] = useState(null);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = calFrameRef.current;
+      if (!el || typeof window === "undefined") return;
+      // Measured at rest (calendar mounts at page-scroll 0): rect.top is the
+      // viewport distance to the frame's top. Fill from there to the bottom.
+      const top = el.getBoundingClientRect().top;
+      const h = Math.max(320, Math.round((window.innerHeight || 800) - top));
+      setCalFrameH(h);
+    };
+    measure();
+    // Re-measure after fonts/layout settle, and on any viewport change.
+    const t = setTimeout(measure, 120);
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    return () => { clearTimeout(t); window.removeEventListener("resize", measure); window.removeEventListener("orientationchange", measure); };
+  }, []);
+
   const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts((cur) => { const next = cur.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a)); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; }); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } setTimeout(() => handleFreedSlot(freed), 350); } };
   // open checkout instead of silently completing
   // #16: an appointment that already carries a payment (checked out once, or a status reverted after
@@ -23465,7 +23493,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const nextFreeSlot = (providerId) => earliestOpenSlot(providerId, selectedDate, 30);
 
   return (
-    <div className="fade-up" style={{ maxWidth: 1320, margin: "0 auto" }}>
+    <div ref={calFrameRef} className="fade-up" style={{ maxWidth: 1320, margin: "0 auto", height: calFrameH ? calFrameH : "calc(100dvh - 84px)", display: "flex", flexDirection: "column" }}>
       {showWaitlistPanel && (
         <div onClick={() => setShowWaitlistPanel(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg)", borderBottomLeftRadius: 22, borderBottomRightRadius: 22, maxHeight: "85vh", overflowY: "auto", padding: "calc(20px + env(safe-area-inset-top)) 22px 30px", boxShadow: "0 20px 40px rgba(0,0,0,0.4)" }}>
@@ -23577,7 +23605,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       {/* Calendar header — COMPACT: date headline + inline actions on one row, a single info line
           below (was 4 stacked rows). VISUAL ONLY; every handler is unchanged — date picker, New,
           Sale, jump-to-Today, and the ⋯ menu all do exactly what they did. */}
-      <div style={{ marginTop: 6, marginBottom: 14 }}>
+      <div style={{ marginTop: 6, marginBottom: 14, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, textAlign: "left", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
             <span style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{relativeDate(selectedDate)}</span>
@@ -23614,10 +23642,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
         </div>
       </Sheet>
 
-      {/* STICKY calendar context — Mango-style: the day strip + staff names pin below the dashboard
-          bar while the grid scrolls, so you always know what day/columns you're looking at. Bleeds
-          edge-to-edge (cancels the tab-content wrapper's 10px side padding). */}
-      <div style={{ position: "sticky", top: "calc(env(safe-area-inset-top, 0px) + 56px)", zIndex: 9, background: "var(--bg)", margin: "0 -10px", padding: "6px 10px 0", borderBottom: "1px solid var(--border2)" }}>
+      {/* LOCKED calendar context (calendar-locked-header) — Mango-style: the day strip + staff names
+          are a fixed (non-scrolling) band at the top of the calendar frame; ONLY the grid below scrolls.
+          NOT position:sticky — that drifted mid-scroll in the iOS app and let grid content bleed above it.
+          Bleeds edge-to-edge (cancels the tab-content wrapper's 10px side padding). */}
+      <div style={{ flexShrink: 0, background: "var(--bg)", margin: "0 -10px", padding: "6px 10px 0", borderBottom: "1px solid var(--border2)" }}>
       {/* Scrollable multi-week day strip — swipe horizontally, tap to pick. Includes 14 days back so barbers can look up past visits. */}
       <div ref={dayStripRef} style={{ display: "flex", gap: 6, marginBottom: 4, padding: "4px 2px", overflowX: "auto", scrollSnapType: "x proximity", WebkitOverflowScrolling: "touch" }}>
         {Array.from({ length: 14 + 70 }, (_, i) => { // 14 days back + 70 days ahead (rebook chips jump up to 8 weeks); today sits at index 14 and is pre-scrolled into view on mount
@@ -23648,16 +23677,21 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
       {/* Rebook hand-off banner — armed at checkout; tapping any open time opens the form pre-filled */}
       {rebookPrefill && (
-        <div className="fade-in" style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--wash)", border: "1px solid var(--gold)", borderRadius: 12, padding: "10px 12px", margin: "8px 0 14px" }}>
+        <div className="fade-in" style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--wash)", border: "1px solid var(--gold)", borderRadius: 12, padding: "10px 12px", margin: "8px 0 14px", flexShrink: 0 }}>
           <Repeat size={16} style={{ color: "var(--gold)", flexShrink: 0 }} />
           <div style={{ flex: 1, fontSize: 14, color: "var(--text)", lineHeight: 1.35 }}><strong style={{ fontWeight: 600 }}>Rebooking {rebookPrefill.name}</strong> — tap any open time and the appointment is pre-filled.</div>
           <button onClick={() => setRebookPrefill(null)} style={{ background: "none", border: "none", color: "var(--sub)", padding: 4, cursor: "pointer" }}><X size={16} /></button>
         </div>
       )}
 
+      {/* GRID SCROLLER (calendar-locked-header) — the ONLY thing that scrolls on the calendar. Fills
+          the space left under the locked header band and scrolls internally, so the day strip + staff
+          names stay pinned. Full-bleed (owns the -10px edge bleed now); pad the bottom so the last
+          appointment clears the fixed bottom tab bar. */}
+      <div style={{ flex: "1 1 0", minHeight: 0, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", margin: "0 -10px", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)" }}>
       {/* the timeline grid — full-bleed to the screen edges, Mango-style. Columns touch (gap 0)
           with a hairline divider between barbers; hour lines one step darker (approved contrast pass). */}
-      <div style={{ display: "flex", position: "relative", gap: 0, margin: "6px -10px 0" }}>
+      <div style={{ display: "flex", position: "relative", gap: 0, margin: "6px 0 0" }}>
         {/* continuous hour/half-hour lines across the whole board (fills the gaps between columns) */}
         <div style={{ position: "absolute", left: 48, right: 0, top: 0, height: gridHeight, pointerEvents: "none", zIndex: 0 }}>
           {quarterLines.filter((t) => t % 30 === 0).map((t) => { const isHour = t % 60 === 0; return (
@@ -23851,6 +23885,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       </div>
 
       <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 16, textAlign: "center" }}>Tap an appointment to check in, notify, or complete · drag it up or down to move it. ★ regular · ↻ rebooked · ✎ note · ▱ photos.</p>
+      </div>{/* /GRID SCROLLER (calendar-locked-header) */}
 
       {/* drag-to-move confirmation — pinned so it's always visible on drop */}
       {/* WAITLIST MATCH — a freed slot matches waitlisted clients; confirm to notify */}
