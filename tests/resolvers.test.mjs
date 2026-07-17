@@ -44,7 +44,7 @@ if (pEnd === -1) throw new Error("resolvers.test: could not find end of lockedAp
 const block2 = src.slice(ps, pEnd);
 
 const NAMES = ["cancelWindowMinutes","getStaffEntry","getDuration","overdueBufferMin","getPrice",
-  "byServiceOrder","cutStylePrice","cutStyleDuration","addonDuration","addonPriceFor",
+  "byServiceOrder","cutStylePrice","cutStyleDuration","choiceStylePrice","choiceStyleDuration","addonDuration","addonPriceFor",
   "cleanServiceLabel","answerDuration","answerPriceFor","priceWithTimeRules","lockedApptPrice"];
 for (const n of NAMES) {
   const inBlock1 = new RegExp(`(const|function)\\s+${n}\\b`).test(block);
@@ -148,6 +148,25 @@ test("answerPriceFor / answerDuration: per-barber answer override → option def
   assert.equal(R.answerDuration(svc, "dan", group, opt), 6);
   assert.equal(R.answerPriceFor(svc, "jr", group, opt), 5); // option default
   assert.equal(R.answerDuration(svc, "jr", group, opt), 4);
+});
+
+// ─── NEW menu model: a cut style's ABSOLUTE per-barber price/time (setsPrice) ──
+// The point of the rebuild: the style value REPLACES the base — it is NOT base + increment.
+// This is what a `setsPrice` choice group resolves to; it must never re-introduce the doubling bug.
+test("choiceStylePrice: per-barber ABSOLUTE replaces the base (never base+increment)", () => {
+  const svc = { id: "cut", price: 42, staff: { dan: { choicePrice: { cutchoice: { skinfade: 60 } } }, jr: {} } };
+  const group = { id: "cutchoice" }, opt = { id: "skinfade", price: 5 };
+  assert.equal(R.choiceStylePrice(svc, "dan", group, opt), 60);           // per-barber absolute — NOT 42+5
+  assert.equal(R.choiceStylePrice(svc, "jr", group, opt), 5);             // no per-barber → option's own absolute
+  assert.equal(R.choiceStylePrice(svc, "jr", group, { id: "x" }), 42);    // no option price → service default
+  assert.equal(R.choiceStylePrice(svc, "dan", group, { id: "y" }), 42);   // dan has no value for this opt → service default
+});
+test("choiceStyleDuration: per-barber ABSOLUTE replaces the base", () => {
+  const svc = { id: "cut", duration: 45, staff: { dan: { duration: 35, choiceDur: { cutchoice: { skinfade: 70 } } }, jr: {} } };
+  const group = { id: "cutchoice" }, opt = { id: "skinfade", min: 10 };
+  assert.equal(R.choiceStyleDuration(null, svc, "dan", group, opt), 70);          // absolute — NOT 35+10
+  assert.equal(R.choiceStyleDuration(null, svc, "jr", group, opt), 10);           // option's own absolute min
+  assert.equal(R.choiceStyleDuration(null, svc, "jr", group, { id: "x" }), 45);   // no option min → service default
 });
 
 // ─── cancelWindowMinutes: the leadTimeMin:0 bug guard ──────────────────────
