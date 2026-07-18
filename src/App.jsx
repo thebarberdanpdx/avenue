@@ -27905,12 +27905,24 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
 
   const q = query.trim().toLowerCase();
   // Lifetime value = imported spend + any real payments actually collected in Vero (one pass over appts).
-  const paidByClient = {};
-  for (const a of (appts || [])) { const t = a && a.paid && Number(a.paid.total); if (a && a.clientId && t > 0) paidByClient[a.clientId] = (paidByClient[a.clientId] || 0) + t; }
+  const paidByClient = useMemo(() => { const m = {}; for (const a of (appts || [])) { const t = a && a.paid && Number(a.paid.total); if (a && a.clientId && t > 0) m[a.clientId] = (m[a.clientId] || 0) + t; } return m; }, [appts]);
   const spendOf = (c) => (Number(c.importedSpent) || 0) + (paidByClient[c.id] || 0);
   const overOf = (c) => { if (!c.cadenceDays || !c.lastVisit) return -1; return Math.round((Date.now() - new Date(c.lastVisit)) / 86400000) - c.cadenceDays; };
   // Ordering is a pure, unit-tested function (clientListComparator) — see resolvers.test.mjs.
-  const shown = (q ? clients.filter((c) => (c.name + " " + (c.phone || "") + " " + (c.email || "")).toLowerCase().includes(q)) : clients).slice().sort(clientListComparator(sortMode, paidByClient));
+  const shown = useMemo(() => (q ? clients.filter((c) => (c.name + " " + (c.phone || "") + " " + (c.email || "")).toLowerCase().includes(q)) : clients).slice().sort(clientListComparator(sortMode, paidByClient)), [clients, q, sortMode, paidByClient]);
+  // Windowing (clients-list-window): with ~3,000 clients, painting every row on tab-open was the
+  // Clients-tab lag. Render at most `visLimit` rows; an IntersectionObserver on a sentinel below the
+  // list bumps the limit as you scroll near the bottom, so it grows on demand and never feels capped.
+  const [visLimit, setVisLimit] = useState(80);
+  useEffect(() => { setVisLimit(80); }, [q, sortMode]);
+  const listSentinelRef = useRef(null);
+  useEffect(() => {
+    const el = listSentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((ents) => { if (ents.some((e) => e.isIntersecting)) setVisLimit((l) => l + 80); }, { rootMargin: "800px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [shown]);
   // Row subtitle reflects the active sort, so you can SEE what you sorted by (the value is right there).
   const fmtShort = (iso) => { if (!iso) return "—"; const d = new Date(iso); if (isNaN(d)) return "—"; return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${String(d.getFullYear()).slice(2)}`; };
   const subFor = (c, provider) => {
@@ -27926,13 +27938,13 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
   // A client gets a `nudgeDismissedAt` stamp when you either Nudge them or X them out. If that stamp is more
   // recent than their last visit, they're hidden from the folder. When they come in again, lastVisit jumps
   // forward and they become eligible again — no manual reset needed.
-  const overdue = clients.map((c) => {
+  const overdue = useMemo(() => clients.map((c) => {
     if (!c.cadenceDays || !c.lastVisit) return null;
     if (c.nudgeDismissedAt && new Date(c.nudgeDismissedAt) > new Date(c.lastVisit)) return null;
     const days = Math.round((Date.now() - new Date(c.lastVisit)) / 86400000);
     const over = days - c.cadenceDays;
     return over > 0 ? { c, days, over } : null;
-  }).filter(Boolean).sort((a, b) => b.over - a.over);
+  }).filter(Boolean).sort((a, b) => b.over - a.over), [clients]);
   const [showNudgeFolder, setShowNudgeFolder] = useState(false);
   const [nudgeConfirm, setNudgeConfirm] = useState(null); // { c, days, over } awaiting a send
   const [nudgeChannel, setNudgeChannel] = useState("text"); // "text" | "email"
@@ -28050,7 +28062,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
           <ChevronDown size={16} style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
         </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1] || providers[0] || {}; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>{subFor(c, provider)}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}</div>
+      <div style={{ display: "flex", flexDirection: "column" }}>{shown.slice(0, visLimit).map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1] || providers[0] || {}; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>{subFor(c, provider)}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}{shown.length > visLimit && <div ref={listSentinelRef} style={{ height: 1 }} />}</div>
       {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : "No clients yet — tap + to add your first one."}</p>}
     </div>
 
