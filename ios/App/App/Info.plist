@@ -35,6 +35,17 @@
 	<string>Vero uses Bluetooth to connect to card readers for in-person payments.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>Vero uses Bluetooth to connect to card readers for in-person payments.</string>
+	<!-- The client card's "Take photo" opens the camera via <input capture>. iOS HARD-CRASHES
+	     (app closes instantly) any app that touches the camera without this usage-description
+	     string — this was the "the second I click take photo the app crashes" bug. NOTE: this
+	     lives in the NATIVE binary, so it only takes effect after a native rebuild
+	     (npx cap sync + Xcode/TestFlight); a gotvero.com web deploy CANNOT grant it. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Vero uses the camera to take client and gallery photos.</string>
+	<!-- Some photo pickers can route through the photo library; include its usage string so
+	     library access never crashes either. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Vero uses your photo library to attach client and gallery photos.</string>
 	<!-- Stripe Terminal REQUIRES bluetooth-central in UIBackgroundModes to discover/stay
 	     connected to a Bluetooth reader (Stripe Reader M2 / WisePad 3). Without it the SDK
 	     raises an integration error and aborts at discoverReaders (SIGABRT) — the crash seen
