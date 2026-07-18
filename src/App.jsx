@@ -3051,6 +3051,46 @@ function App() {
   };
   const writeCache = (table, list) => { try { if (Array.isArray(list)) localStorage.setItem(CACHE_PREFIX + table, JSON.stringify(slimForCache(table, list))); } catch (e) { /* quota — ignore */ } };
   const readCache = (table) => { try { const raw = localStorage.getItem(CACHE_PREFIX + table); const v = raw ? JSON.parse(raw) : null; return Array.isArray(v) ? v : null; } catch (e) { return null; } };
+  // [checkin-durable] A checked-in visit the server hasn't stored yet must survive a stale refresh —
+  // the same guarantee the payment outbox gives a completed sale. ROOT (Dan, 2026-07-18, 40 min lost):
+  // check-in was a fire-and-forget save. If that write was blocked (cache-degraded mode, loadedRef=false)
+  // or dropped (flaky network), the "in-service" status + start time lived ONLY in memory, and the next
+  // server-authoritative mirror rolled the appt back to "confirmed" — silently, wiping the running timer.
+  // Fix: keep a TINY durable record (id + start time, in localStorage) of any in-service visit the server
+  // baseline hasn't acknowledged, OVERLAY it onto every server snapshot we apply so a point-in-time read
+  // can never downgrade a live visit, and re-save until the server confirms it. The pending set is DERIVED
+  // from live state, so a deliberate reset / checkout / cancel (appt stops being in-service) drops itself.
+  const checkinLoggedRef = useRef(new Set());
+  const CHECKIN_OUTBOX_KEY = `vero_checkin_outbox_${SHOP_ID}`;
+  const checkinOutboxRead = () => { try { const raw = localStorage.getItem(CHECKIN_OUTBOX_KEY); const v = raw ? JSON.parse(raw) : []; return Array.isArray(v) ? v : []; } catch (e) { return []; } };
+  const checkinOutboxWrite = (box) => { try { localStorage.setItem(CHECKIN_OUTBOX_KEY, JSON.stringify((Array.isArray(box) ? box : []).slice(-100))); } catch (e) {} };
+  // Overlay un-acknowledged check-ins onto a server snapshot. READ-ONLY (the derived effect below is the
+  // sole writer of the outbox): an entry the server has since stored (serviceStartedAt present) or moved
+  // past (done / cancelled / paid) is simply NOT overlaid, so it can never resurrect a legitimately-reset
+  // visit; the derived effect drops it on the next render.
+  const reconcileCheckinOutbox = (serverList) => {
+    const box = checkinOutboxRead();
+    if (!box.length) return serverList;
+    const byId = new Map((serverList || []).map((a) => [String(a && a.id), a]));
+    const localById = new Map((apptsRef.current || []).map((a) => [String(a && a.id), a]));
+    let overlaid = false;
+    for (const e of box) {
+      const sv = byId.get(String(e && e.id));
+      if (!sv) continue; // appt gone on the server — nothing to protect
+      const landed = sv.serviceStartedAt != null || sv.status === "done" || sv.status === "cancelled" || (sv.paid && Number(sv.paid.total) > 0);
+      if (landed) continue; // server caught up (or moved past it) — never resurrect a reset/paid visit
+      // Respect a deliberate LOCAL downgrade (reset / checkout / cancel) even in the ~1-tick window
+      // before the derived effect prunes the entry — only protect a visit STILL in progress locally.
+      // (A missing local row = a fresh cache/cold-boot overlay, which we DO want.)
+      const loc = localById.get(String(e.id));
+      if (loc && !(loc.status === "in-service" && loc.serviceStartedAt != null)) continue;
+      byId.set(String(e.id), { ...sv, status: "in-service", serviceStartedAt: e.serviceStartedAt });
+      overlaid = true;
+      if (!checkinLoggedRef.current.has(e.id)) { checkinLoggedRef.current.add(e.id); try { Sentry.captureMessage("checkin-durable: re-applied an in-progress visit the server had dropped", { level: "warning", tags: { area: "checkin-durable" }, extra: { apptId: String(e.id) } }); } catch (x) {} }
+    }
+    if (!overlaid) return serverList;
+    return (serverList || []).map((a) => byId.get(String(a && a.id)) || a);
+  };
   // Hydrate one table read-only from cache after a failed load. Blocks all saves (degraded state) and
   // sets lastRemoteRef to the same reference so the save effect sees "no change" and never writes.
   const hydrateFromCache = (table, current, setter) => {
@@ -3058,7 +3098,7 @@ function App() {
     const c = readCache(table);
     if (!c || !c.length) return false;
     lastRemoteRef.current[table] = c;
-    setter(c);
+    setter(table === "appointments" ? reconcileCheckinOutbox(c) : c); // [checkin-durable] keep a live visit visible on a cache cold-boot
     loadedRef.current = false;                          // degraded: block every save until a clean reload
     setUsingCache(true);
     return true;
@@ -3184,7 +3224,7 @@ function App() {
       if (table === "appointments" || table === "clients") {
         lastRemoteRef.current[table] = list;
         const set = tableSetters[table];
-        if (set) set(list);
+        if (set) set(table === "appointments" ? reconcileCheckinOutbox(list) : list); // [checkin-durable] protect a live visit from a background refetch
         writeCache(table, list);
         setUsingCache(false);
         if (table === "appointments") { staffApptsLoadedRef.current = true; setSaveFailed(false); }
@@ -3265,7 +3305,12 @@ function App() {
     // ~10s to recolor and the calendar slow to open. writeCache still runs each mirror so the offline
     // cache stays fresh (no stale cold-boot paint); we skip only the redundant setState + re-render.
     if (!sameRowset(serverCl, clientsRef.current)) setClients(serverCl);
-    if (!sameRowset(serverAp, apptsRef.current)) setAppts(serverAp);
+    // [checkin-durable] Overlay any in-progress visit the server hasn't stored yet so this mirror can't
+    // silently roll it back to "confirmed". Baseline (lastRemoteRef, set above) stays the RAW server copy,
+    // so the overlaid-local difference re-triggers a save that lands the check-in; the cache is written RAW
+    // too, so the derived outbox effect keeps a correct picture on a later cold-boot.
+    const localAp = reconcileCheckinOutbox(serverAp);
+    if (!sameRowset(localAp, apptsRef.current)) setAppts(localAp);
     staffClientsLoadedRef.current = true;
     staffApptsLoadedRef.current = true;
     writeCache("clients", serverCl);
@@ -3796,6 +3841,69 @@ function App() {
   useEffect(() => { if (!loadedRef.current || !session) return; if (reviews === lastRemoteRef.current.reviews) return; lastSaveAt.current.reviews = Date.now(); pendingSaveRef.current.reviews = reviews; const t = setTimeout(() => firePending('reviews'), 800); return () => clearTimeout(t); }, [reviews]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (services === lastRemoteRef.current.services) return; lastSaveAt.current.services = Date.now(); pendingSaveRef.current.services = services; const t = setTimeout(() => firePending('services'), 800); return () => clearTimeout(t); }, [services]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (providers === lastRemoteRef.current.providers) return; lastSaveAt.current.providers = Date.now(); providersDirtyRef.current = true; pendingSaveRef.current.providers = providers; const t = setTimeout(() => firePending('providers'), 800); return () => clearTimeout(t); }, [providers]);
+  // [checkin-durable] SOLE WRITER of the check-in outbox. ADDITIVE with PROOF-BASED removal, and it
+  // re-runs on every mirror (keyed on syncHealth) as well as every local edit ([appts]):
+  //   • ADD  — an in-service visit with a start time the server baseline hasn't stored yet.
+  //   • DROP — ONLY on proof: the server stored/advanced it (landed), a deliberate LOCAL downgrade
+  //            (present locally but no longer in-service), or a FULL load proving it gone from BOTH
+  //            sides (deleted). It must NEVER drop an entry just because `appts` is the empty pre-load
+  //            array — that self-erased the durable record on every cold boot (review Finding 1).
+  //   • keyed on syncHealth — the [mirror-noop-skip] optimization suppresses the [appts] change after a
+  //            check-in lands, so pruning can't hang off [appts] alone or a stale entry would later
+  //            resurrect a cross-device reset back to in-service (review Finding 2). syncHealth bumps on
+  //            every mirror, so a landed entry is pruned within one sync tick.
+  useEffect(() => {
+    try {
+      const local = apptsRef.current || [];
+      const base = new Map((lastRemoteRef.current.appointments || []).map((a) => [String(a && a.id), a]));
+      const localById = new Map(local.map((a) => [String(a && a.id), a]));
+      const box = checkinOutboxRead();
+      const next = [];
+      const added = new Set();
+      // 1. Visits still in progress LOCALLY — authoritative start time straight from live state.
+      for (const a of local) {
+        if (a && a.status === "in-service" && a.serviceStartedAt != null) {
+          const sv = base.get(String(a.id));
+          if (!sv || sv.serviceStartedAt == null) { next.push({ id: String(a.id), serviceStartedAt: a.serviceStartedAt }); added.add(String(a.id)); }
+        }
+      }
+      // 2. Preserve existing entries whose appt isn't in `local` yet — UNLESS proven resolved.
+      for (const e of box) {
+        const id = String(e && e.id);
+        if (added.has(id)) continue;
+        const sv = base.get(id);
+        if (sv && (sv.serviceStartedAt != null || sv.status === "done" || sv.status === "cancelled" || (sv.paid && Number(sv.paid.total) > 0))) continue; // server stored/advanced it → landed
+        if (localById.has(id)) continue; // present locally but not in-service (step 1 skipped it) → deliberate downgrade
+        if (loadedRef.current && staffApptsLoadedRef.current && !sv) continue; // fully loaded and gone from BOTH sides → deleted
+        next.push(e); // not-yet-loaded / offline → keep the durable record
+      }
+      const same = next.length === box.length && next.every((n) => box.some((b) => String(b.id) === n.id && b.serviceStartedAt === n.serviceStartedAt));
+      if (!same) checkinOutboxWrite(next);
+    } catch (e) {}
+  }, [appts, syncHealth]);
+  // [checkin-durable] Keep re-saving a pending check-in until the server confirms it — the visit timer
+  // must land even if the first save was blocked (cache mode) or dropped (flaky network). Stops the
+  // instant the server baseline shows the start time. Mirrors the payment-outbox drain (mount / online /
+  // interval); gated on loadedRef so a stripped cache copy is never written back.
+  useEffect(() => {
+    if (!session) return;
+    const drain = () => {
+      if (!loadedRef.current || !staffApptsLoadedRef.current) return;
+      const box = checkinOutboxRead();
+      if (!box.length) return;
+      const base = new Map((lastRemoteRef.current.appointments || []).map((a) => [String(a && a.id), a]));
+      const unlanded = box.some((e) => { const sv = base.get(String(e && e.id)); return !sv || sv.serviceStartedAt == null; });
+      if (!unlanded) return;
+      // Re-save the CURRENT local state: if the visit is still in progress it re-asserts the check-in;
+      // if the owner reset it (entry not yet pruned) it correctly saves the reset. Either way, honest.
+      if (flushApptsNow) flushApptsNow(apptsRef.current || []);
+    };
+    drain();
+    const onOnline = () => drain();
+    if (typeof window !== "undefined") window.addEventListener("online", onOnline);
+    const id = setInterval(drain, 25000);
+    return () => { if (typeof window !== "undefined") window.removeEventListener("online", onOnline); clearInterval(id); };
+  }, [session]);
   // Backgrounded mid-debounce → flush every pending save NOW. syncList itself serializes per
   // table and diffs against the server baseline, so a flush followed by a stale timer firing
   // can never double-write or send stale data.
