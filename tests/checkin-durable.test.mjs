@@ -41,16 +41,29 @@ function reconcile(serverList, box, localList = null) {
   if (!overlaid) return serverList;
   return (serverList || []).map((a) => byId.get(String(a && a.id)) || a);
 }
-function derive(localAppts, baseAppts) {
+// ADDITIVE with PROOF-BASED removal (mirrors Effect A). `loaded` = loadedRef && staffApptsLoadedRef.
+function derive(localAppts, baseAppts, box = [], loaded = true) {
+  const local = localAppts || [];
   const base = new Map((baseAppts || []).map((a) => [String(a && a.id), a]));
-  const want = [];
-  for (const a of (localAppts || [])) {
+  const localById = new Map(local.map((a) => [String(a && a.id), a]));
+  const next = [];
+  const added = new Set();
+  for (const a of local) {
     if (a && a.status === "in-service" && a.serviceStartedAt != null) {
       const sv = base.get(String(a.id));
-      if (!sv || sv.serviceStartedAt == null) want.push({ id: String(a.id), serviceStartedAt: a.serviceStartedAt });
+      if (!sv || sv.serviceStartedAt == null) { next.push({ id: String(a.id), serviceStartedAt: a.serviceStartedAt }); added.add(String(a.id)); }
     }
   }
-  return want;
+  for (const e of (box || [])) {
+    const id = String(e && e.id);
+    if (added.has(id)) continue;
+    const sv = base.get(id);
+    if (sv && (sv.serviceStartedAt != null || sv.status === "done" || sv.status === "cancelled" || (sv.paid && Number(sv.paid.total) > 0))) continue; // landed
+    if (localById.has(id)) continue; // present locally but not in-service → deliberate downgrade
+    if (loaded && !sv) continue; // fully loaded and gone from both sides → deleted
+    next.push(e); // not-yet-loaded / offline → keep the durable record
+  }
+  return next;
 }
 const START = 1_752_800_000_000; // fixed timestamp — tests must never call Date.now()
 
@@ -167,6 +180,54 @@ test("derive ignores an in-service appt with no start time (nothing to protect)"
   const local = [{ id: "a1", status: "in-service", serviceStartedAt: null }];
   const base = [{ id: "a1", status: "confirmed" }];
   assert.deepEqual(derive(local, base), []);
+});
+
+// --- review Finding 1: the durable record must survive a cold boot (empty pre-load `appts`) ----
+test("derive PRESERVES a pending entry on a cold boot — empty local, not loaded yet (Finding 1)", () => {
+  // App just launched mid-visit: appts=[] (async load not back), outbox has the record from before.
+  const out = derive([], [], [{ id: "a1", serviceStartedAt: START }], /*loaded*/ false);
+  assert.deepEqual(out, [{ id: "a1", serviceStartedAt: START }]); // NOT wiped
+});
+
+test("derive still preserves the entry while offline even if a stale empty baseline exists", () => {
+  const out = derive([], [], [{ id: "a1", serviceStartedAt: START }], false);
+  assert.equal(out.length, 1);
+});
+
+// --- review Finding 2: a landed entry is pruned by the mirror, not left to resurrect a reset -------
+test("derive DROPS a landed entry when the baseline shows the start time, even if local unchanged (Finding 2)", () => {
+  // The check-in has landed (baseline has serviceStartedAt) but noop-skip left local === in-service.
+  // Re-running on the mirror (syncHealth) must prune the now-stale outbox entry.
+  const local = [{ id: "a1", status: "in-service", serviceStartedAt: START }];
+  const base = [{ id: "a1", status: "in-service", serviceStartedAt: START }];
+  const out = derive(local, base, [{ id: "a1", serviceStartedAt: START }], true);
+  assert.deepEqual(out, []); // pruned → can't later resurrect a cross-device reset
+});
+
+test("derive DROPS a deleted appt once fully loaded (gone from both local and server)", () => {
+  const out = derive([], [], [{ id: "a1", serviceStartedAt: START }], /*loaded*/ true);
+  assert.deepEqual(out, []); // no perpetual re-save of a ghost
+});
+
+test("derive DROPS a stale entry on a deliberate local downgrade (reset), even before the mirror", () => {
+  const local = [{ id: "a1", status: "confirmed", serviceStartedAt: null }];
+  const base = [{ id: "a1", status: "confirmed", serviceStartedAt: null }];
+  const out = derive(local, base, [{ id: "a1", serviceStartedAt: START }], true);
+  assert.deepEqual(out, []);
+});
+
+test("derive REFRESHES the start time if the barber adjusts it mid-visit", () => {
+  const local = [{ id: "a1", status: "in-service", serviceStartedAt: START + 600000 }];
+  const base = [{ id: "a1", status: "confirmed", serviceStartedAt: null }];
+  const out = derive(local, base, [{ id: "a1", serviceStartedAt: START }], true);
+  assert.deepEqual(out, [{ id: "a1", serviceStartedAt: START + 600000 }]);
+});
+
+test("derive keeps a still-in-progress visit whose check-in hasn't landed (server still confirmed)", () => {
+  const local = [{ id: "a1", status: "in-service", serviceStartedAt: START }];
+  const base = [{ id: "a1", status: "confirmed", serviceStartedAt: null }];
+  const out = derive(local, base, [{ id: "a1", serviceStartedAt: START }], true);
+  assert.deepEqual(out, [{ id: "a1", serviceStartedAt: START }]); // still protected + re-saved
 });
 
 // --- end-to-end: the exact bug can no longer happen -------------------------------------------
