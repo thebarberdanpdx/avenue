@@ -1836,15 +1836,19 @@ const choiceStylePrice = (service, providerId, group, opt) => {
   const se = getStaffEntry(service, providerId);
   const g = se && se.choicePrice && group && se.choicePrice[group.id];
   if (g && opt && g[opt.id] != null && g[opt.id] !== "") return Number(g[opt.id]) || 0;
-  if (opt && opt.price != null) return Number(opt.price) || 0;
-  return getPrice(service, providerId);
+  // [perbarber-fallback] No per-barber absolute for this (barber, style) — a brand-new style, a new hire,
+  // or an "anyone" booking. Fall back to base + this style's increment (opt.price), NEVER the bare
+  // increment: opt.price is a base-relative extra (standard 0, fade +5), so returning it alone charged
+  // $0 for a standard cut. Seeded per-barber absolutes still win above, so no migrated value moves.
+  return getPrice(service, providerId) + (Number(opt && opt.price) || 0);
 };
 const choiceStyleDuration = (client, service, providerId, group, opt) => {
   const se = getStaffEntry(service, providerId);
   const g = se && se.choiceDur && group && se.choiceDur[group.id];
   if (g && opt && g[opt.id] != null && g[opt.id] !== "") return Number(g[opt.id]) || 0;
-  if (opt && opt.min != null) return Number(opt.min) || 0;
-  return getDuration(client, service, providerId);
+  // [perbarber-fallback] base duration + this style's extra minutes, never the bare increment (which
+  // would book a 0-minute appointment for an unseeded barber/style).
+  return getDuration(client, service, providerId) + (Number(opt && opt.min) || 0);
 };
 // Migrate ONE service's cut-choice group from the increment model → the ABSOLUTE per-barber model.
 // Fills staff[pid].choicePrice/choiceDur[gid][optId] with each barber's CURRENT effective total (their

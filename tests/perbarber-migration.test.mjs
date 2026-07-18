@@ -36,15 +36,13 @@ const choiceStylePrice = (service, providerId, group, opt) => {
   const se = getStaffEntry(service, providerId);
   const g = se && se.choicePrice && group && se.choicePrice[group.id];
   if (g && opt && g[opt.id] != null && g[opt.id] !== "") return Number(g[opt.id]) || 0;
-  if (opt && opt.price != null) return Number(opt.price) || 0;
-  return getPrice(service, providerId);
+  return getPrice(service, providerId) + (Number(opt && opt.price) || 0);   // base + increment fallback
 };
 const choiceStyleDuration = (client, service, providerId, group, opt) => {
   const se = getStaffEntry(service, providerId);
   const g = se && se.choiceDur && group && se.choiceDur[group.id];
   if (g && opt && g[opt.id] != null && g[opt.id] !== "") return Number(g[opt.id]) || 0;
-  if (opt && opt.min != null && group && group.setsPrice) return Number(opt.min) || 0;
-  return getDuration(client, service, providerId) + (opt && opt.min ? Number(opt.min) : 0);
+  return getDuration(client, service, providerId) + (Number(opt && opt.min) || 0);
 };
 
 const addonDuration = (service, providerId, group) => {
@@ -214,6 +212,28 @@ eq("no-cutstyle service untouched", JSON.stringify(migrateCutServiceToPerBarber(
   eq("addon per-barber: Heather facial 25 min", addonDuration(withOverride, "heather", facial), 25);
   eq("addon per-barber: Dan facial still $30", addonPriceFor(withOverride, "dan", facial), 30);
   eq("addon per-barber: Dan facial still 20 min", addonDuration(withOverride, "dan", facial), 20);
+}
+
+// ---- REGRESSION: an unseeded (barber, style) on a setsPrice service must charge base + increment,
+// NEVER the bare increment ($0 for a standard cut). Covers: a brand-new cut style, a new hire, "anyone".
+{
+  // Haircut, migrated + setsPrice, but a THIRD staff "sam" was added after the fact (no choicePrice) and
+  // a NEW style "specialty" (opt.price 8) exists that no barber has priced yet.
+  const svc = migrateCutServiceToPerBarber(HAIRCUT, STAFF);
+  const g = svc.addonGroups.find((x) => x.id === CUT_ID);
+  g.setsPrice = true;
+  g.options.push({ id: "specialty", min: 15, price: 8, label: "Specialty" }); // opt.price is a +extra
+  svc.staff.sam = { on: true, price: null, duration: 40 };                     // new hire, no choicePrice
+  // new hire, EXISTING style: base ($42) + increment (standard 0 / fade 5), NOT $0 / $5
+  eq("new hire standard = base $42 (not $0)", choiceStylePrice(svc, "sam", g, g.options[0]), 42);
+  eq("new hire fade = base+extra $47 (not $5)", choiceStylePrice(svc, "sam", g, g.options[1]), 47);
+  eq("new hire standard time = 40 (not 0)", choiceStyleDuration(null, svc, "sam", g, g.options[0]), 40);
+  // ANY barber, brand-new unpriced style: base + its +extra, NOT the bare $8
+  eq("new style Dan = base+extra $50 (not $8)", choiceStylePrice(svc, "dan", g, g.options[2]), 50);
+  eq("new style Dan time = 35+15=50 (not 15)", choiceStyleDuration(null, svc, "dan", g, g.options[2]), 50);
+  // seeded barbers on existing styles are UNCHANGED by the fallback fix
+  eq("seeded Dan fade still $47", choiceStylePrice(svc, "dan", g, g.options[1]), 47);
+  eq("seeded Heather fade still $47", choiceStylePrice(svc, "heather", g, g.options[1]), 47);
 }
 
 // Integrate with `node --test` (ship-check runs tests/*.test.mjs): the assertions above tally into
