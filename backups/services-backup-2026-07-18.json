@@ -1,0 +1,1004 @@
+{
+  "takenAt": "2026-07-18",
+  "count": 15,
+  "rows": [
+    {
+      "id": "shave",
+      "data": {
+        "id": "shave",
+        "name": "Straight Razor Shave",
+        "color": "slate",
+        "order": 3,
+        "photo": "photo-1596728325488-58c87691e9af",
+        "price": 30,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": null
+          },
+          "heather": {
+            "on": false,
+            "price": null,
+            "duration": null
+          }
+        },
+        "category": "Services",
+        "duration": 30,
+        "addonGroups": [
+          {
+            "id": "lib-ao-1782857503533",
+            "item": {
+              "min": 30,
+              "desc": "",
+              "name": "Want a facial?",
+              "price": 30,
+              "addsPrice": true
+            },
+            "type": "addon",
+            "label": "Want a facial?",
+            "photo": "",
+            "noLabel": "No thanks",
+            "required": false,
+            "yesLabel": "Yes - Add Facial"
+          }
+        ]
+      },
+      "shop_id": "sanctuary"
+    },
+    {
+      "id": "shave",
+      "data": {
+        "id": "shave",
+        "name": "Straight Razor Shave",
+        "color": "slate",
+        "order": 3,
+        "photo": "photo-1596728325488-58c87691e9af",
+        "price": 30,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": null
+          },
+          "heather": {
+            "on": false,
+            "price": null,
+            "duration": null
+          }
+        },
+        "category": "Services",
+        "duration": 30,
+        "addonGroups": []
+      },
+      "shop_id": "vero-test"
+    },
+    {
+      "id": "svc-1783003268406",
+      "data": {
+        "id": "svc-1783003268406",
+        "name": "The Gentleman’s Facial",
+        "color": "turquoise",
+        "order": 4,
+        "photo": "",
+        "price": 30,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": null
+          },
+          "heather": {
+            "on": true,
+            "price": null,
+            "duration": null
+          }
+        },
+        "photos": [],
+        "booking": {
+          "available": true,
+          "customPrice": false,
+          "description": "A rejuvenating facial designed to refresh and restore your skin. This service begins with steam to open pores, followed by a deep cleanse and exfoliation to remove impurities and dead skin cells. A balancing toner and hydrating moisturizer are applied to nourish and protect your complexion. To finish, you’ll experience a 24K Gold Collagen mask that helps reduce puffiness, support anti-aging, boost circulation, and leave your skin feeling firm, smooth, and revitalized. Perfect for hydration, relaxation, and a healthy glow.",
+          "requireCard": true,
+          "promptToCall": false,
+          "requireAddress": false,
+          "requirePayment": false
+        },
+        "category": "Services",
+        "duration": 30,
+        "addonGroups": [],
+        "usesCutStyles": false
+      },
+      "shop_id": "vero-test"
+    },
+    {
+      "id": "cutbeard",
+      "data": {
+        "id": "cutbeard",
+        "name": "Haircut + Beard",
+        "color": "gold",
+        "order": 1,
+        "photo": "photo-1621607512214-68297480165e",
+        "price": 58,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": 50
+          },
+          "heather": {
+            "on": true,
+            "price": null,
+            "duration": 60
+          }
+        },
+        "booking": {
+          "available": true,
+          "description": "Your cut and your beard, dialed in together. We keep some length and clean up the sides without going down to bare skin, then shape the beard to match. Best for keeping your usual look sharp, not a big change. If that is not what you are after, tap Change and pick the one that fits."
+        },
+        "category": "Services",
+        "duration": 60,
+        "addonGroups": [
+          {
+            "id": "cutchoice",
+            "type": "choice",
+            "label": "Choose your cut",
+            "options": [
+              {
+                "id": "standard",
+                "min": 0,
+                "desc": "Some length kept, nothing taken down to the skin.",
+                "label": "Standard cut",
+                "price": 0
+              },
+              {
+                "id": "skinfade",
+                "min": 10,
+                "desc": "Faded down close to the skin.",
+                "label": "Skin fade or specialty style",
+                "price": 5
+              }
+            ],
+            "required": true
+          },
+          {
+            "id": "hottowel",
+            "item": {
+              "min": 10,
+              "desc": "A hot towel treatment finished with a straight-razor line up.",
+              "name": "Hot Towel & Straight Razor",
+              "price": 10
+            },
+            "type": "addon",
+            "label": "Hot towel finish?",
+            "photo": "photo-1493256338651-d82f7acb2b38"
+          }
+        ],
+        "usesCutStyles": false
+      },
+      "shop_id": "vero-test"
+    },
+    {
+      "id": "beard",
+      "data": {
+        "id": "beard",
+        "name": "Beard Trim",
+        "color": "clay",
+        "order": 2,
+        "photo": "photo-1517832606299-7ae9b720a186",
+        "price": 35,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": null
+          },
+          "heather": {
+            "on": true,
+            "price": null,
+            "duration": null
+          }
+        },
+        "category": "Services",
+        "duration": 30,
+        "addonGroups": []
+      },
+      "shop_id": "vero-test"
+    },
+    {
+      "id": "cut",
+      "data": {
+        "id": "cut",
+        "name": "Haircut",
+        "color": "gold",
+        "order": 0,
+        "photo": "photo-1503951914875-452162b0f3f1",
+        "price": 42,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": 35
+          },
+          "heather": {
+            "on": true,
+            "price": null,
+            "duration": 45
+          }
+        },
+        "booking": {
+          "available": true,
+          "description": "Your regular cut. We keep some length and clean up the sides without going down to bare skin. It is about keeping you looking your best, not a big change or trying something new. If that is not what you are after, tap Change and pick the one that fits."
+        },
+        "category": "Services",
+        "duration": 45,
+        "addonGroups": [
+          {
+            "id": "cutchoice",
+            "type": "choice",
+            "label": "Choose your cut",
+            "options": [
+              {
+                "id": "standard",
+                "min": 0,
+                "desc": "Some length kept, nothing taken down to the skin.",
+                "label": "Standard cut",
+                "price": 0
+              },
+              {
+                "id": "skinfade",
+                "min": 10,
+                "desc": "Faded down close to the skin.",
+                "label": "Skin fade or specialty style",
+                "price": 5
+              }
+            ],
+            "required": true
+          },
+          {
+            "id": "facial",
+            "item": {
+              "min": 20,
+              "desc": "A rejuvenating facial featuring steam, deep cleansing, exfoliation, and hydration, finished with a 24K Gold Collagen mask.",
+              "name": "The Gentleman's Facial",
+              "price": 30
+            },
+            "type": "addon",
+            "label": "Want a facial?",
+            "photo": "photo-1570172619644-dfd03ed5d881"
+          }
+        ],
+        "usesCutStyles": false
+      },
+      "shop_id": "vero-test"
+    },
+    {
+      "id": "shave",
+      "data": {
+        "id": "shave",
+        "name": "Straight Razor Shave",
+        "color": "slate",
+        "order": 3,
+        "photo": "photo-1596728325488-58c87691e9af",
+        "price": 30,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": null
+          },
+          "heather": {
+            "on": false,
+            "price": null,
+            "duration": null
+          }
+        },
+        "category": "Services",
+        "duration": 30,
+        "addonGroups": []
+      },
+      "shop_id": "vero-mig"
+    },
+    {
+      "id": "svc-1783003268406",
+      "data": {
+        "id": "svc-1783003268406",
+        "name": "The Gentleman’s Facial",
+        "color": "turquoise",
+        "order": 4,
+        "photo": "",
+        "price": 30,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": null
+          },
+          "heather": {
+            "on": true,
+            "price": null,
+            "duration": null
+          }
+        },
+        "photos": [],
+        "booking": {
+          "available": true,
+          "customPrice": false,
+          "description": "A rejuvenating facial designed to refresh and restore your skin. This service begins with steam to open pores, followed by a deep cleanse and exfoliation to remove impurities and dead skin cells. A balancing toner and hydrating moisturizer are applied to nourish and protect your complexion. To finish, you’ll experience a 24K Gold Collagen mask that helps reduce puffiness, support anti-aging, boost circulation, and leave your skin feeling firm, smooth, and revitalized. Perfect for hydration, relaxation, and a healthy glow.",
+          "requireCard": true,
+          "promptToCall": false,
+          "requireAddress": false,
+          "requirePayment": false
+        },
+        "category": "Services",
+        "duration": 30,
+        "addonGroups": [],
+        "usesCutStyles": false
+      },
+      "shop_id": "vero-mig"
+    },
+    {
+      "id": "cutbeard",
+      "data": {
+        "id": "cutbeard",
+        "name": "Haircut + Beard",
+        "color": "gold",
+        "order": 1,
+        "photo": "photo-1621607512214-68297480165e",
+        "price": 58,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": 50
+          },
+          "heather": {
+            "on": true,
+            "price": null,
+            "duration": 60
+          }
+        },
+        "booking": {
+          "available": true,
+          "description": "Your cut and your beard, dialed in together. We keep some length and clean up the sides without going down to bare skin, then shape the beard to match. Best for keeping your usual look sharp, not a big change. If that is not what you are after, tap Change and pick the one that fits."
+        },
+        "category": "Services",
+        "duration": 60,
+        "addonGroups": [
+          {
+            "id": "cutchoice",
+            "type": "choice",
+            "label": "Choose your cut",
+            "options": [
+              {
+                "id": "standard",
+                "min": 0,
+                "desc": "Some length kept, nothing taken down to the skin.",
+                "label": "Standard cut",
+                "price": 0
+              },
+              {
+                "id": "skinfade",
+                "min": 10,
+                "desc": "Faded down close to the skin.",
+                "label": "Skin fade or specialty style",
+                "price": 5
+              }
+            ],
+            "required": true
+          },
+          {
+            "id": "hottowel",
+            "item": {
+              "min": 10,
+              "desc": "A hot towel treatment finished with a straight-razor line up.",
+              "name": "Hot Towel & Straight Razor",
+              "price": 10
+            },
+            "type": "addon",
+            "label": "Hot towel finish?",
+            "photo": "photo-1493256338651-d82f7acb2b38"
+          }
+        ],
+        "usesCutStyles": false
+      },
+      "shop_id": "vero-mig"
+    },
+    {
+      "id": "beard",
+      "data": {
+        "id": "beard",
+        "name": "Beard Trim",
+        "color": "clay",
+        "order": 2,
+        "photo": "photo-1517832606299-7ae9b720a186",
+        "price": 35,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": null
+          },
+          "heather": {
+            "on": true,
+            "price": null,
+            "duration": null
+          }
+        },
+        "category": "Services",
+        "duration": 30,
+        "addonGroups": []
+      },
+      "shop_id": "vero-mig"
+    },
+    {
+      "id": "cut",
+      "data": {
+        "id": "cut",
+        "name": "Haircut",
+        "color": "gold",
+        "order": 0,
+        "photo": "photo-1503951914875-452162b0f3f1",
+        "price": 42,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": 35
+          },
+          "heather": {
+            "on": true,
+            "price": null,
+            "duration": 45
+          }
+        },
+        "booking": {
+          "available": true,
+          "description": "Your regular cut. We keep some length and clean up the sides without going down to bare skin. It is about keeping you looking your best, not a big change or trying something new. If that is not what you are after, tap Change and pick the one that fits."
+        },
+        "category": "Services",
+        "duration": 45,
+        "addonGroups": [
+          {
+            "id": "cutchoice",
+            "type": "choice",
+            "label": "Choose your cut",
+            "options": [
+              {
+                "id": "standard",
+                "min": 0,
+                "desc": "Some length kept, nothing taken down to the skin.",
+                "label": "Standard cut",
+                "price": 0
+              },
+              {
+                "id": "skinfade",
+                "min": 10,
+                "desc": "Faded down close to the skin.",
+                "label": "Skin fade or specialty style",
+                "price": 5
+              }
+            ],
+            "required": true
+          },
+          {
+            "id": "facial",
+            "item": {
+              "min": 20,
+              "desc": "A rejuvenating facial featuring steam, deep cleansing, exfoliation, and hydration, finished with a 24K Gold Collagen mask.",
+              "name": "The Gentleman's Facial",
+              "price": 30
+            },
+            "type": "addon",
+            "label": "Want a facial?",
+            "photo": "photo-1570172619644-dfd03ed5d881"
+          }
+        ],
+        "usesCutStyles": false
+      },
+      "shop_id": "vero-mig"
+    },
+    {
+      "id": "cut",
+      "data": {
+        "id": "cut",
+        "name": "Haircut",
+        "color": "gold",
+        "order": 0,
+        "photo": "",
+        "price": 40,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": 40,
+            "answerDur": {
+              "cutchoice": {
+                "skinfade": 5,
+                "standard": 0,
+                "cs1784295630148": 10
+              }
+            },
+            "choiceDur": {
+              "cutchoice": {
+                "skinfade": 45,
+                "standard": 40,
+                "cs1784295630148": 50
+              }
+            },
+            "answerPrice": {
+              "cutchoice": {
+                "skinfade": 5,
+                "standard": 0
+              }
+            },
+            "choicePrice": {
+              "cutchoice": {
+                "skinfade": 45,
+                "standard": 40,
+                "cs1784295630148": 50
+              }
+            }
+          },
+          "heather": {
+            "on": true,
+            "price": null,
+            "duration": 50,
+            "answerDur": {
+              "cutchoice": {
+                "skinfade": 10,
+                "standard": 0,
+                "cs1784295630148": 10
+              }
+            },
+            "choiceDur": {
+              "cutchoice": {
+                "skinfade": 60,
+                "standard": 50,
+                "cs1784295630148": 60
+              }
+            },
+            "answerPrice": {
+              "cutchoice": {
+                "skinfade": 5,
+                "standard": 0
+              }
+            },
+            "choicePrice": {
+              "cutchoice": {
+                "skinfade": 45,
+                "standard": 40,
+                "cs1784295630148": 50
+              }
+            }
+          }
+        },
+        "photos": [],
+        "booking": {
+          "available": true,
+          "description": "Your regular cut. We keep some length and clean up the sides without going down to bare skin. It is about keeping you looking your best, not a big change or trying something new. If that is not what you are after, tap Change and pick the one that fits.",
+          "requireCard": true,
+          "promptToCall": false,
+          "requireAddress": false,
+          "requirePayment": false
+        },
+        "category": "Services",
+        "duration": 45,
+        "addonGroups": [
+          {
+            "id": "cutchoice",
+            "type": "choice",
+            "label": "Choose your cut",
+            "options": [
+              {
+                "id": "standard",
+                "min": 0,
+                "desc": "Some length kept, nothing taken down to the skin.",
+                "label": "Standard cut",
+                "price": 0
+              },
+              {
+                "id": "skinfade",
+                "min": 5,
+                "desc": "Faded down close to the skin.",
+                "label": "Skin fade or specialty style",
+                "price": 5
+              },
+              {
+                "id": "cs1784295630148",
+                "min": 10,
+                "desc": "",
+                "label": "Transformation/Big Change",
+                "price": 10
+              }
+            ],
+            "required": true,
+            "setsPrice": true
+          },
+          {
+            "id": "lib-ao-1782857503533",
+            "item": {
+              "min": 30,
+              "desc": "",
+              "name": "Want a facial?",
+              "price": 30,
+              "addsPrice": true
+            },
+            "type": "addon",
+            "label": "Want a facial?",
+            "photo": "",
+            "noLabel": "No thanks",
+            "required": false,
+            "yesLabel": "Yes - Add Facial"
+          }
+        ],
+        "usesCutStyles": false,
+        "_preNumbers2026": {
+          "dan": {
+            "duration": 35,
+            "answerDur": {
+              "skinfade": 5,
+              "standard": 5
+            },
+            "choiceDur": {
+              "skinfade": 45,
+              "standard": 40,
+              "cs1784295630148": 45
+            },
+            "choicePrice": {
+              "skinfade": 45,
+              "standard": 40,
+              "cs1784295630148": 50
+            }
+          },
+          "heather": {
+            "duration": 45,
+            "answerDur": {
+              "skinfade": 10,
+              "standard": 5
+            },
+            "choiceDur": {
+              "skinfade": 50,
+              "standard": 45,
+              "cs1784295630148": 60
+            },
+            "choicePrice": {
+              "skinfade": 45,
+              "standard": 40,
+              "cs1784295630148": 50
+            }
+          }
+        }
+      },
+      "shop_id": "sanctuary"
+    },
+    {
+      "id": "beard",
+      "data": {
+        "id": "beard",
+        "name": "Beard Trim",
+        "color": "clay",
+        "order": 2,
+        "photo": "photo-1517832606299-7ae9b720a186",
+        "price": 35,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": null
+          },
+          "heather": {
+            "on": true,
+            "price": null,
+            "duration": null
+          }
+        },
+        "category": "Services",
+        "duration": 30,
+        "addonGroups": [
+          {
+            "id": "lib-ao-1782857503533",
+            "item": {
+              "min": 30,
+              "desc": "",
+              "name": "Want a facial?",
+              "price": 30,
+              "addsPrice": true
+            },
+            "type": "addon",
+            "label": "Want a facial?",
+            "photo": "",
+            "noLabel": "No thanks",
+            "required": false,
+            "yesLabel": "Yes - Add Facial"
+          }
+        ]
+      },
+      "shop_id": "sanctuary"
+    },
+    {
+      "id": "cutbeard",
+      "data": {
+        "id": "cutbeard",
+        "name": "Haircut + Beard",
+        "color": "gold",
+        "order": 1,
+        "photo": "photo-1621607512214-68297480165e",
+        "price": 55,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": 55,
+            "addonDur": {
+              "lib-ao1784299716753afxzxzb": 5
+            },
+            "duration": 55,
+            "answerDur": {
+              "cutchoice": {
+                "skinfade": 10,
+                "standard": 0,
+                "cs1784295630148": 10
+              }
+            },
+            "choiceDur": {
+              "cutchoice": {
+                "skinfade": 65,
+                "standard": 55,
+                "cs1784295630148": 65
+              }
+            },
+            "addonPrice": {
+              "lib-ao1784299716753afxzxzb": 10
+            },
+            "choicePrice": {
+              "cutchoice": {
+                "skinfade": 60,
+                "standard": 55,
+                "cs1784295630148": 65
+              }
+            }
+          },
+          "heather": {
+            "on": true,
+            "price": null,
+            "addonDur": {
+              "lib-ao1784299716753afxzxzb": 10
+            },
+            "duration": 75,
+            "answerDur": {
+              "cutchoice": {
+                "skinfade": 10,
+                "standard": 0,
+                "cs1784295630148": 10
+              }
+            },
+            "choiceDur": {
+              "cutchoice": {
+                "skinfade": 85,
+                "standard": 75,
+                "cs1784295630148": 85
+              }
+            },
+            "addonPrice": {
+              "lib-ao1784299716753afxzxzb": 10
+            },
+            "choicePrice": {
+              "cutchoice": {
+                "skinfade": 60,
+                "standard": 55,
+                "cs1784295630148": 65
+              }
+            }
+          }
+        },
+        "photos": [
+          "photo-1621607512214-68297480165e"
+        ],
+        "booking": {
+          "available": true,
+          "description": "Your cut and your beard, dialed in together. We keep some length and clean up the sides without going down to bare skin, then shape the beard to match. Best for keeping your usual look sharp, not a big change. If that is not what you are after, tap Change and pick the one that fits.",
+          "requireCard": true,
+          "promptToCall": false,
+          "requireAddress": false,
+          "requirePayment": false
+        },
+        "category": "Services",
+        "duration": 60,
+        "addonGroups": [
+          {
+            "id": "cutchoice",
+            "type": "choice",
+            "label": "Choose your cut",
+            "options": [
+              {
+                "id": "standard",
+                "min": 0,
+                "desc": "Some length kept, nothing taken down to the skin.",
+                "label": "Standard cut",
+                "price": 0
+              },
+              {
+                "id": "skinfade",
+                "min": 10,
+                "desc": "Faded down close to the skin.",
+                "label": "Skin fade or specialty style",
+                "price": 5
+              },
+              {
+                "id": "cs1784295630148",
+                "min": 10,
+                "desc": "",
+                "label": "Transformation/Big Change",
+                "price": 10
+              }
+            ],
+            "required": true,
+            "setsPrice": true
+          },
+          {
+            "id": "lib-ao1784299716753afxzxzb",
+            "item": {
+              "min": 10,
+              "desc": "A hot towel treatment finished with a straight-razor line up.",
+              "name": "Hot Towel & Straight Razor",
+              "price": 10,
+              "addsPrice": true
+            },
+            "type": "addon",
+            "label": "Hot towel finish?",
+            "photo": "photo-1493256338651-d82f7acb2b38",
+            "noLabel": "",
+            "required": false,
+            "yesLabel": ""
+          },
+          {
+            "id": "lib-ao-1782857503533",
+            "item": {
+              "min": 30,
+              "desc": "",
+              "name": "Want a facial?",
+              "price": 30,
+              "addsPrice": true
+            },
+            "type": "addon",
+            "label": "Want a facial?",
+            "photo": "",
+            "noLabel": "No thanks",
+            "required": false,
+            "yesLabel": "Yes - Add Facial"
+          }
+        ],
+        "_preAddonLib": [
+          {
+            "id": "cutchoice",
+            "type": "choice",
+            "label": "Choose your cut",
+            "options": [
+              {
+                "id": "standard",
+                "min": 0,
+                "desc": "Some length kept, nothing taken down to the skin.",
+                "label": "Standard cut",
+                "price": 0
+              },
+              {
+                "id": "skinfade",
+                "min": 10,
+                "desc": "Faded down close to the skin.",
+                "label": "Skin fade or specialty style",
+                "price": 5
+              },
+              {
+                "id": "cs1784295630148",
+                "min": 0,
+                "desc": "",
+                "label": "Transformation/Big Change",
+                "price": 0
+              }
+            ],
+            "required": true,
+            "setsPrice": true
+          },
+          {
+            "id": "hottowel",
+            "item": {
+              "min": 10,
+              "desc": "A hot towel treatment finished with a straight-razor line up.",
+              "name": "Hot Towel & Straight Razor",
+              "price": 10
+            },
+            "type": "addon",
+            "label": "Hot towel finish?",
+            "photo": "photo-1493256338651-d82f7acb2b38"
+          },
+          {
+            "id": "lib-ao-1782857503533",
+            "item": {
+              "min": 30,
+              "desc": "",
+              "name": "Want a facial?",
+              "price": 30,
+              "addsPrice": true
+            },
+            "type": "addon",
+            "label": "Want a facial?",
+            "photo": "",
+            "noLabel": "No thanks",
+            "required": false,
+            "yesLabel": "Yes - Add Facial"
+          }
+        ],
+        "usesCutStyles": false,
+        "_preNumbers2026": {
+          "dan": {
+            "duration": 50,
+            "answerDur": {},
+            "choiceDur": {
+              "skinfade": 70,
+              "standard": 50,
+              "cs1784295630148": 75
+            },
+            "choicePrice": {
+              "skinfade": 60,
+              "standard": 55,
+              "cs1784295630148": 70
+            }
+          },
+          "heather": {
+            "duration": 70,
+            "answerDur": {},
+            "choiceDur": {
+              "skinfade": 80,
+              "standard": 75,
+              "cs1784295630148": 90
+            },
+            "choicePrice": {
+              "skinfade": 60,
+              "standard": 55,
+              "cs1784295630148": 70
+            }
+          }
+        }
+      },
+      "shop_id": "sanctuary"
+    },
+    {
+      "id": "svc-1783003268406",
+      "data": {
+        "id": "svc-1783003268406",
+        "name": "The Gentleman’s Facial",
+        "color": "turquoise",
+        "order": 4,
+        "photo": "",
+        "price": 30,
+        "staff": {
+          "dan": {
+            "on": true,
+            "price": null,
+            "duration": null
+          },
+          "heather": {
+            "on": true,
+            "price": null,
+            "duration": null
+          }
+        },
+        "photos": [],
+        "booking": {
+          "available": true,
+          "customPrice": false,
+          "description": "A rejuvenating facial designed to refresh and restore your skin. This service begins with steam to open pores, followed by a deep cleanse and exfoliation to remove impurities and dead skin cells. A balancing toner and hydrating moisturizer are applied to nourish and protect your complexion. To finish, you’ll experience a 24K Gold Collagen mask that helps reduce puffiness, support anti-aging, boost circulation, and leave your skin feeling firm, smooth, and revitalized. Perfect for hydration, relaxation, and a healthy glow.",
+          "requireCard": true,
+          "promptToCall": false,
+          "requireAddress": false,
+          "requirePayment": false
+        },
+        "category": "Services",
+        "duration": 30,
+        "addonGroups": [],
+        "usesCutStyles": false
+      },
+      "shop_id": "sanctuary"
+    }
+  ]
+}
