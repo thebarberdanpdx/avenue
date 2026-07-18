@@ -265,6 +265,23 @@ try {
   record(false, "No TDZ in Services editor (backBar before cutsScreen)", "check error: " + e.message);
 }
 
+// 6b-ii) Same class of TDZ: `cutsBody` is an IIFE that runs the moment its const initializes (for any
+//     service offering cut styles) and references the `microLbl` style object. `microLbl` MUST be declared
+//     before cutsBody or opening a cut-style service (Haircut) throws "Cannot access 'microLbl' before
+//     initialization" and crashes the whole Settings screen — shipped once, invisible to build + eslint
+//     no-undef. Locks the order. [menu-editor-microlbl-tdz]
+try {
+  const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
+  const ml = app.indexOf("const microLbl =");
+  const cb = app.indexOf("const cutsBody =");
+  const ok = ml !== -1 && cb !== -1 && ml < cb;
+  record(ok, "No TDZ in Services editor (microLbl before cutsBody)",
+    ok ? "microLbl is declared before its eager use in cutsBody"
+       : "microLbl is missing or declared AFTER cutsBody — temporal-dead-zone crash opening a cut-style service; move the microLbl declaration above cutsBody");
+} catch (e) {
+  record(false, "No TDZ in Services editor (microLbl before cutsBody)", "check error: " + e.message);
+}
+
 // 6c) Reachability guard for the service-editor drill-in sections. The editor renders sub-screens as
 //     `{drill ? (section === "X" ? Xscreen : …) : mainForm}`. If a section is DISPATCHED but missing
 //     from the `drill` OR-chain, tapping into it silently re-renders the main form and the editor is
