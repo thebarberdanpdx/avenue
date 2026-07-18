@@ -13207,15 +13207,17 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
 
   return (
     <div style={{ position: "relative", minHeight: "100dvh" }}>
-      {/* Slim header: small fixed top padding (the native status bar already reserves the notch area,
-          so env(safe-area-inset-top) was double-counting and ballooning this bar). Sync status text
-          removed — the sync-GAP alert is a separate banner, so nothing important is lost here. */}
-      <div style={{ borderBottom: "1px solid var(--line)", padding: "9px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
+      {/* Slim header (client-card-header-fix): top padding = max(12px, safe-area-inset-top) so it ALWAYS
+          clears the iOS status bar / Dynamic Island. The old fixed 9px let the shop name collide with
+          the clock (Dan's screenshot). max() is self-correcting — 12px when there's no inset, the real
+          inset when there is — so it can't balloon. On a client card the shop-name switcher is hidden
+          (irrelevant when you're looking at a person). */}
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "max(12px, env(safe-area-inset-top, 12px)) 18px 9px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
         {navStack.length > 0 ? <BackBar to={backLabel} onClick={navBack} style={{ marginBottom: 0 }} /> : <div style={{ width: 40 }} />}
-        <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} />
+        {activeClient ? <div style={{ flex: 1 }} /> : <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} />}
         <div style={{ width: 40 }} />
       </div>
-      <div style={{ width: "100%", margin: "0 auto", padding: tab === "calendar" ? "24px 10px 0" : "24px 10px 120px" }}>
+      <div style={{ width: "100%", margin: "0 auto", padding: tab === "calendar" ? "24px 10px 0" : (activeClient ? "8px 10px 120px" : "24px 10px 120px") }}>
         {/* Per-tab crash containment: a render error in ONE tab shows a recoverable "something went
             wrong here" panel instead of white-screening the whole app. The bottom tab bar lives
             outside this div, so it stays alive — the owner can switch tabs and keep working. Keyed by
