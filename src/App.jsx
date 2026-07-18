@@ -23721,8 +23721,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       {/* staff column headers — plain bold names, Mango-style (no color chips) */}
       <div style={{ display: "flex", gap: 0 }}>
         <div style={{ width: 48, flexShrink: 0 }} />
-        {orderedStaff.map((p) => { const off = isOffDay(p); const editable = p.id !== "anyone"; return (
-          <div key={p.id} onClick={editable ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setHoursMenu({ providerId: p.id, cx: r.left + r.width / 2, top: r.bottom }); } : undefined} style={{ flex: 1, padding: "8px 0 10px", display: "flex", alignItems: "center", justifyContent: "center", opacity: off ? 0.55 : 1, minWidth: 0, cursor: editable ? "pointer" : "default" }}>
+        {orderedStaff.map((p, idx) => { const off = isOffDay(p); const editable = p.id !== "anyone"; return (
+          <div key={p.id} onClick={editable ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setHoursMenu({ providerId: p.id, cx: r.left + r.width / 2, top: r.bottom }); } : undefined} style={{ flex: 1, padding: "8px 0 10px", marginLeft: idx ? 8 : 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: off ? 0.55 : 1, minWidth: 0, cursor: editable ? "pointer" : "default" }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: off ? "var(--faint)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}{off ? " · off" : ""}</span>
           </div>
         ); })}
@@ -23797,7 +23797,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           })();
           return (
             <div key={p.id}
-              style={{ flex: 1, position: "relative", height: gridHeight, background: "var(--panel)", overflow: "hidden", borderRight: pIdx < orderedStaff.length - 1 ? "1.5px solid var(--border2)" : "none" }}>
+              style={{ flex: 1, position: "relative", height: gridHeight, background: "var(--panel)", overflow: "hidden", marginLeft: pIdx ? 8 : 0 }}>
               {/* off-shift shade: dim the hours outside this barber's shift for the selected day (behind cards, ignores taps) */}
               {(() => {
                 const h = hoursForDate(p, selectedDate);
@@ -23895,27 +23895,27 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     onClick={() => { const d = dragRef.current; if (d && (d.didDrag || d.scrolled)) return; setOpen(a); }}
                     onMouseDown={(e) => startDrag(e, a)} onTouchStart={(e) => startDrag(e, a)}
                     className={isDragging ? "" : "lift"}
-                    style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: 1, border: "none", borderRadius: 4, padding: height > 44 ? "8px 13px 6px" : "4px 13px", color: nameOn, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
+                    style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: 1, border: "none", borderRadius: 4, padding: height > 44 ? "7px 12px 5px" : "4px 12px", color: nameOn, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
                     {/* service — small-caps eyebrow above the name on tall-enough tiles (service only, clean) */}
-                    {height > 44 && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.6, textTransform: "uppercase", color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{svcTop}</span>}
+                    {height > 42 && <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{svcTop}</span>}
                     {/* client name — compact & airy, sized to FIT the full name like Mango. Tile-text-density: smaller than before so the denser (L) rows read like Mango instead of cramming. */}
-                    <span style={{ fontSize: 11.5, fontWeight: 600, lineHeight: 1.15, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: height > 44 ? 2 : 0, paddingRight: height <= 54 && isNew ? 28 : 0 }}>{apptDisplayName(a, clients)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.12, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: height > 42 ? 2 : 0, paddingRight: height <= 54 && isNew ? 26 : 0 }}>{apptDisplayName(a, clients)}</span>
                     {/* full time range under the name */}
-                    {height > 60 && <span style={{ fontSize: 11, color: subOn, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{range}</span>}
+                    {height > 58 && <span style={{ fontSize: 10.5, color: subOn, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{range}</span>}
                     {/* cut style + add-ons on tall blocks — online bookings carry them (shortened) on
                         addonLabels; older/staff appts keep a free-text detail string, shown verbatim */}
                     {height > 110 && (() => {
                       const txt = (Array.isArray(a.addonLabels) && a.addonLabels.length)
                         ? [...new Set(a.addonLabels.map(cleanServiceLabel).filter(Boolean))].join(" · ")
                         : (a.detail || "");
-                      return txt ? <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: 0.1, color: nameOn, lineHeight: 1.3, marginTop: 3, paddingRight: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{txt}</div> : null;
+                      return txt ? <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.1, color: nameOn, lineHeight: 1.25, marginTop: 2, paddingRight: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{txt}</div> : null;
                     })()}
                     {/* quiet markers, bottom-right: ✎ note · ▱ photos · NEW · ↻ rebooked · ★ regular */}
                     {height > 54 && (
                     <div style={{ position: "absolute", bottom: 9, right: 11, display: "flex", gap: 7, alignItems: "center", color: subOn }}>
                       {a.hasNote && <Edit2 size={11} style={{ opacity: 0.75 }} />}
                       {a.hasPhotos && <ImageIcon size={12} style={{ opacity: 0.75 }} />}
-                      {isNew && <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6, color: nameOn }}>NEW</span>}
+                      {isNew && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, color: nameOn }}>NEW</span>}
                       {rebooked && <span style={{ fontSize: 13, lineHeight: 1 }}>↻</span>}
                       {a.vip && <span style={{ fontSize: 13, color: nameOn }}>★</span>}
                     </div>
