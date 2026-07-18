@@ -4479,8 +4479,11 @@ function PhotoPicker({ onClose, onPick, onFail, startTab }) {
 }
 
 // Profile-picture picker for staff members: portrait grid + simulated upload.
-function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto, onFail, startTab }) {
-  const [tab, setTab] = useState(startTab || "library");
+function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto, onFail, startTab, noStock }) {
+  // noStock (client profile pic, Dan's request): drop the STOCK sample-photo tab, but keep BOTH
+  // real options — "Take photo" (camera) and "Choose photo" (the phone's gallery). Never show the
+  // demo/stock sample photos as a real option for a client's face.
+  const [tab, setTab] = useState(noStock ? "upload" : (startTab || "library"));
   const camRef = useRef(null);
   const libRef = useRef(null);
   const handleFile = (e) => {
@@ -4494,10 +4497,12 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto, onFail, startTa
         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24 }}>Profile picture</div>
         <button onClick={onClose} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
       </div>
+      {!noStock && (
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
         <button onClick={() => setTab("library")} style={{ flex: 1, padding: 12, borderRadius: 12, background: tab === "library" ? "var(--gold)" : "var(--panel2)", color: tab === "library" ? "var(--on-gold)" : "var(--text)", fontSize: 15, letterSpacing: 1 }}>FROM LIBRARY</button>
         <button onClick={() => setTab("upload")} style={{ flex: 1, padding: 12, borderRadius: 12, background: tab === "upload" ? "var(--gold)" : "var(--panel2)", color: tab === "upload" ? "var(--on-gold)" : "var(--text)", fontSize: 15, letterSpacing: 1 }}>UPLOAD YOUR OWN</button>
       </div>
+      )}
 
       {tab === "library" && (
         <>
@@ -4522,7 +4527,7 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto, onFail, startTa
           <input ref={libRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
           <div style={{ display: "flex", gap: 10 }}>
             <button className="lift" onClick={() => camRef.current && camRef.current.click()} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Camera size={16} /> Take photo</button>
-            <button className="lift" onClick={() => libRef.current && libRef.current.click()} style={{ flex: 1, background: "var(--panel2)", color: "var(--text)", border: "1px solid var(--border)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><ImageIcon size={16} /> Library</button>
+            <button className="lift" onClick={() => libRef.current && libRef.current.click()} style={{ flex: 1, background: "var(--panel2)", color: "var(--text)", border: "1px solid var(--border)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><ImageIcon size={16} /> Choose photo</button>
           </div>
           <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>Photos are resized automatically.</p>
         </div>
@@ -28488,7 +28493,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         ); })}
       </div>
 
-      {picker && <StaffPhotoPicker hasPhoto={!!live.photo} startTab="upload" onFail={() => showToast && showToast("Couldn't use that photo — please try again.")} onClose={() => setPicker(false)} onPick={setClientPhoto} onRemove={removeClientPhoto} />}
+      {picker && <StaffPhotoPicker hasPhoto={!!live.photo} startTab="upload" noStock onFail={() => showToast && showToast("Couldn't use that photo — please try again.")} onClose={() => setPicker(false)} onPick={setClientPhoto} onRemove={removeClientPhoto} />}
       {galPicker && <PhotoPicker startTab="upload" onFail={() => showToast && showToast("Couldn't use that photo — please try again.")} onClose={() => setGalPicker(false)} onPick={addGalleryPhoto} />}
 
       {/* ============ TIMELINE — pinned preferences + upcoming + one chronological feed ============ */}
