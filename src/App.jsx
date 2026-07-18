@@ -7941,7 +7941,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     const picks = (draft.addonGroups || []).map((g) => {
                       const sel = draftAddons && draftAddons[g.id]; if (!sel) return null;
                       if (g.type === "choice") { const o = (g.options || []).find((x) => x.id === sel); return o ? { name: o.label, desc: "", price: Number(o.price) || 0 } : null; }
-                      if (g.type === "addon") { const it = g.item || {}; return { name: it.name, desc: it.desc || "", price: it.addsPrice !== false ? (Number(it.price) || 0) : 0 }; }
+                      if (g.type === "addon") { const it = g.item || {}; const _pp = (prov || resolved || waReal[0] || { id: "dan" }); return { name: it.name, desc: it.desc || "", price: it.addsPrice !== false ? (addonPriceFor(draft, _pp.id, g) || 0) : 0 }; }  // [addon-lib-perbarber] per-barber so the line item matches previewLT's total
                       return null;
                     }).filter(Boolean);
                     return (
@@ -8512,7 +8512,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   const picks = (e.service.addonGroups || []).map((g) => {
                     const sel = e.addons && e.addons[g.id]; if (!sel) return null;
                     if (g.type === "choice") { const o = (g.options || []).find((x) => x.id === sel); return o ? { name: o.label, desc: "", price: Number(o.price) || 0 } : null; }
-                    if (g.type === "addon") { const it = g.item || {}; return { name: it.name, desc: it.desc || "", price: it.addsPrice !== false ? (Number(it.price) || 0) : 0 }; }
+                    if (g.type === "addon") { const it = g.item || {}; return { name: it.name, desc: it.desc || "", price: it.addsPrice !== false ? (addonPriceFor(e.service, (e.provider && e.provider.id) || "dan", g) || 0) : 0 }; }  // [addon-lib-perbarber] per-barber line item matches lineTotal
                     return null;
                   }).filter(Boolean);
                   return (
@@ -20599,7 +20599,7 @@ function promoteInlineAddOns(services, business) {
       const newId = rm[id];
       if (!newId) return g; // already lib- (or not remapped)
       const a = libById[newId] || {};
-      return { id: newId, type: "addon", label: a.prompt || a.name, photo: a.photo || "", required: !!a.required, yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(), item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 } };
+      return { id: newId, type: "addon", label: a.prompt || a.name, photo: a.photo || "", required: !!a.required, yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(), item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0, staff: a.staff || {} } };  // [addon-lib-perbarber] 4th materialize site — MUST carry item.staff or a re-promote silently drops per-barber → shop-wide charge
     });
     // Re-key per-barber overrides from the old inline id → the new lib- id so custom prices/times survive.
     const staff = {};
@@ -22596,7 +22596,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
                       <span style={{ width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} />}</span>
                       <span style={{ fontSize: 15, fontWeight: 500 }}>{it.name || g.label}</span>
                     </span>
-                    <span style={{ fontSize: 13.5, color: "var(--sub)", flexShrink: 0 }}>{Number(it.price) > 0 ? `+ $${it.price}` : ""}{Number(it.min) > 0 ? ` · +${it.min}m` : ""}</span>
+                    <span style={{ fontSize: 13.5, color: "var(--sub)", flexShrink: 0 }}>{(() => { const _p = addonPriceFor(service, provId, g) || 0, _m = addonDuration(service, provId, g) || 0; return `${_p > 0 ? `+ $${_p}` : ""}${_m > 0 ? ` · +${_m}m` : ""}`; })()}</span>
                   </button>
                 );
               })}
@@ -22608,8 +22608,8 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
                   {addableLibrary.filter((g) => !extraIds.includes(g.id)).map((g) => {
                     const it = g.item || {};
                     const lbl = g.type === "choice" ? (g.label || "Question") : (it.name || g.label);
-                    const pr = g.type === "choice" ? 0 : (Number(it.price) || 0);
-                    const mn = g.type === "choice" ? 0 : (Number(it.min) || 0);
+                    const pr = g.type === "choice" ? 0 : (addonPriceFor(service, provId, g) || 0);  // [addon-lib-perbarber]
+                    const mn = g.type === "choice" ? 0 : (addonDuration(service, provId, g) || 0);
                     return (
                       <button key={g.id} onClick={() => setExtraIds((ids) => [...ids, g.id])} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "var(--panel)", border: "1px dashed var(--border2)", borderRadius: 12, padding: "12px 15px", color: "var(--text)", textAlign: "left", marginBottom: 8, cursor: "pointer" }}>
                         <span style={{ display: "flex", alignItems: "center", gap: 10 }}><Plus size={16} style={{ color: "var(--sub)" }} /><span style={{ fontSize: 15 }}>{lbl}</span></span>
