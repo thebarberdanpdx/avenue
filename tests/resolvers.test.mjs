@@ -150,23 +150,26 @@ test("answerPriceFor / answerDuration: per-barber answer override → option def
   assert.equal(R.answerDuration(svc, "jr", group, opt), 4);
 });
 
-// ─── NEW menu model: a cut style's ABSOLUTE per-barber price/time (setsPrice) ──
-// The point of the rebuild: the style value REPLACES the base — it is NOT base + increment.
-// This is what a `setsPrice` choice group resolves to; it must never re-introduce the doubling bug.
-test("choiceStylePrice: per-barber ABSOLUTE replaces the base (never base+increment)", () => {
+// ─── Per-barber cut-style price/time (setsPrice) ──
+// A barber's per-barber ABSOLUTE (staff.choicePrice/choiceDur) is the total and always WINS. When a
+// (barber, style) has NO absolute — a brand-new style, a new hire, or "anyone" — the fallback is
+// base + the style's increment (opt.price/opt.min are base-relative extras: standard 0, fade +5), NEVER
+// the bare increment (which charged $0 for a standard cut — the pre-launch money-path review's finding).
+// [perbarber-fallback]
+test("choiceStylePrice: per-barber absolute wins; fallback = base + increment (never $0)", () => {
   const svc = { id: "cut", price: 42, staff: { dan: { choicePrice: { cutchoice: { skinfade: 60 } } }, jr: {} } };
   const group = { id: "cutchoice" }, opt = { id: "skinfade", price: 5 };
-  assert.equal(R.choiceStylePrice(svc, "dan", group, opt), 60);           // per-barber absolute — NOT 42+5
-  assert.equal(R.choiceStylePrice(svc, "jr", group, opt), 5);             // no per-barber → option's own absolute
-  assert.equal(R.choiceStylePrice(svc, "jr", group, { id: "x" }), 42);    // no option price → service default
-  assert.equal(R.choiceStylePrice(svc, "dan", group, { id: "y" }), 42);   // dan has no value for this opt → service default
+  assert.equal(R.choiceStylePrice(svc, "dan", group, opt), 60);           // per-barber absolute wins
+  assert.equal(R.choiceStylePrice(svc, "jr", group, opt), 47);            // no per-barber → base 42 + increment 5
+  assert.equal(R.choiceStylePrice(svc, "jr", group, { id: "x" }), 42);    // no increment → base
+  assert.equal(R.choiceStylePrice(svc, "dan", group, { id: "y" }), 42);   // dan has no value for this opt → base
 });
-test("choiceStyleDuration: per-barber ABSOLUTE replaces the base", () => {
+test("choiceStyleDuration: per-barber absolute wins; fallback = base + extra minutes", () => {
   const svc = { id: "cut", duration: 45, staff: { dan: { duration: 35, choiceDur: { cutchoice: { skinfade: 70 } } }, jr: {} } };
   const group = { id: "cutchoice" }, opt = { id: "skinfade", min: 10 };
-  assert.equal(R.choiceStyleDuration(null, svc, "dan", group, opt), 70);          // absolute — NOT 35+10
-  assert.equal(R.choiceStyleDuration(null, svc, "jr", group, opt), 10);           // option's own absolute min
-  assert.equal(R.choiceStyleDuration(null, svc, "jr", group, { id: "x" }), 45);   // no option min → service default
+  assert.equal(R.choiceStyleDuration(null, svc, "dan", group, opt), 70);          // per-barber absolute wins
+  assert.equal(R.choiceStyleDuration(null, svc, "jr", group, opt), 55);           // base 45 + 10
+  assert.equal(R.choiceStyleDuration(null, svc, "jr", group, { id: "x" }), 45);   // base
 });
 test("migrateCutStylesToAbsolute: fills each barber's effective TOTAL + flags setsPrice (numbers don't move)", () => {
   const form = {
