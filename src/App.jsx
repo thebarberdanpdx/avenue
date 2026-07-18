@@ -23895,27 +23895,27 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     onClick={() => { const d = dragRef.current; if (d && (d.didDrag || d.scrolled)) return; setOpen(a); }}
                     onMouseDown={(e) => startDrag(e, a)} onTouchStart={(e) => startDrag(e, a)}
                     className={isDragging ? "" : "lift"}
-                    style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: 1, border: "none", borderRadius: 4, padding: height > 48 ? "10px 14px 6px" : "5px 14px", color: nameOn, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
+                    style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: 1, border: "none", borderRadius: 4, padding: height > 44 ? "8px 13px 6px" : "4px 13px", color: nameOn, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
                     {/* service — small-caps eyebrow above the name on tall-enough tiles (service only, clean) */}
-                    {height > 48 && <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{svcTop}</span>}
-                    {/* client name — compact & airy, sized to FIT the full name like Mango (Dan-approved). */}
-                    <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: height > 48 ? 3 : 0, paddingRight: height <= 54 && isNew ? 30 : 0 }}>{apptDisplayName(a, clients)}</span>
+                    {height > 44 && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.6, textTransform: "uppercase", color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{svcTop}</span>}
+                    {/* client name — compact & airy, sized to FIT the full name like Mango. Tile-text-density: smaller than before so the denser (L) rows read like Mango instead of cramming. */}
+                    <span style={{ fontSize: 11.5, fontWeight: 600, lineHeight: 1.15, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: height > 44 ? 2 : 0, paddingRight: height <= 54 && isNew ? 28 : 0 }}>{apptDisplayName(a, clients)}</span>
                     {/* full time range under the name */}
-                    {height > 64 && <span style={{ fontSize: 12.5, color: subOn, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{range}</span>}
+                    {height > 60 && <span style={{ fontSize: 11, color: subOn, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{range}</span>}
                     {/* cut style + add-ons on tall blocks — online bookings carry them (shortened) on
                         addonLabels; older/staff appts keep a free-text detail string, shown verbatim */}
                     {height > 110 && (() => {
                       const txt = (Array.isArray(a.addonLabels) && a.addonLabels.length)
                         ? [...new Set(a.addonLabels.map(cleanServiceLabel).filter(Boolean))].join(" · ")
                         : (a.detail || "");
-                      return txt ? <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.1, color: nameOn, lineHeight: 1.35, marginTop: 5, paddingRight: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{txt}</div> : null;
+                      return txt ? <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: 0.1, color: nameOn, lineHeight: 1.3, marginTop: 3, paddingRight: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{txt}</div> : null;
                     })()}
                     {/* quiet markers, bottom-right: ✎ note · ▱ photos · NEW · ↻ rebooked · ★ regular */}
                     {height > 54 && (
                     <div style={{ position: "absolute", bottom: 9, right: 11, display: "flex", gap: 7, alignItems: "center", color: subOn }}>
                       {a.hasNote && <Edit2 size={11} style={{ opacity: 0.75 }} />}
                       {a.hasPhotos && <ImageIcon size={12} style={{ opacity: 0.75 }} />}
-                      {isNew && <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.8, color: nameOn }}>NEW</span>}
+                      {isNew && <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6, color: nameOn }}>NEW</span>}
                       {rebooked && <span style={{ fontSize: 13, lineHeight: 1 }}>↻</span>}
                       {a.vip && <span style={{ fontSize: 13, color: nameOn }}>★</span>}
                     </div>
