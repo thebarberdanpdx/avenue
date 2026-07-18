@@ -6037,7 +6037,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     putEntry({ ...cur, addons: { ...(cur.addons || {}), [group.id]: optionId } });
   };
   // Close the confirm sheet — and if it carried a pending pick, record it now (this is what advances
-  // the screen to the next question, AFTER the sheet is gone).
+  // the screen to the next question, AFTER the sheet is gone). This is the "Lock it in" path.
   const closePickConfirm = () => {
     const pc = pickConfirm;
     setPickConfirm(null);
@@ -6046,6 +6046,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       putEntry({ ...cur, addons: { ...(cur.addons || {}), [pc.commit.groupId]: pc.commit.optionId } });
     }
   };
+  // "Choose something else" / tap-outside — dismiss the confirm sheet WITHOUT recording the pending
+  // pick, so nothing is locked in and the client lands back on the cut list to choose again. Only the
+  // explicit "Lock it in" button (closePickConfirm) commits — that's what reveals the bottom price.
+  const cancelPickConfirm = () => setPickConfirm(null);
   // Toggle an optional add-on on the add-ons screen.
   const choiceGroupsOf = (svc) => (svc?.addonGroups || []).filter((g) => g.type === "choice");
   const extraGroupsOf = (svc) => (svc?.addonGroups || []).filter((g) => g.type === "addon");
@@ -7292,7 +7296,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           );
         })()}
 
-        {/* ===== SCREEN 1 — the cut: prominent description + required choice(s), NO prices ===== */}
+        {/* ===== SCREEN 1 — the cut: prominent description + required choice(s). Price stays hidden until
+            the cut is locked in, then a single "Your visit so far" running total shows at the bottom,
+            above Continue — the ONLY price on this screen (owner ask, 2026-07-18). ===== */}
         {cutFlow && cutFlow.phase === "cut" && cart[0] && (() => {
           const e = cart[0]; const svc = e.service;
           const provId = e.provider && e.provider.id !== "anyone" ? e.provider.id : "dan";
@@ -7387,15 +7393,26 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </span>
               </div>
               {shown.map((g, idx) => renderGroup(g, idx))}
-              <button className="lift" disabled={!ready} onClick={cutFlowFinish} style={{ width: "100%", marginTop: 34, background: ready ? "var(--text)" : "var(--panel2)", color: ready ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 12, padding: 15, fontSize: 14.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: ready ? "pointer" : "default" }}>{ready ? "Continue" : "Pick your options"}</button>
+              {/* booking-price-reveal (owner ask, 2026-07-18): once the required cut choice is locked in,
+                  reveal a single running total at the bottom — the only price shown on this screen. Uses
+                  lineTotal (the SAME resolver checkout uses) so the number can never drift from what's
+                  actually charged; it updates live as the facial / add-ons are toggled. All barbers charge
+                  the same for these cuts, so the figure is exact even before a barber is picked. */}
+              {cutChoicesReady() && (
+                <div className="fade-up" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, padding: "14px 16px", border: "1px solid var(--line)", borderRadius: 13, background: "var(--panel2)" }}>
+                  <span style={{ fontFamily: FONT_BODY, fontSize: 13, color: "var(--sub)", fontWeight: 600 }}>Your visit so far</span>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, letterSpacing: "-0.3px", color: "var(--text)" }}>${lineTotal(e).price}</span>
+                </div>
+              )}
+              <button className="lift" disabled={!ready} onClick={cutFlowFinish} style={{ width: "100%", marginTop: 24, background: ready ? "var(--text)" : "var(--panel2)", color: ready ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 12, padding: 15, fontSize: 14.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: ready ? "pointer" : "default" }}>{ready ? "Continue" : "Pick your options"}</button>
             </div>
           );
         })()}
 
         {/* "Just to confirm" — full description of the option/add-on the client just picked. */}
         {pickConfirm && (
-          <Sheet open onClose={closePickConfirm} align="center" maxWidth={480}>
-            <div style={{ display: "flex", flexDirection: "column", maxHeight: "82dvh", padding: "8px 4px 4px" }}>
+          <Sheet open onClose={cancelPickConfirm} align="center" maxWidth={480}>
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", minHeight: "min(52dvh, 380px)", maxHeight: "82dvh", padding: "26px 8px 14px" }}>
               {pickConfirm.photos && pickConfirm.photos.length > 0 && (
                 <div style={{ flexShrink: 0, margin: "0 0 18px" }}>
                   <div onScroll={(ev) => { const el = ev.currentTarget; const idx = Math.round(el.scrollLeft / Math.max(1, el.clientWidth)); if (idx !== confIdx) setConfIdx(idx); }} style={{ display: "flex", overflowX: "auto", scrollSnapType: "x mandatory", borderRadius: 16, WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
@@ -7410,14 +7427,22 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   )}
                 </div>
               )}
-              <div style={{ fontFamily: FONT_BODY, fontSize: 13, letterSpacing: 2.5, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, textAlign: "center", margin: "0 0 12px", flexShrink: 0 }}>Please Confirm</div>
-              {pickConfirm.name && <div style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.12, color: "var(--text)", textAlign: "center", margin: "0 0 16px", flexShrink: 0 }}>{pickConfirm.name}</div>}
+              <div style={{ fontFamily: FONT_BODY, fontSize: 13, letterSpacing: 2.5, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, textAlign: "center", margin: "0 0 16px", flexShrink: 0 }}>Please Confirm</div>
+              {pickConfirm.name && <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.14, color: "var(--text)", textAlign: "center", margin: "0 0 18px", flexShrink: 0 }}>{pickConfirm.name}</div>}
               {pickConfirm.desc && String(pickConfirm.desc).trim() && (
-                <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: "0 1 auto", minHeight: 0, margin: "0 0 26px" }}>
+                <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: "0 1 auto", minHeight: 0, margin: "0 0 34px" }}>
                   <p style={{ fontSize: 16.5, color: "var(--text2)", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap", textAlign: "center" }}>{pickConfirm.desc}</p>
                 </div>
               )}
-              <button className="lift" onClick={closePickConfirm} style={{ flexShrink: 0, width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 13, padding: 17, fontSize: 16, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>OK</button>
+              {/* Cut picks (pickConfirm.commit) get an explicit two-button confirm: "Lock it in" commits
+                  and reveals the bottom price; "Choose something else" backs out with nothing locked in.
+                  The read-only "more info" sheet (no commit) keeps a single OK. (owner ask, 2026-07-18) */}
+              <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, marginTop: 6 }}>
+                <button className="lift" onClick={closePickConfirm} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 13, padding: 17, fontSize: 16, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>{pickConfirm.commit ? "Lock it in" : "OK"}</button>
+                {pickConfirm.commit && (
+                  <button onClick={cancelPickConfirm} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, textDecoration: "underline", textUnderlineOffset: 2, padding: 6, cursor: "pointer" }}>Choose something else</button>
+                )}
+              </div>
             </div>
           </Sheet>
         )}
