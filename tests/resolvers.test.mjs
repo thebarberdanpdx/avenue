@@ -141,6 +141,20 @@ test("addonPriceFor / addonDuration: per-barber override → item default", () =
   assert.equal(R.addonPriceFor(svc, "jr", group), 10);  // no override → item default
   assert.equal(R.addonDuration(svc, "jr", group), 5);
 });
+// [addon-lib-perbarber] per-barber price/time set ONCE in the Add-ons library is stamped onto the group's
+// item.staff and read FIRST (before the legacy per-service override and the shop-wide default).
+test("addonPriceFor / addonDuration: LIBRARY per-barber (item.staff) wins; blank → shop-wide", () => {
+  const svc = { id: "cut", staff: { dan: { addonPrice: { g1: 12 } } } };  // legacy per-service override present
+  const group = { id: "g1", item: { price: 10, min: 5, staff: { heather: { price: 15, min: 9 } } } };
+  assert.equal(R.addonPriceFor(svc, "heather", group), 15);  // library per-barber
+  assert.equal(R.addonDuration(svc, "heather", group), 9);
+  assert.equal(R.addonPriceFor(svc, "jr", group), 10);       // no per-barber anywhere → shop-wide item.price
+  assert.equal(R.addonDuration(svc, "jr", group), 5);        // → shop-wide item.min
+  // library value takes priority over the legacy per-service override for the same barber
+  const g2 = { id: "g1", item: { price: 10, min: 5, staff: { dan: { price: 20 } } } };
+  assert.equal(R.addonPriceFor(svc, "dan", g2), 20);         // item.staff.dan wins over staff.dan.addonPrice(12)
+  assert.equal(R.addonDuration(svc, "dan", g2), 5);          // no dan min in library → shop-wide item.min
+});
 test("answerPriceFor / answerDuration: per-barber answer override → option default", () => {
   const svc = { id: "cut", staff: { dan: { answerPrice: { g1: { fade: 7 } }, answerDur: { g1: { fade: 6 } } } } };
   const group = { id: "g1" }, opt = { id: "fade", price: 5, min: 4 };

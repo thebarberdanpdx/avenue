@@ -1996,17 +1996,26 @@ const deriveCutBaseAndAdds = (svc) => {
 // Per-add-on time cascade — how many minutes a chosen add-on adds for this barber.
 // per-barber override (staff.addonDur[groupId], absolute minutes) → the add-on's own item.min.
 // Mirrors cutDur so a master's "hot towel" can run longer than a junior's.
+// Per-add-on time cascade — how many minutes a chosen add-on adds for this barber. [addon-lib-perbarber]
+// LIBRARY per-barber (item.staff[pid].min, set once in the Add-ons library, stamped onto every service's
+// lib- group) → legacy per-SERVICE override (staff.addonDur[groupId]) → the add-on's shop-wide item.min.
 const addonDuration = (service, providerId, group) => {
+  const it = group && group.item;
+  const ls = it && it.staff && providerId && it.staff[providerId];
+  if (ls && ls.min != null && ls.min !== "") return Number(ls.min) || 0;
   const se = getStaffEntry(service, providerId);
   if (se && se.addonDur && group && se.addonDur[group.id] != null) return Number(se.addonDur[group.id]) || 0;
-  return Number(group && group.item && group.item.min) || 0;
+  return Number(it && it.min) || 0;
 };
-// Per-add-on PRICE cascade — what a chosen add-on costs for this barber.
-// per-barber override (staff.addonPrice[groupId]) → the add-on's own item.price. Mirrors addonDuration.
+// Per-add-on PRICE cascade — what a chosen add-on costs for this barber. [addon-lib-perbarber]
+// LIBRARY per-barber (item.staff[pid].price) → legacy per-SERVICE override (staff.addonPrice) → item.price.
 const addonPriceFor = (service, providerId, group) => {
+  const it = group && group.item;
+  const ls = it && it.staff && providerId && it.staff[providerId];
+  if (ls && ls.price != null && ls.price !== "") return Number(ls.price) || 0;
   const se = getStaffEntry(service, providerId);
   if (se && se.addonPrice && group && se.addonPrice[group.id] != null) return Number(se.addonPrice[group.id]) || 0;
-  return Number(group && group.item && group.item.price) || 0;
+  return Number(it && it.price) || 0;
 };
 // Shorten a service / cut-style / add-on label to the couple of words that say what it is, so the
 // appointment card, calendar and every notification stay glanceable. Rules, in order: a yes/no prompt
@@ -14609,7 +14618,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
         {cutSecTab === "addons" && (addonList.length ? (
           <>
-            <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 14 }}>Optional extras clients can <b>add on</b>. Set each barber's extra time and price.</p>
+            <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 14 }}>Optional extras clients can <b>add on</b>. Prices &amp; times per barber are set in the <b>Add-ons library</b> — shown here for reference.</p>
             <div style={pillsRow}>
               {addonList.map((g) => (<button key={g.id} onClick={() => setSelAddonId(g.id)} style={pill(curAddon && g.id === curAddon.id)}>{(g.item && g.item.name) || g.label || "Add-on"}</button>))}
             </div>
@@ -14617,13 +14626,24 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <>
                 <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.3px", marginBottom: 3 }}>{(curAddon.item && curAddon.item.name) || curAddon.label}</div>
                 {(curAddon.item && curAddon.item.desc) ? <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginBottom: 16 }}>{curAddon.item.desc}</div> : <div style={{ marginBottom: 16 }} />}
-                <span style={{ ...microLbl, marginBottom: 8 }}>Who offers it · extra time &amp; price</span>
-                {barberCards(
-                  (pid) => addP(pid, curAddon),
-                  (pid, v) => setStaffAddonPrice(pid, curAddon.id, v),
-                  (pid) => addD(pid, curAddon),
-                  (pid, m) => setStaffAddonDur(pid, curAddon.id, m)
-                )}
+                <span style={{ ...microLbl, marginBottom: 8 }}>Time &amp; price per barber</span>
+                {staffList.map((p, pi) => {
+                  const it = curAddon.item || {};
+                  const st = (it.staff && it.staff[p.id]) || {};
+                  const price = (st.price != null && st.price !== "") ? st.price : (Number(it.price) || 0);
+                  const mins = (st.min != null && st.min !== "") ? st.min : (Number(it.min) || 0);
+                  const custom = (st.price != null && st.price !== "") || (st.min != null && st.min !== "");
+                  return (
+                    <div key={p.id} style={{ ...bCard, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "13px 16px", marginBottom: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                        <Avatar size={30} photo={p.photo} initial={(p.name || "?").charAt(0).toUpperCase()} color={AV[pi % AV.length]} fontSize={13} />
+                        <span style={{ fontSize: 15.5, fontWeight: 700 }}>{(p.name || "").split(" ")[0]}</span>
+                      </div>
+                      <span style={{ fontVariantNumeric: "tabular-nums", fontSize: 15.5, fontWeight: 700, color: "var(--text)" }}>${price}{mins ? ` · +${mins}m` : ""}{custom ? <span style={{ fontSize: 11, color: "var(--sub)", fontWeight: 600, marginLeft: 6 }}>custom</span> : null}</span>
+                    </div>
+                  );
+                })}
+                <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 4 }}>To change a barber's add-on price or time, edit this add-on under <b>Settings → Add-ons</b> — it updates everywhere the add-on is offered.</p>
               </>
             ) : null}
           </>
@@ -15354,7 +15374,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       </div>
 
       {/* ---- ADD-ONS TAB ---- */}
-      {menuTab === "addons" && <AddOnsEditor services={services} setServices={setServices} business={business} setBusiness={setBusiness} showToast={showToast} openId={libJump} onOpened={() => setLibJump(null)} />}
+      {menuTab === "addons" && <AddOnsEditor services={services} setServices={setServices} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} openId={libJump} onOpened={() => setLibJump(null)} />}
 
       {/* ---- QUESTIONS TAB ---- */}
       {menuTab === "questions" && <QuestionsEditor services={services} setServices={setServices} business={business} setBusiness={setBusiness} showToast={showToast} openId={libJump} onOpened={() => setLibJump(null)} />}
@@ -20122,8 +20142,18 @@ function MergeDuplicatesTool({ shopId, clients, setClients, appts, setAppts, sho
 // optionally make it a must-answer question during booking. Saving materializes each
 // add-on into the assigned services' addonGroups (id "lib-<id>") so the booking flow
 // keeps working unchanged; legacy per-service groups are left untouched.
-function AddOnsEditor({ services, setServices, business, setBusiness, showToast, openId, onOpened }) {
+function AddOnsEditor({ services, setServices, providers, business, setBusiness, showToast, openId, onOpened }) {
   const lib = business.addOnsLibrary || [];
+  const aoStaff = (providers || []).filter((p) => p && p.id !== "anyone");   // barbers who can carry a per-barber add-on price
+  // [addon-lib-perbarber] per-barber override for THIS add-on, set once here in the library and stamped
+  // onto every service via item.staff. Blank clears (falls back to the shop-wide price/time above).
+  const setAoStaff = (pid, patch) => setForm((f) => {
+    const staff = { ...(f.staff || {}) };
+    const cur = { ...(staff[pid] || {}) };
+    Object.keys(patch).forEach((k) => { const v = patch[k]; if (v == null || v === "") delete cur[k]; else cur[k] = Number(v); });
+    if (Object.keys(cur).length) staff[pid] = cur; else delete staff[pid];
+    return { ...f, staff };
+  });
   const [editing, setEditing] = useState(null); // addon id or "new"
   const [form, setForm] = useState(null);
   const [picker, setPicker] = useState(false);
@@ -20144,7 +20174,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
       const mine = nextLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({
         id: "lib-" + a.id, type: "addon", label: a.prompt || a.name, photo: a.photo || "", required: !!a.required,
         yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(),
-        item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 },
+        item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0, staff: a.staff || {} },
       }));
       return { ...s, addonGroups: [...keep, ...mine] };
     }));
@@ -20152,7 +20182,15 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
 
   const save = () => {
     if (!form.name) { showToast("Give it a name."); return; }
-    const clean = { ...form, price: Number(form.price) || 0, extraMin: Number(form.extraMin) || 0 };
+    // [addon-lib-perbarber] keep only real per-barber overrides (drop blanks → fall back to shop-wide).
+    const staff = {};
+    Object.entries(form.staff || {}).forEach(([pid, o]) => {
+      const e = {};
+      if (o && o.price != null && o.price !== "") e.price = Number(o.price) || 0;
+      if (o && o.min != null && o.min !== "") e.min = Number(o.min) || 0;
+      if (Object.keys(e).length) staff[pid] = e;
+    });
+    const clean = { ...form, price: Number(form.price) || 0, extraMin: Number(form.extraMin) || 0, staff };
     const nextLib = editing === "new" ? [...lib, clean] : lib.map((a) => (a.id === editing ? clean : a));
     setBusiness({ ...business, addOnsLibrary: nextLib });
     materialize(nextLib);
@@ -20208,6 +20246,36 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
             </div>
           </div>
         </div>
+
+        {aoStaff.length > 0 && (
+          <>
+            <div style={aoSectionLbl}>Per barber · optional</div>
+            <p style={{ fontSize: 12.5, color: "var(--faint)", margin: "-4px 2px 12px", lineHeight: 1.45 }}>Leave blank to use the price &amp; time above. Set a barber's own to charge differently — it applies everywhere this add-on is offered.</p>
+            <div style={{ display: "grid", gap: 10 }}>
+              {aoStaff.map((p) => {
+                const ov = (form.staff || {})[p.id] || {};
+                return (
+                  <div key={p.id} style={{ border: "1px solid var(--border)", borderRadius: 14, padding: "12px 14px", background: "var(--panel2)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                      <Avatar size={28} photo={p.photo} initial={(p.name || "?").charAt(0).toUpperCase()} color={p.color} fontSize={12} />
+                      <span style={{ fontSize: 15, fontWeight: 600 }}>{(p.name || "").split(" ")[0]}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <div style={{ ...aoMoneyWrap, background: "var(--panel)", flex: 1, minWidth: 0 }}>
+                        <span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span>
+                        <input type="number" inputMode="decimal" value={ov.price ?? ""} onChange={(e) => setAoStaff(p.id, { price: e.target.value })} placeholder={String(Number(form.price) || 0)} style={{ ...aoMoneyInput, padding: "11px 12px" }} />
+                      </div>
+                      <div style={{ ...aoMoneyWrap, background: "var(--panel)", flex: 1, minWidth: 0 }}>
+                        <input type="number" inputMode="numeric" value={ov.min ?? ""} onChange={(e) => setAoStaff(p.id, { min: e.target.value })} placeholder={String(Number(form.extraMin) || 0)} style={{ ...aoMoneyInput, padding: "11px 12px", paddingLeft: 14 }} />
+                        <span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13 }}>min</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         <div style={aoSectionLbl}>Description</div>
         <textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} placeholder="What the client gets — shown while they book." rows={3} style={{ ...aoInp, resize: "vertical", minHeight: 84, lineHeight: 1.55 }} />
@@ -20474,7 +20542,7 @@ function consolidateBookingLibraries(services, business) {
   if (!touched) return null; // everything already library-managed
   const nextServices = (services || []).map((s) => {
     const libQ = qLib.filter((q) => (q.services || []).includes(s.id)).map((q) => ({ id: "libq-" + q.id, type: "choice", label: q.label, required: !!q.required, options: (q.options || []).map((o) => ({ id: o.id, label: o.label, desc: o.desc || "", price: Number(o.price) || 0, min: Number(o.min) || 0, photos: Array.isArray(o.photos) ? o.photos : [] })) }));
-    const libA = aLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.prompt || a.name, photo: a.photo || "", required: !!a.required, yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(), item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 } }));
+    const libA = aLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.prompt || a.name, photo: a.photo || "", required: !!a.required, yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(), item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0, staff: a.staff || {} } }));
     return { ...s, _preLib: (s._preLib || s.addonGroups || []), addonGroups: [...libQ, ...libA] };
   });
   return { services: nextServices, questionsLibrary: qLib, addOnsLibrary: aLib };
@@ -22251,7 +22319,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   const serviceGroups = (service && Array.isArray(service.addonGroups)) ? service.addonGroups : [];
   const libraryGroups = [
     ...((business.questionsLibrary || []).map((q) => ({ id: "libq-" + q.id, type: "choice", label: q.label, options: q.options || [] }))),
-    ...((business.addOnsLibrary || []).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.prompt || a.name, item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, min: Number(a.extraMin) || 0, addsPrice: true, addsTime: true } }))),
+    ...((business.addOnsLibrary || []).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.prompt || a.name, item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, min: Number(a.extraMin) || 0, addsPrice: true, addsTime: true, staff: a.staff || {} } }))),
   ];
   const groupName = (g) => String((g && (g.type === "choice" ? g.label : ((g.item && g.item.name) || g.label))) || "").trim().toLowerCase();
   const serviceNames = new Set(serviceGroups.map(groupName));
@@ -22266,7 +22334,10 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
     }
     if (!selVal) return { p: 0, m: 0, label: null };
     const it = (svcGrp && svcGrp.item) || grp.item || {};
-    return { p: it.addsPrice !== false ? (svcGrp ? addonPriceFor(service, provId, svcGrp) : (Number(it.price) || 0)) : 0, m: it.addsTime !== false ? (svcGrp ? addonDuration(service, provId, svcGrp) : (Number(it.min) || 0)) : 0, label: it.name || grp.label };
+    // [addon-lib-perbarber] resolve per-barber whether the add-on is already on the service (svcGrp) or
+    // being added from the library picker (grp) — both carry item.staff, and addonPriceFor falls back to
+    // the shop-wide item price when a barber has no per-barber value.
+    return { p: it.addsPrice !== false ? addonPriceFor(service, provId, svcGrp || grp) : 0, m: it.addsTime !== false ? addonDuration(service, provId, svcGrp || grp) : 0, label: it.name || grp.label };
   };
   const optExtra = (() => {
     let p = 0, m = 0; const labels = [];
