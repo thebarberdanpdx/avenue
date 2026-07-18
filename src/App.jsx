@@ -13685,6 +13685,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     <span style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0, transition: "background .2s", display: "inline-block" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
   );
   const addTileStyle = { width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "transparent", border: "1.5px dashed var(--border2)", color: "var(--text)", padding: "14px 16px", fontSize: 14.5, fontWeight: 500, borderRadius: 14, cursor: "pointer" };
+  // [menu-editor-microlbl-tdz] microLbl MUST be declared HERE, with the other MenuEditor style consts and
+  // ABOVE cutsBody. It's used inside cutsBody (the cut-styles editor IIFE), which evaluates during render
+  // for any service that offers cut styles. When this const lived ~380 lines lower it was in the temporal
+  // dead zone at that point, so OPENING a cut-style service (Haircut / Haircut + Beard) threw "Cannot
+  // access 'microLbl' before initialization" and crashed the whole Settings screen. Keep it above cutsBody.
+  const microLbl = { fontFamily: FONT_BODY, fontSize: 12, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 5, display: "block" };
 
   // ---- CUT TYPES section ----
   const setCut = (i, patch) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c, idx) => idx === i ? { ...c, ...patch } : c) }));
@@ -14857,7 +14863,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       {sub && <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 400 }}> · {sub}</span>}
     </div>
   );
-  const microLbl = { fontFamily: FONT_BODY, fontSize: 12, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 5, display: "block" };
   const fieldBox = { border: "1px solid var(--border2)", borderRadius: 12, background: "var(--panel)", padding: "9px 13px 10px" };
   const bareInp = { width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: 0, color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
 
