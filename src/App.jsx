@@ -1787,6 +1787,28 @@ const getPrice = (service, providerId) => {
 const byServiceOrder = (a, b) =>
   (((a && a.order) ?? 1e9) - ((b && b.order) ?? 1e9)) ||
   String((a && a.id) ?? "").localeCompare(String((b && b.id) ?? ""));
+// [mirror-noop-skip] Order-insensitive deep equality, used to short-circuit a server mirror that
+// returns data identical to what's already on screen. Object keys are compared regardless of order
+// because a value read back from Postgres JSONB comes back key-reordered vs the in-memory object, so a
+// naive JSON.stringify compare would falsely report "changed" on every mirror. Arrays stay order-
+// sensitive (row order is meaningful). Short-circuits on the first difference.
+const _deepEq = (a, b) => {
+  if (a === b) return true;
+  if (a == null || b == null || typeof a !== "object" || typeof b !== "object") return false;
+  const aArr = Array.isArray(a), bArr = Array.isArray(b);
+  if (aArr !== bArr) return false;
+  if (aArr) { if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (!_deepEq(a[i], b[i])) return false; return true; }
+  const ak = Object.keys(a), bk = Object.keys(b);
+  if (ak.length !== bk.length) return false;
+  for (let i = 0; i < ak.length; i++) { const k = ak[i]; if (!Object.prototype.hasOwnProperty.call(b, k) || !_deepEq(a[k], b[k])) return false; }
+  return true;
+};
+const sameRowset = (a, b) => {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (!_deepEq(a[i], b[i])) return false;
+  return true;
+};
 // Per-cut-style cascades — used when a client picks a specific style at booking.
 // price:  per-barber override (staff.cutPrice[ctId]) → the style's own price → service/staff default
 // length: per-barber override (staff.cutDur[ctId], absolute) → service/staff length + the style's extra minutes
@@ -3182,8 +3204,15 @@ function App() {
     lastMirrorCountsRef.current = { clients: serverCl.length, appointments: serverAp.length };
     lastSaveAt.current.clients = Date.now();
     lastSaveAt.current.appointments = Date.now();
-    setClients(serverCl);
-    setAppts(serverAp);
+    // [mirror-noop-skip] Replace React state ONLY when the server copy actually differs from what's
+    // already rendered. The dominant cases — the realtime echo of your OWN write, the save-response
+    // after your own edit, and the idle 30s heartbeat — return byte-identical data. Unconditionally
+    // calling setClients/setAppts forced a full re-render of the whole calendar (memos recompute + all
+    // tiles reconcile over 886 appts / 2977 clients) EVERY time, which is what made a status tap take
+    // ~10s to recolor and the calendar slow to open. writeCache still runs each mirror so the offline
+    // cache stays fresh (no stale cold-boot paint); we skip only the redundant setState + re-render.
+    if (!sameRowset(serverCl, clientsRef.current)) setClients(serverCl);
+    if (!sameRowset(serverAp, apptsRef.current)) setAppts(serverAp);
     staffClientsLoadedRef.current = true;
     staffApptsLoadedRef.current = true;
     writeCache("clients", serverCl);
