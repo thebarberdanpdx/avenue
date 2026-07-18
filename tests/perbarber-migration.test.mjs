@@ -1,3 +1,4 @@
+import { test } from "node:test";
 // Money-safety proof for the per-barber cut-styles migration.
 // The migration flips a service's cut styles to per-barber ABSOLUTE price/time (staff.choicePrice /
 // staff.choiceDur, setsPrice:true). The ONLY acceptable outcome is: every barber's effective price and
@@ -44,6 +45,24 @@ const choiceStyleDuration = (client, service, providerId, group, opt) => {
   if (g && opt && g[opt.id] != null && g[opt.id] !== "") return Number(g[opt.id]) || 0;
   if (opt && opt.min != null && group && group.setsPrice) return Number(opt.min) || 0;
   return getDuration(client, service, providerId) + (opt && opt.min ? Number(opt.min) : 0);
+};
+
+const addonDuration = (service, providerId, group) => {
+  const se = getStaffEntry(service, providerId);
+  if (se && se.addonDur && group && se.addonDur[group.id] != null) return Number(se.addonDur[group.id]) || 0;
+  return Number(group && group.item && group.item.min) || 0;
+};
+const addonPriceFor = (service, providerId, group) => {
+  const se = getStaffEntry(service, providerId);
+  if (se && se.addonPrice && group && se.addonPrice[group.id] != null) return Number(se.addonPrice[group.id]) || 0;
+  return Number(group && group.item && group.item.price) || 0;
+};
+// flagCutStyleSetsPrice copied verbatim from src/App.jsx (the save-path transform).
+const flagCutStyleSetsPrice = (form) => {
+  if (!form || !Array.isArray(form.addonGroups)) return form;
+  const gi = form.addonGroups.findIndex((g) => g && g.type === "choice" && String(g.id) === "cutchoice");
+  if (gi < 0) return form;
+  return { ...form, addonGroups: form.addonGroups.map((g, k) => (k === gi ? { ...g, setsPrice: true } : g)) };
 };
 
 // The single source of truth for a barber's effective price/time for a cut option, matching how the
@@ -158,5 +177,47 @@ eq("per-barber divergence: dan skinfade untouched", effPrice(m3, "dan", g3, g3.o
 const SHAVE = { id: "shave", name: "Shave", price: 30, duration: 30, staff: { dan: { on: true } }, addonGroups: [] };
 eq("no-cutstyle service untouched", JSON.stringify(migrateCutServiceToPerBarber(SHAVE, STAFF)), JSON.stringify(SHAVE));
 
-console.log(`\n${pass} passed, ${fail} failed`);
-process.exit(fail ? 1 : 0);
+// ---- FULL round-trip: open(migrate) → owner edits a per-barber price → save(flag) → what checkout reads ----
+// This is the money contract: an edited per-barber price must reach the booking/checkout engine intact.
+{
+  let svc = migrateCutServiceToPerBarber(HAIRCUT, STAFF);              // openEdit
+  // owner sets Heather's Skin fade to $60 (setStaffChoicePrice writes staff.heather.choicePrice)
+  svc = { ...svc, staff: { ...svc.staff, heather: { ...svc.staff.heather, choicePrice: { ...svc.staff.heather.choicePrice, cutchoice: { ...svc.staff.heather.choicePrice.cutchoice, skinfade: 60 } } } } };
+  const saved = flagCutStyleSetsPrice(svc);                            // save
+  const g = saved.addonGroups.find((x) => x.id === CUT_ID);
+  const skin = g.options[1];
+  eq("round-trip: engine reads Heather's edited $60", choiceStylePrice(saved, "heather", g, skin), 60);
+  eq("round-trip: Dan's Skin fade still $47", choiceStylePrice(saved, "dan", g, skin), 47);
+  eq("round-trip: Dan's Standard still $42", choiceStylePrice(saved, "dan", g, g.options[0]), 42);
+  eq("round-trip: setsPrice persisted", g.setsPrice, true);
+}
+
+// ---- no-edit round-trip is a price no-op (open then save, touching nothing) ----
+{
+  const opened = migrateCutServiceToPerBarber(CUTBEARD, STAFF);
+  const saved = flagCutStyleSetsPrice(opened);
+  const g = saved.addonGroups.find((x) => x.id === CUT_ID);
+  for (const pid of STAFF) for (const o of g.options) {
+    // compare against the ORIGINAL live service's effective price/time
+    const og = CUTBEARD.addonGroups.find((x) => x.id === CUT_ID);
+    eq(`no-edit ${pid}/${o.id} price`, choiceStylePrice(saved, pid, g, o), effPrice(CUTBEARD, pid, og, o));
+    eq(`no-edit ${pid}/${o.id} time`, choiceStyleDuration(null, saved, pid, g, o), effDur(CUTBEARD, pid, og, o));
+  }
+}
+
+// ---- add-on per-barber: Heather charges more for the Facial; Dan keeps the default ----
+{
+  const facial = HAIRCUT.addonGroups.find((g) => g.id === "facial");
+  eq("addon default: Dan facial $30", addonPriceFor(HAIRCUT, "dan", facial), 30);
+  const withOverride = { ...HAIRCUT, staff: { ...HAIRCUT.staff, heather: { ...HAIRCUT.staff.heather, addonPrice: { facial: 40 }, addonDur: { facial: 25 } } } };
+  eq("addon per-barber: Heather facial $40", addonPriceFor(withOverride, "heather", facial), 40);
+  eq("addon per-barber: Heather facial 25 min", addonDuration(withOverride, "heather", facial), 25);
+  eq("addon per-barber: Dan facial still $30", addonPriceFor(withOverride, "dan", facial), 30);
+  eq("addon per-barber: Dan facial still 20 min", addonDuration(withOverride, "dan", facial), 20);
+}
+
+// Integrate with `node --test` (ship-check runs tests/*.test.mjs): the assertions above tally into
+// pass/fail at import time; this single test fails the suite if any money-safety assertion failed.
+test(`per-barber pricing money-safety (${pass + fail} assertions)`, () => {
+  if (fail) throw new Error(`${fail} of ${pass + fail} per-barber money-safety assertions FAILED`);
+});

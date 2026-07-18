@@ -1917,6 +1917,46 @@ const recomputeChoiceAbsolutes = (form, staffIds) => {
   const addonGroups = form.addonGroups.map((x, k) => (k === gi ? { ...x, setsPrice: true } : x));
   return { ...form, addonGroups, staff };
 };
+// [perbarber-migrate] Flip a cut service to the per-barber ABSOLUTE model: for every (barber, style)
+// write that barber's CURRENT effective price + time into staff[pid].choicePrice/choiceDur and flag the
+// group setsPrice. Uses the SAME resolvers the live booking/checkout engine uses today, so the migration
+// is guaranteed not to move a single price or time (proven in scripts/perbarber-migration.test.mjs).
+// Idempotent; a no-op for services without cut styles. This is what openEdit runs so the editor always
+// shows per-barber totals; save persists them verbatim (no recompute overwrites them).
+const migrateCutServiceToPerBarber = (svc, staffIds) => {
+  if (!svc || !Array.isArray(svc.addonGroups)) return svc;
+  const gi = svc.addonGroups.findIndex((g) => g && g.type === "choice" && String(g.id) === "cutchoice");
+  if (gi < 0) return svc;
+  const group = svc.addonGroups[gi];
+  const opts = group.options || [];
+  if (!opts.length) return svc;
+  const ids = (Array.isArray(staffIds) && staffIds.length) ? staffIds : Object.keys(svc.staff || {});
+  const staff = { ...(svc.staff || {}) };
+  // effective price/time for a barber's version of a style, matching the engine (setsPrice → absolute;
+  // else base + increment). Reading a service that's ALREADY setsPrice returns its stored absolutes.
+  const effP = (pid, o) => group.setsPrice ? choiceStylePrice(svc, pid, group, o) : (getPrice(svc, pid) + answerPriceFor(svc, pid, group, o));
+  const effD = (pid, o) => group.setsPrice ? choiceStyleDuration(null, svc, pid, group, o) : (getDuration(null, svc, pid) + answerDuration(svc, pid, group, o));
+  for (const pid of ids) {
+    const se = { ...(staff[pid] || { on: true, duration: null, price: null }) };
+    const cp = { ...(se.choicePrice || {}) }, cd = { ...(se.choiceDur || {}) };
+    const cpg = {}, cdg = {};
+    for (const o of opts) { cpg[o.id] = Math.max(0, Number(effP(pid, o)) || 0); cdg[o.id] = Math.max(0, Number(effD(pid, o)) || 0); }
+    cp[group.id] = cpg; cd[group.id] = cdg;
+    staff[pid] = { ...se, choicePrice: cp, choiceDur: cd };
+  }
+  const addonGroups = svc.addonGroups.map((g, k) => (k === gi ? { ...g, setsPrice: true } : g));
+  return { ...svc, addonGroups, staff };
+};
+// [perbarber-save] On save the form ALREADY holds per-barber absolutes (openEdit migrated them, the editor
+// edits them in place). So save must NOT recompute them from a shared base — it only flags the cut group
+// setsPrice so the booking/checkout engine reads the per-barber choicePrice/choiceDur. Replaces the old
+// recomputeChoiceAbsolutes on the save path; per-barber staff overrides pass through untouched.
+const flagCutStyleSetsPrice = (form) => {
+  if (!form || !Array.isArray(form.addonGroups)) return form;
+  const gi = form.addonGroups.findIndex((g) => g && g.type === "choice" && String(g.id) === "cutchoice");
+  if (gi < 0) return form;
+  return { ...form, addonGroups: form.addonGroups.map((g, k) => (k === gi ? { ...g, setsPrice: true } : g)) };
+};
 const deriveCutBaseAndAdds = (svc) => {
   if (!svc || !Array.isArray(svc.addonGroups)) return svc;
   const gi = svc.addonGroups.findIndex((g) => g && g.type === "choice" && String(g.id) === "cutchoice" && g.setsPrice);
@@ -13510,6 +13550,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const blank = { id: "", name: "", price: "", duration: "", color: "sage", photo: "", photos: [], category: cats[0], addonGroups: [], staff: {}, booking: defaultBooking(), usesCutStyles: false };
   const [form, setForm] = useState(blank);
   const [openCutId, setOpenCutId] = useState(null);   // which cut style has its note/photo editor open
+  // [perbarber-editor] new cut-styles/add-ons editor state: which section (styles|addons) and which item.
+  const [cutSecTab, setCutSecTab] = useState("styles");   // cut editor section: "styles" | "addons"
+  const [selStyleId, setSelStyleId] = useState(null);  // selected cut option id (null → first)
+  const [selAddonId, setSelAddonId] = useState(null);  // selected add-on group id (null → first)
   const [cutPhotoOi, setCutPhotoOi] = useState(null); // which cut style's photo picker is open (option index)
   const [cutAdvOpen, setCutAdvOpen] = useState({});   // per-style: is the per-barber advanced row open
   const dragId = useRef(null);
@@ -13595,7 +13639,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     const f = { ...blank, ...seed, id: "svc-" + Date.now(), photos: [], staff: defaultStaffMap(), booking: { ...defaultBooking(), ...(seed.booking || {}) } };
     setForm(f); setTplPick(false); setSection("details"); setEditing("new");
   };
-  const openEdit = (s) => { let copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; copy.photos = copy.photos || (copy.photo ? [copy.photo] : []); copy.usesCutStyles = (copy.usesCutStyles !== undefined) ? (copy.usesCutStyles !== false) : ((copy.cutTypes || []).length > 0); copy = deriveCutBaseAndAdds(copy); setForm(copy); setSection(null); setEditing(s.id); };
+  const openEdit = (s) => { let copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; copy.photos = copy.photos || (copy.photo ? [copy.photo] : []); copy.usesCutStyles = (copy.usesCutStyles !== undefined) ? (copy.usesCutStyles !== false) : ((copy.cutTypes || []).length > 0); copy = migrateCutServiceToPerBarber(copy, staffList.map((p) => p.id)); setForm(copy); setCutSecTab("styles"); setSelStyleId(null); setSelAddonId(null); setSection(null); setEditing(s.id); };
   const save = () => {
     const priceNum = Number(form.price);
     if (!form.name || !(priceNum > 0)) { showToast("Name and a valid price are required."); return; }
@@ -13624,7 +13668,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     // NEW MENU MODEL: on save, migrate this service's cut styles to ABSOLUTE per-barber pricing — fills
     // each (barber, style) with its current effective total and flags the group setsPrice. Same numbers,
     // now doubling-proof. Idempotent + a no-op for services without cut styles.
-    const clean = recomputeChoiceAbsolutes({ ...form, price: Math.min(100000, priceNum), duration: Math.max(5, Math.min(600, Number(form.duration) || 30)), staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false }, staffList.map((p) => p.id));
+    const clean = flagCutStyleSetsPrice({ ...form, price: Math.min(100000, priceNum), duration: Math.max(5, Math.min(600, Number(form.duration) || 30)), staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false });
     if (editing === "new") {
       // A new service MUST get a defined order (appended to the end). Blank orders were the
       // root cause of the reorder-doesn't-stick saga: an undefined order sorts unpredictably
@@ -14471,126 +14515,124 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     setForm((f) => ({ ...f, addonGroups: newGroups }));
     if (editing && editing !== "new") setServices((svcs) => svcs.map((s) => (s.id === editing ? { ...s, addonGroups: newGroups } : s)));
   };
-  const cutsBody = cutGroup ? (() => {
-    const AV = ["#161616", "#7C6A8F", "#A67C33", "#3E6F63"]; // barber circles (Dan ink, Heather orchid, …)
-    const baseP = Number(form.price) || 0;
-    const baseTime = (pid) => { const se = form.staff[pid] || {}; return (se.duration != null && se.duration !== "") ? Number(se.duration) : (Number(form.duration) || 0); };
-    // cut-base-adds-model: the editor is base + a shared "+add" per style; save (recomputeChoiceAbsolutes)
-    // turns that into the per-barber absolute totals the engine reads, so pricing is untouched.
-    const exOpt = cutOpts.find((o) => (Number(o.price) || 0) > 0) || cutOpts[cutOpts.length > 1 ? 1 : 0] || cutOpts[0];
-    const exBarber = staffList[0];
-    const exAdd = (exBarber && exOpt) ? (() => { const a = ((form.staff[exBarber.id] || {}).answerDur || {})[cutGroup.id]; const v = a && a[exOpt.id]; return (v != null && v !== "") ? Number(v) : (Number(exOpt.min) || 0); })() : 0;
-    return (
-    <>
-      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18 }}>Set your base once, then add a little for the fancier styles — the app does the math. Times read in hours &amp; minutes.</p>
-      {cutPhotoOi != null && <PhotoPicker onClose={() => setCutPhotoOi(null)} onPick={(id) => { setCutOpt(cutPhotoOi, { photos: [id], photo: id }); setCutPhotoOi(null); }} />}
+  // [perbarber-editor] the redesigned Styles & Add-ons editor. Both sections use ONE per-barber card
+  // (time + price per barber). Cut-style price/time are stored as per-barber ABSOLUTES (choicePrice /
+  // choiceDur; openEdit migrated them, save flags setsPrice). Add-on price/time are per-barber absolutes
+  // (addonPrice / addonDur) that fall back to the add-on's own item price/min when a barber hasn't set one.
+  const addonList = (form.addonGroups || []).filter((g) => g && g.type === "addon");
+  const curStyle = cutOpts.find((o) => o.id === selStyleId) || cutOpts[0] || null;
+  const curAddon = addonList.find((g) => g.id === selAddonId) || addonList[0] || null;
+  const cutsBody = (cutGroup || addonList.length) ? (() => {
+    const AV = ["#161616", "#7C6A8F", "#A67C33", "#3E6F63"];
+    const gid = cutGroup ? cutGroup.id : null;
+    const styleP = (pid, oid) => { const g = ((form.staff[pid] || {}).choicePrice || {})[gid]; return (g && g[oid] != null) ? g[oid] : ""; };
+    const styleD = (pid, oid) => { const g = ((form.staff[pid] || {}).choiceDur || {})[gid]; return (g && g[oid] != null) ? Number(g[oid]) : (Number(form.duration) || 0); };
+    const addP = (pid, g) => { const m = (form.staff[pid] || {}).addonPrice; return (m && m[g.id] != null) ? m[g.id] : ((g.item && g.item.price != null) ? g.item.price : ""); };
+    const addD = (pid, g) => { const m = (form.staff[pid] || {}).addonDur; return (m && m[g.id] != null) ? Number(m[g.id]) : (Number(g.item && g.item.min) || 0); };
 
-      {/* BASE — one price (shared) + each barber's time */}
-      <div style={{ border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: 16, marginBottom: 16 }}>
-        <span style={microLbl}>Price · same for both</span>
-        <div style={{ ...moneyWrap }}>
-          <span style={{ padding: "0 0 0 14px", color: "var(--sub)", fontSize: 17 }}>$</span>
-          <input type="number" inputMode="decimal" value={form.price ?? ""} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="55" style={{ ...moneyInput, fontSize: 17, fontWeight: 700 }} />
-        </div>
-        {staffList.length > 0 && (
-          <>
-            <span style={{ ...microLbl, marginTop: 18 }}>How long — each barber</span>
-            {staffList.map((p, pi) => (
-              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 2px", borderTop: pi === 0 ? "none" : "1px solid var(--line)" }}>
-                <Avatar size={28} photo={p.photo} initial={(p.name || "?").charAt(0).toUpperCase()} color={AV[pi % AV.length]} fontSize={12} />
-                <span style={{ flex: 1, fontSize: 15.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(p.name || "").split(" ")[0]}</span>
-                <HrMinPick value={baseTime(p.id)} minVal={5} maxVal={240} onChange={(m) => setStaff(p.id, { duration: m })} />
-              </div>
-            ))}
-          </>
-        )}
-      </div>
+    const seg = { display: "flex", gap: 4, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 4, marginBottom: 16 };
+    const segBtn = (on) => ({ flex: 1, border: "none", background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--sub)", fontFamily: FONT_BODY, fontSize: 14.5, fontWeight: 600, padding: "10px 8px", borderRadius: 10, cursor: "pointer" });
+    const pill = (on) => ({ flex: "0 0 auto", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text2)", padding: "9px 15px", borderRadius: 22, fontFamily: FONT_BODY, fontSize: 13.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" });
+    const pillsRow = { display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2, marginBottom: 16, WebkitOverflowScrolling: "touch" };
+    const bCard = { border: "1px solid var(--border)", background: "var(--panel)", borderRadius: 18, padding: "16px 16px 12px", boxShadow: "var(--shadow-sm)", marginBottom: 12 };
+    const fRow = { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, padding: "14px 0 0", marginTop: 12, borderTop: "1px solid var(--line)" };
+    const fLbl = { fontSize: 15, color: "var(--text2)", fontWeight: 500, paddingTop: 6 };
 
-      {/* CUT STYLES — each is base + a shared add */}
-      <span style={{ ...microLbl, marginBottom: 10 }}>Cut styles · client picks one</span>
-      {cutOpts.map((o, oi) => {
-        const open = openCutId === o.id;
-        const photo = (Array.isArray(o.photos) && o.photos[0]) || o.photo || null;
-        const isBase = (Number(o.price) || 0) === 0 && (Number(o.min) || 0) === 0;
-        return (
-          <div key={o.id} style={{ border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: 14, marginBottom: 12 }}>
-            <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}>
-              {photo
-                ? <img src={imgUrl(photo, 180)} alt="" onClick={() => setCutPhotoOi(oi)} style={{ width: 54, height: 54, borderRadius: 13, objectFit: "cover", flexShrink: 0, cursor: "pointer" }} />
-                : <div onClick={() => setCutPhotoOi(oi)} style={{ width: 54, height: 54, borderRadius: 13, flexShrink: 0, border: "1.5px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--faint)", fontSize: 22, cursor: "pointer" }}>+</div>}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {open ? (
-                  <>
-                    <input value={o.label || ""} onChange={(e) => setCutOpt(oi, { label: e.target.value })} placeholder="Style name" style={{ ...inpStyle, marginBottom: 8 }} />
-                    <textarea value={o.desc || ""} onChange={(e) => setCutOpt(oi, { desc: e.target.value })} rows={2} placeholder="Description clients read" style={{ ...inpStyle, resize: "vertical", minHeight: 52, lineHeight: 1.5 }} />
-                    <div style={{ display: "flex", gap: 18, marginTop: 8 }}>
-                      <button onClick={() => setCutPhotoOi(oi)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 12.5, fontWeight: 600, padding: 0, cursor: "pointer" }}>{photo ? "Change photo" : "Add photo"}</button>
-                      <button onClick={() => setOpenCutId(null)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 700, padding: 0, cursor: "pointer" }}>Done</button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 16.5, fontWeight: 700, letterSpacing: "-0.2px" }}>{o.label || "Untitled style"}</div>
-                    {o.desc ? <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{o.desc}</div> : null}
-                    <button onClick={() => setOpenCutId(o.id)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 12.5, fontWeight: 600, padding: "7px 0 0", cursor: "pointer", opacity: 0.72 }}>&#9998; Edit note &amp; photo</button>
-                  </>
-                )}
-              </div>
+    // one per-barber card list, shared by styles & add-ons. getP/getD read a barber's value; setP/setD write it.
+    const barberCards = (getP, setP, getD, setD) => staffList.map((p, pi) => {
+      const on = ((form.staff[p.id] || {}).on) !== false;
+      return (
+        <div key={p.id} style={{ ...bCard, opacity: on ? 1 : 0.55 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+              <Avatar size={34} photo={p.photo} initial={(p.name || "?").charAt(0).toUpperCase()} color={AV[pi % AV.length]} fontSize={14} />
+              <span style={{ fontSize: 16.5, fontWeight: 700, letterSpacing: "-0.1px" }}>{(p.name || "").split(" ")[0]}</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
-              <span style={{ fontSize: 11.5, color: "var(--faint)", fontWeight: 700, letterSpacing: 0.4, flexShrink: 0 }}>ADDS</span>
-              <EditableNum value={o.price ?? 0} inputMode="decimal" onCommit={(v) => setCutOpt(oi, { price: v === "" ? 0 : v })} prefix={<span style={{ padding: "0 0 0 11px", color: "var(--sub)", fontSize: 14 }}>+$</span>} wrapStyle={{ ...moneyWrap, width: 96 }} inputStyle={{ ...moneyInput, padding: "11px 8px", fontSize: 15 }} />
-              <span style={{ fontSize: 12.5, color: "var(--faint)" }}>price · same for both</span>
-            </div>
-            {staffList.length > 0 && (
-              <div style={{ marginTop: 9 }}>
-                <span style={{ fontSize: 11.5, color: "var(--faint)", fontWeight: 700, letterSpacing: 0.4 }}>ADDS TIME · each barber</span>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 7 }}>
-                  {staffList.map((p, pi) => {
-                    const se = form.staff[p.id] || {};
-                    const tAdd = (se.answerDur && se.answerDur[cutGroup.id] && se.answerDur[cutGroup.id][o.id] != null && se.answerDur[cutGroup.id][o.id] !== "") ? Number(se.answerDur[cutGroup.id][o.id]) : (Number(o.min) || 0);
-                    return (
-                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7, flex: "1 1 44%", minWidth: 130 }}>
-                        <Avatar size={22} photo={p.photo} initial={(p.name || "?").charAt(0).toUpperCase()} color={AV[pi % AV.length]} fontSize={10} />
-                        <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--sub)", flexShrink: 0 }}>{(p.name || "").split(" ")[0]}</span>
-                        <HrMinPick plus value={tAdd} minVal={0} maxVal={180} zeroLabel="+0" onChange={(m) => setStaffAnswerDur(p.id, cutGroup.id, o.id, m)} style={{ marginLeft: "auto", background: "var(--panel)", border: "1.5px solid var(--border2)", borderRadius: 11, padding: "8px 12px", color: tAdd ? "var(--text)" : "var(--sub)", fontSize: 14, fontWeight: 700, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" }} />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 9 }}>
-              {isBase ? <span style={{ fontSize: 12, color: "#3E6F63", fontWeight: 600 }}>Included — your base price &amp; time</span> : <span />}
-              <button onClick={() => removeCutStyle(oi)} style={{ background: "none", border: "none", color: "#C2392B", fontSize: 12.5, fontWeight: 500, cursor: "pointer", padding: 0 }}>Remove</button>
-            </div>
+            <span onClick={() => setStaff(p.id, { on: !on })} style={{ cursor: "pointer", flexShrink: 0 }} title={on ? "Offers this service" : "Not offered"}>{pillSwitch(on)}</span>
           </div>
-        );
-      })}
-      <button onClick={addCutStyle} style={{ ...addTileStyle, marginTop: 8 }}><Plus size={18} /> Add a cut style</button>
-
-      {exOpt && exBarber && (
-        <div style={{ background: "var(--text)", color: "var(--bg)", borderRadius: 16, padding: "15px 17px", marginTop: 18 }}>
-          <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", opacity: 0.62, fontWeight: 700 }}>What a client would get</div>
-          <div style={{ fontSize: 16.5, fontWeight: 700, marginTop: 6 }}>{exOpt.label || "This style"} with {(exBarber.name || "").split(" ")[0]}</div>
-          <div style={{ fontSize: 14, opacity: 0.78, marginTop: 3 }}>{fmtDurLong(baseTime(exBarber.id) + exAdd)} · ${baseP + (Number(exOpt.price) || 0)}</div>
+          {on && (
+            <>
+              <div style={fRow}>
+                <span style={fLbl}>Time</span>
+                <HrMinPick value={getD(p.id)} minVal={0} maxVal={300} onChange={(m) => setD(p.id, m)} />
+              </div>
+              <div style={fRow}>
+                <span style={fLbl}>Price</span>
+                <EditableNum value={getP(p.id)} inputMode="decimal" onCommit={(v) => setP(p.id, v)} prefix={<span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span>} wrapStyle={{ ...moneyWrap, width: 120 }} inputStyle={{ ...moneyInput, padding: "11px 10px", fontSize: 16, fontWeight: 700, textAlign: "right" }} />
+              </div>
+            </>
+          )}
         </div>
-      )}
+      );
+    });
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginTop: 24, paddingTop: 20, borderTop: "1px solid var(--line)" }}>
-        <span style={{ minWidth: 0 }}>
-          <span style={{ display: "block", fontSize: 16, fontWeight: 600 }}>Clients must choose a style</span>
-          <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.45 }}>They can't book without picking one.</span>
-        </span>
-        <span onClick={() => setCutGroup({ required: !(cutGroup.required !== false) })} style={{ cursor: "pointer", flexShrink: 0 }}>{pillSwitch(cutGroup.required !== false)}</span>
-      </div>
-    </>
+    return (
+      <>
+        <div style={seg}>
+          <button onClick={() => setCutSecTab("styles")} style={segBtn(cutSecTab === "styles")}>Cut styles</button>
+          <button onClick={() => setCutSecTab("addons")} style={segBtn(cutSecTab === "addons")}>Add-ons</button>
+        </div>
+
+        {cutSecTab === "styles" && (cutGroup ? (
+          <>
+            <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 14 }}>Clients pick <b>one</b>. Set each barber's time and price for it.</p>
+            <div style={pillsRow}>
+              {cutOpts.map((o) => (<button key={o.id} onClick={() => setSelStyleId(o.id)} style={pill(curStyle && o.id === curStyle.id)}>{o.label || "Untitled"}</button>))}
+              <button onClick={() => addCutStyle()} style={{ ...pill(false), borderStyle: "dashed", color: "var(--sub)" }}>+ Add style</button>
+            </div>
+            {curStyle ? (
+              <>
+                <input value={curStyle.label || ""} onChange={(e) => setCutOpt(cutOpts.indexOf(curStyle), { label: e.target.value })} placeholder="Style name" style={{ ...inpStyle, fontWeight: 700, marginBottom: 8 }} />
+                <textarea value={curStyle.desc || ""} onChange={(e) => setCutOpt(cutOpts.indexOf(curStyle), { desc: e.target.value })} rows={2} placeholder="Short description clients read" style={{ ...inpStyle, resize: "vertical", minHeight: 48, lineHeight: 1.5, marginBottom: 16 }} />
+                <span style={{ ...microLbl, marginBottom: 8 }}>Who cuts it · time &amp; price</span>
+                {barberCards(
+                  (pid) => styleP(pid, curStyle.id),
+                  (pid, v) => setStaffChoicePrice(pid, gid, curStyle.id, v),
+                  (pid) => styleD(pid, curStyle.id),
+                  (pid, m) => setStaffChoiceDur(pid, gid, curStyle.id, m)
+                )}
+                {cutOpts.length > 1 && <button onClick={() => { removeCutStyle(cutOpts.indexOf(curStyle)); setSelStyleId(null); }} style={{ background: "none", border: "none", color: "#C2392B", fontSize: 13, fontWeight: 500, cursor: "pointer", padding: "6px 0 8px" }}>Remove this style</button>}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginTop: 8, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+                  <span style={{ fontSize: 15, fontWeight: 600 }}>Clients must pick a style</span>
+                  <span onClick={() => setCutGroup({ required: !(cutGroup.required !== false) })} style={{ cursor: "pointer", flexShrink: 0 }}>{pillSwitch(cutGroup.required !== false)}</span>
+                </div>
+              </>
+            ) : null}
+          </>
+        ) : (
+          <p style={{ fontSize: 14, color: "var(--sub)", padding: "10px 0", lineHeight: 1.5 }}>This service doesn't use cut styles.</p>
+        ))}
+
+        {cutSecTab === "addons" && (addonList.length ? (
+          <>
+            <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 14 }}>Optional extras clients can <b>add on</b>. Set each barber's extra time and price.</p>
+            <div style={pillsRow}>
+              {addonList.map((g) => (<button key={g.id} onClick={() => setSelAddonId(g.id)} style={pill(curAddon && g.id === curAddon.id)}>{(g.item && g.item.name) || g.label || "Add-on"}</button>))}
+            </div>
+            {curAddon ? (
+              <>
+                <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.3px", marginBottom: 3 }}>{(curAddon.item && curAddon.item.name) || curAddon.label}</div>
+                {(curAddon.item && curAddon.item.desc) ? <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginBottom: 16 }}>{curAddon.item.desc}</div> : <div style={{ marginBottom: 16 }} />}
+                <span style={{ ...microLbl, marginBottom: 8 }}>Who offers it · extra time &amp; price</span>
+                {barberCards(
+                  (pid) => addP(pid, curAddon),
+                  (pid, v) => setStaffAddonPrice(pid, curAddon.id, v),
+                  (pid) => addD(pid, curAddon),
+                  (pid, m) => setStaffAddonDur(pid, curAddon.id, m)
+                )}
+              </>
+            ) : null}
+          </>
+        ) : (
+          <p style={{ fontSize: 14, color: "var(--sub)", padding: "10px 0", lineHeight: 1.5 }}>No add-ons on this service yet.</p>
+        ))}
+      </>
     );
   })() : null;
   const cutsScreen = (
     <>
       {backBar((form.name || "SERVICE").toUpperCase(), () => setSection(null))}
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Cut styles</h2>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Styles &amp; add-ons</h2>
       {cutsBody}
       <SaveBar />
     </>
