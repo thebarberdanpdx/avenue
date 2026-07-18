@@ -23529,6 +23529,64 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     return staff.indexOf(a) - staff.indexOf(b);          // else keep order
   });
 
+  // ── Perf (calendar-perf-maps): with ~3,000 clients a drag re-renders CalendarView ~60×/sec, and
+  // the old render did a clients.find + an appts.some PER appointment tile, every frame — O(tiles ×
+  // clients). Precompute the derived data ONCE, keyed on the data (appts/clients/date), NOT on the
+  // drag, so a drag frame reuses it: clientById (O(1) lookup), isNewByApptId (the first-ever-booking
+  // flag), and layoutByProvider (the per-column lane layout). Behaviour is identical — same inputs,
+  // same output — this only moves the work out of the hot render path.
+  const clientById = useMemo(() => { const m = new Map(); for (const c of (clients || [])) m.set(c.id, c); return m; }, [clients]);
+  const isNewByApptId = useMemo(() => {
+    const m = new Map(); const minBooked = new Map();
+    for (const o of (appts || [])) {
+      if (!o.clientId || o.status === "cancelled" || o.status === "no-show" || o.status === "block" || !o.bookedFor) continue;
+      const t = new Date(o.bookedFor).getTime();
+      const cur = minBooked.get(o.clientId);
+      if (cur == null || t < cur) minBooked.set(o.clientId, t);
+    }
+    for (const a of (appts || [])) {
+      if (a.status === "block" || a.status === "done") { m.set(a.id, false); continue; }
+      if (!a.clientId) { m.set(a.id, true); continue; }                    // guest with no client id = first-timer
+      const c = clientById.get(a.clientId);
+      if (!c || (c.visits || 0) > 0) { m.set(a.id, false); continue; }
+      const mine = a.bookedFor ? new Date(a.bookedFor).getTime() : Infinity;
+      const earliest = minBooked.get(a.clientId);
+      m.set(a.id, earliest == null || mine <= earliest);                    // NEW only on their earliest booking
+    }
+    return m;
+  }, [appts, clientById]);
+  const layoutByProvider = useMemo(() => {
+    const computeCol = (pid) => {
+      const list = (appts || [])
+        .filter((a) => a.providerId === pid && a.status !== "cancelled" && sameDay(a.bookedFor, selectedDate))
+        .sort((aa, bb) => aa.start - bb.start || aa.end - bb.end);
+      if (list.length === 0) return [];
+      const clusters = []; let cur = []; let curEnd = -Infinity;
+      for (const a of list) {
+        if (a.start >= curEnd) { if (cur.length) clusters.push(cur); cur = [a]; curEnd = a.end; }
+        else { cur.push(a); curEnd = Math.max(curEnd, a.end); }
+      }
+      if (cur.length) clusters.push(cur);
+      const out = [];
+      for (const cluster of clusters) {
+        const laneEnds = []; const laneOf = new Map();
+        for (const a of cluster) {
+          let assigned = laneEnds.findIndex((e) => e <= a.start);
+          if (assigned === -1) { assigned = laneEnds.length; laneEnds.push(a.end); }
+          else laneEnds[assigned] = a.end;
+          laneOf.set(a.id, assigned);
+        }
+        const laneCount = laneEnds.length;
+        for (const a of cluster) out.push({ ...a, _lane: laneOf.get(a.id), _laneCount: laneCount });
+      }
+      return out;
+    };
+    const m = new Map(); const pids = new Set();
+    for (const a of (appts || [])) { if (a.status !== "cancelled" && sameDay(a.bookedFor, selectedDate)) pids.add(a.providerId); }
+    for (const pid of pids) m.set(pid, computeCol(pid));           // providers with no appts today fall back to [] at the call site
+    return m;
+  }, [appts, selectedDate]);
+
   // Earliest open slot for a provider on a given date, respecting that day's working hours and
   // existing bookings. durMin = the appointment length to fit. + NEW and rebook default to this,
   // so a new booking lands at the earliest fair time — the barber can still drag it anywhere.
@@ -23773,35 +23831,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           // Lane-aware layout: when N appointments on this provider overlap in time,
           // split that section of the column into N side-by-side lanes so nothing hides behind anything.
           // Single appointments keep the full column width.
-          const col = (() => {
-            const list = appts
-              .filter((a) => a.providerId === p.id && a.status !== "cancelled" && sameDay(a.bookedFor, selectedDate))
-              .sort((aa, bb) => aa.start - bb.start || aa.end - bb.end);
-            if (list.length === 0) return [];
-            // Group into clusters where each cluster is a chain of mutually-overlapping appts.
-            const clusters = [];
-            let cur = []; let curEnd = -Infinity;
-            for (const a of list) {
-              if (a.start >= curEnd) { if (cur.length) clusters.push(cur); cur = [a]; curEnd = a.end; }
-              else { cur.push(a); curEnd = Math.max(curEnd, a.end); }
-            }
-            if (cur.length) clusters.push(cur);
-            // Within each cluster, greedy lane assignment.
-            const out = [];
-            for (const cluster of clusters) {
-              const laneEnds = []; // laneEnds[i] = the latest end time placed into lane i so far
-              const laneOf = new Map();
-              for (const a of cluster) {
-                let assigned = laneEnds.findIndex((e) => e <= a.start);
-                if (assigned === -1) { assigned = laneEnds.length; laneEnds.push(a.end); }
-                else laneEnds[assigned] = a.end;
-                laneOf.set(a.id, assigned);
-              }
-              const laneCount = laneEnds.length;
-              for (const a of cluster) out.push({ ...a, _lane: laneOf.get(a.id), _laneCount: laneCount });
-            }
-            return out;
-          })();
+          const col = layoutByProvider.get(p.id) || [];   // calendar-perf-maps: precomputed lane layout (see memo above)
           return (
             <div key={p.id}
               style={{ flex: 1, position: "relative", height: gridHeight, background: "var(--panel)", overflow: "hidden", marginLeft: pIdx ? 8 : 0 }}>
@@ -23887,11 +23917,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                   : { left: 0, right: 0 };
                 // NEW = this client's first-ever booking only — a zero-visit client with several
                 // future appointments shouldn't flag NEW on every tile (reads as noise).
-                const isNew = !isBlock && !isDone && (!a.clientId || (() => {
-                  const c = clients.find((cl) => cl.id === a.clientId);
-                  if (!c || (c.visits || 0) > 0) return false;
-                  return !appts.some((o) => o.id !== a.id && o.clientId === a.clientId && o.status !== "cancelled" && o.status !== "no-show" && o.status !== "block" && o.bookedFor && new Date(o.bookedFor) < new Date(a.bookedFor));
-                })());
+                const isNew = isNewByApptId.get(a.id) || false;   // calendar-perf-maps: precomputed once (was a per-tile clients.find + appts.some)
                 const rebooked = /rebook/i.test(a.title || "");
                 const range = `${fmtTime(liveStart)} – ${fmtTime(liveStart + (a.end - a.start))}`;
                 // Eyebrow shows the service alone; the cut style + add-ons get their own clean line below,
