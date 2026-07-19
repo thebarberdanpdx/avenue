@@ -26320,17 +26320,24 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
             </div>
           )}
         </div>
-        {/* Running behind — kept from the old popup, minus the tacky box. onLetThemKnow opens the
-            barber's OWN Messages pre-typed (the existing running-late tap-to-text); nothing auto-sends. */}
-        {showLatePrompt && (
+        {/* Message the next client. When genuinely behind (<=10 min left or a late start) it's a loud
+            amber alert; otherwise it's a quiet, ALWAYS-available heads-up so the barber can warn the
+            next client EARLY — sometimes you can tell at the start of a cut that you'll run long. Both
+            open the barber's OWN Messages pre-typed via the existing running-late tap-to-text
+            (onLetThemKnow); nothing auto-sends. */}
+        {nextClient && (
           lateNotified ? (
             <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
               <div style={{ fontSize: 13.5, color: tagColor, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}><Check size={15} style={{ flexShrink: 0 }} /> Heads-up sent · running {lateNotified} min behind</div>
               {onSendAgain && <button className="lift" onClick={onSendAgain} style={{ flexShrink: 0, background: "none", border: `1px solid color-mix(in srgb, ${WARN} 55%, transparent)`, color: "#F1ECE0", borderRadius: 10, padding: "7px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Send again</button>}
             </div>
-          ) : (
+          ) : showLatePrompt ? (
             <button className="lift" onClick={onLetThemKnow} style={{ marginTop: 16, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", border: `1px solid color-mix(in srgb, ${WARN} 55%, transparent)`, color: WARN, borderRadius: 12, padding: "13px 16px", fontSize: 14.5, fontWeight: 600, lineHeight: 1.35, cursor: "pointer" }}>
               {nextFirst ? `Text ${nextFirst} you're running a few min behind →` : "Let them know you're behind →"}
+            </button>
+          ) : (
+            <button className="lift" onClick={onLetThemKnow} style={{ marginTop: 14, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: "transparent", border: "1px solid rgba(241,236,224,.18)", color: "rgba(241,236,224,.62)", borderRadius: 12, padding: "11px 16px", fontSize: 13.5, fontWeight: 600, lineHeight: 1.35, cursor: "pointer" }}>
+              {nextFirst ? `Give ${nextFirst} a heads-up →` : "Give the next client a heads-up →"}
             </button>
           )
         )}
