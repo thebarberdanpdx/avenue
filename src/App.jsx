@@ -153,12 +153,28 @@ async function ensureFreshSession() {
 // pull, show an empty calendar/clients, and never retry until a full sign-out.
 async function fetchStaffTable(table, shopId, opts = {}) {
   const tries = Math.max(1, opts.tries || 3);
-  const query = () => supabase.from(table).select("data").eq("shop_id", shopId);
+  // [staff-load-paginate] PostgREST caps a .select() at 1000 rows — an UNRANGED load silently dropped
+  // every appt/client past the first 1,000 as the shop grew (clients already 2,900+). Worse: this is the
+  // degraded fallback load, and a truncated appt set flowing into api/calendar-pull's delete step could
+  // mass-DELETE synced/paid appointments beyond the cap. Page through EVERY row (stable .order("id"),
+  // mirrors lib/paginate.js). NEVER return a partial set: any page error fails the whole load so the
+  // retry re-fetches cleanly rather than handing a truncated list downstream.
+  const fetchAll = async () => {
+    const all = [];
+    for (let from = 0, page = 0; page < 100000; page++, from += 1000) {
+      const { data, error } = await supabase.from(table).select("data").eq("shop_id", shopId).order("id").range(from, from + 999);
+      if (error) return { data: null, error };
+      const batch = data || [];
+      for (const r of batch) all.push(r);
+      if (batch.length < 1000) return { data: all, error: null };
+    }
+    return { data: all, error: null };
+  };
   let lastErr = null;
   for (let attempt = 0; attempt < tries; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 800 * attempt));
     await ensureFreshSession();
-    let { data, error } = await query();
+    let { data, error } = await fetchAll();
     if (!error) return { data, error: null };
     lastErr = error;
     const msg = String((error && error.message) || error);
@@ -166,7 +182,7 @@ async function fetchStaffTable(table, shopId, opts = {}) {
     if (authish) {
       try { await supabase.auth.refreshSession(); } catch (e) {}
       await ensureFreshSession();
-      ({ data, error } = await query());
+      ({ data, error } = await fetchAll());
       if (!error) return { data, error: null };
       lastErr = error;
     }
