@@ -17265,7 +17265,7 @@ function reconcileFeed(currentAppts, events, opts = {}) {
   // ROOT BUG this fixes: toAppt rebuilt every existing synced appt from scratch (clientId:null,
   // status:"confirmed"), so marking a synced appt done — or checking a client out on one — reverted to
   // "confirmed" and lost the checkout/client on the very next sync (the daily cron OR a manual Sync).
-  const worked = (a) => !!(a && (a.clientId || (a.status && a.status !== "confirmed") || a.serviceStartedAt != null || a.serviceEndedAt != null || (a.paid && Number(a.paid.total) > 0) || (Array.isArray(a.lineItems) && a.lineItems.length > 0)));
+  const worked = (a) => !!(a && (a.clientId || (a.status && a.status !== "confirmed") || a.serviceStartedAt != null || a.serviceEndedAt != null || (a.paid && Number(a.paid.total) > 0) || (Array.isArray(a.lineItems) && a.lineItems.length > 0) || a.hasNote || a.note || a.hasPhotos || Number(a.photos) > 0 || Number(a.price) > 0));
   // Build the desired Vero appointment for one feed event — always under this feed's staff.
   const toAppt = (ev, existing) => {
     const { name, service } = splitSummary(ev.summary);

@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 // --- reference implementation (mirrors reconcileFeed / reconcileFeedServer) -------------------------
-const worked = (a) => !!(a && (a.clientId || (a.status && a.status !== "confirmed") || a.serviceStartedAt != null || a.serviceEndedAt != null || (a.paid && Number(a.paid.total) > 0) || (Array.isArray(a.lineItems) && a.lineItems.length > 0)));
+const worked = (a) => !!(a && (a.clientId || (a.status && a.status !== "confirmed") || a.serviceStartedAt != null || a.serviceEndedAt != null || (a.paid && Number(a.paid.total) > 0) || (Array.isArray(a.lineItems) && a.lineItems.length > 0) || a.hasNote || a.note || a.hasPhotos || Number(a.photos) > 0 || Number(a.price) > 0));
 
 function toAppt(ev, existing, { feedId, providerId }) {
   if (ev.start == null) return existing || null;
@@ -73,6 +73,17 @@ test("worked(): false for a bare confirmed mirror block", () => {
   assert.equal(worked({ status: "confirmed", clientId: null }), false);
   assert.equal(worked({ status: "confirmed", paid: { total: 0 } }), false);
   assert.equal(worked({ status: "confirmed", lineItems: [] }), false);
+});
+test("worked(): true for a note / photo / price edit on a client-less synced block", () => {
+  assert.equal(worked({ status: "confirmed", clientId: null, hasNote: true }), true);
+  assert.equal(worked({ status: "confirmed", clientId: null, note: "brought his son" }), true);
+  assert.equal(worked({ status: "confirmed", clientId: null, hasPhotos: true }), true);
+  assert.equal(worked({ status: "confirmed", clientId: null, photos: 2 }), true);
+  assert.equal(worked({ status: "confirmed", clientId: null, price: 35 }), true);
+});
+test("worked(): false for a freshly-built bare mirror (so normal sync still tracks/cancels it)", () => {
+  const bare = toAppt(EV, undefined, OPTS); // price:0, photos:0, hasNote:false, no note
+  assert.equal(worked(bare), false);
 });
 
 // --- toAppt preservation -----------------------------------------------------------------------------

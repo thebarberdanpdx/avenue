@@ -78,7 +78,7 @@ function reconcileFeedServer(currentAppts, events, opts) {
   // appointment — a re-import must NEVER rebuild it back to a bare "confirmed" mirror. ROOT BUG this
   // fixes: the daily cron reset every synced appt's status to "confirmed" and dropped clientId/paid/
   // serviceStartedAt/serviceEndedAt, so a checked-out synced appt reverted + lost its checkout.
-  const worked = (a) => !!(a && (a.clientId || (a.status && a.status !== "confirmed") || a.serviceStartedAt != null || a.serviceEndedAt != null || (a.paid && Number(a.paid.total) > 0) || (Array.isArray(a.lineItems) && a.lineItems.length > 0)));
+  const worked = (a) => !!(a && (a.clientId || (a.status && a.status !== "confirmed") || a.serviceStartedAt != null || a.serviceEndedAt != null || (a.paid && Number(a.paid.total) > 0) || (Array.isArray(a.lineItems) && a.lineItems.length > 0) || a.hasNote || a.note || a.hasPhotos || Number(a.photos) > 0 || Number(a.price) > 0));
   const toAppt = (ev, ex) => {
     const { name, service } = splitSummary(ev.summary);
     const start = localMins(ev.start, tz);
