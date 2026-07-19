@@ -27538,6 +27538,16 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div style={{ fontSize: 16, color: T.sub, letterSpacing: 0.3, marginBottom: 12 }}>Booking Details</div>
                 {(() => { const t = Number(appt.id); const d = (isFinite(t) && t > 1577836800000 && t < 4102444800000) ? new Date(t) : null; return d ? <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15.5, color: T.text, marginBottom: 10 }}><Clock size={15} style={{ color: T.faint }} /> Booked {d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} at {d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div> : null; })()}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15.5, color: T.text }}><User size={15} style={{ color: T.faint }} /> {fmtBookDate}</div>
+                {/* How long the visit actually took — start-service → checkout. Guarded: hidden when the
+                    timer data is missing, backwards, or absurd (a stale/forgotten start), so it never shows
+                    a nonsense length like the old "133 min" screen. */}
+                {appt.status === "done" && (() => {
+                  const ran = (appt.serviceStartedAt && appt.serviceEndedAt && appt.serviceEndedAt > appt.serviceStartedAt) ? Math.round((appt.serviceEndedAt - appt.serviceStartedAt) / 60000) : null;
+                  if (ran == null || ran < 1 || ran > 600) return null;
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15.5, color: T.text, marginTop: 10 }}><Clock size={15} style={{ color: T.faint }} /> Visit took {ran} min — in {fmtClockTs(appt.serviceStartedAt)}, out {fmtClockTs(appt.serviceEndedAt)}</div>
+                  );
+                })()}
               </div>
             </div>
 
