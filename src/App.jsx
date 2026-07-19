@@ -17441,14 +17441,22 @@ function reconcileFeed(currentAppts, events, opts = {}) {
   };
   const minsOf = (iso) => { const d = new Date(iso); return isNaN(d) ? null : d.getHours() * 60 + d.getMinutes(); };
 
+  // [synced-appt-preserve] Once a synced appt has been WORKED — a client attached, a non-"confirmed"
+  // status (checked in / in service / done / no-show), checked in/out, paid, or line items — it is a
+  // REAL appointment, not just a mirror of the outside event, and a re-import must NEVER overwrite it.
+  // ROOT BUG this fixes: toAppt rebuilt every existing synced appt from scratch (clientId:null,
+  // status:"confirmed"), so marking a synced appt done — or checking a client out on one — reverted to
+  // "confirmed" and lost the checkout/client on the very next sync (the daily cron OR a manual Sync).
+  const worked = (a) => !!(a && (a.clientId || (a.status && a.status !== "confirmed") || a.serviceStartedAt != null || a.serviceEndedAt != null || (a.paid && Number(a.paid.total) > 0) || (Array.isArray(a.lineItems) && a.lineItems.length > 0) || a.hasNote || a.note || a.hasPhotos || Number(a.photos) > 0 || Number(a.price) > 0));
   // Build the desired Vero appointment for one feed event — always under this feed's staff.
   const toAppt = (ev, existing) => {
     const { name, service } = splitSummary(ev.summary);
     const startMin = minsOf(ev.start);
-    if (startMin == null) return null;
+    if (startMin == null) return existing || null; // unparseable time: keep a worked appt untouched, else skip
     let endMin = ev.end ? minsOf(ev.end) : null;
     if (endMin == null || endMin <= startMin) endMin = startMin + 30;
     const bf = new Date(ev.start);
+    if (existing && worked(existing)) return { ...existing, source: "sync", _synced: true, syncUid: ev.uid, syncFeed: feedId }; // real appt — preserve verbatim, only re-tag to this feed
     return {
       id: existing ? existing.id : ("sync_" + feedId + "_" + Math.abs(hashStr(ev.uid)).toString(36)),
       source: "sync", _synced: true, syncUid: ev.uid, syncFeed: feedId,
@@ -17487,20 +17495,26 @@ function reconcileFeed(currentAppts, events, opts = {}) {
     }
   }
   // This feed's appts whose event vanished → candidates for removal (scoped to this feed only).
-  const toCancel = mine.filter((a) => a.syncUid && !incomingByUid.has(a.syncUid));
+  // [synced-appt-preserve] A WORKED appt whose outside event disappeared is a real record (done/paid/
+  // checked-in/client-attached) — NEVER auto-cancel or delete it; keep it, still tagged to the feed.
+  // Only bare, untouched mirror blocks are cancel candidates.
+  const vanished = mine.filter((a) => a.syncUid && !incomingByUid.has(a.syncUid));
+  const keptWorkedOrphans = vanished.filter(worked);
+  const toCancel = vanished.filter((a) => !worked(a));
 
   // Safety rail: never let a bad/empty feed wipe its own mirror.
   const emptyFeed = incoming.length === 0 && mine.length > 0;
   const threshold = Math.max(5, Math.ceil(mine.length * 0.34));
   const tooMany = toCancel.length > threshold;
   if (emptyFeed || tooMany) {
-    // Apply nothing destructive; keep this feed's existing appts as-is, still add brand-new ones.
+    // Apply nothing destructive; keep this feed's existing appts as-is (toAppt preserves worked ones),
+    // still add brand-new ones.
     const safeNext = [...rest, ...mine.map((a) => { const e = incomingByUid.get(a.syncUid); return e ? (toAppt(e, a) || a) : a; }),
       ...kept.filter((a) => !syncedByUid.has(a.syncUid))];
     return { next: safeNext, changes: { added, moved, cancelled: 0 }, blocked: true, blockedCount: toCancel.length };
   }
 
-  const next = [...rest, ...kept];
+  const next = [...rest, ...kept, ...keptWorkedOrphans];
   return { next, changes: { added, moved, cancelled: toCancel.length }, blocked: false, blockedCount: 0 };
 }
 
