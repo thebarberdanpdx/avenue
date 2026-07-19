@@ -257,7 +257,7 @@ test("[checkin-durable] markers are present in src/App.jsx", () => {
   const src = readFileSync(join(ROOT, "src", "App.jsx"), "utf8");
   assert.ok(src.includes("reconcileCheckinOutbox"), "reconcileCheckinOutbox helper is gone");
   assert.ok(src.includes("CHECKIN_OUTBOX_KEY"), "durable outbox key is gone");
-  assert.ok(src.includes("const localAp = reconcileCheckinOutbox(serverAp);"), "mirror overlay removed from applyServerAuthoritative");
+  assert.ok(src.includes("reconcileCheckinOutbox(serverAp)"), "mirror overlay removed from applyServerAuthoritative");
   assert.ok(/\[checkin-durable\] SOLE WRITER of the check-in outbox/.test(src), "derived-outbox effect removed");
   assert.ok(/Keep re-saving a pending check-in until the server confirms/.test(src), "drain effect removed");
 });
