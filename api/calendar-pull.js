@@ -115,6 +115,21 @@ export default async function handler(req, res) {
     // Remove synced appts the feed no longer contains (only previously-synced rows; never touches native bookings).
     const keep = new Set(incoming.map((a) => String(a.id)));
     const toDelete = existingSyncedIds.filter((id) => !keep.has(String(id)));
+    // [staff-load-paginate] Delete-rail (defense-in-depth for the 1000-row cap): a client that loaded a
+    // TRUNCATED appt set (a degraded fallback that stopped at PostgREST's cap) would send a partial synced
+    // set and try to delete every synced appt it didn't see — silently mass-deleting real synced/paid
+    // appointments. Hold a deletion that removes more than HALF the synced rows (min 100). Threshold is
+    // 50% ON PURPOSE: each feed's client-side reconcile rail already caps its own cancels at ~34%, so a
+    // NON-truncated client can never aggregate past ~34% across feeds — only a truncated load can push
+    // toDelete over 50%. This avoids false-positives on a legitimate multi-feed sync (a lower bar wrongly
+    // blocked that). A genuine large removal still lands (gradually / via the appointments autosave / the
+    // nightly cron), and a full disconnect uses mode:"clear". The primary guarantee is the paginated load;
+    // this is only the backstop.
+    const delThreshold = Math.max(100, Math.ceil(existingSyncedIds.length * 0.5));
+    if (toDelete.length > delThreshold) {
+      const calSync = await writeCalSync({ ...(body.calSync || {}), lastSyncAt: Date.now(), lastError: `Held off deleting ${toDelete.length} appointment(s) in one sync — looked like a truncated load.` });
+      return res.status(200).json({ ok: true, mode, upserted: incoming.length, removed: 0, blocked: true, blockedCount: toDelete.length, calSync });
+    }
     let removed = 0;
     if (toDelete.length) {
       const { error: delErr } = await supabase.from("appointments").delete().eq("shop_id", shop).in("id", toDelete);
