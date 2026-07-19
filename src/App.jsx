@@ -1414,22 +1414,19 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
 
 function PhoneLink({ number, style }) {
   const [open, setOpen] = useState(false);
-  const lp = useRef({ timer: null, fired: false, touch: false });
   if (!number) return null;
   const clean = String(number);
   const digits = clean.replace(/\D/g, "");
   const disp = fmtPhone(clean);
-  const start = () => { lp.current.touch = true; lp.current.fired = false; lp.current.timer = setTimeout(() => { lp.current.fired = true; setOpen(true); }, 450); };
-  const cancel = () => { if (lp.current.timer) { clearTimeout(lp.current.timer); lp.current.timer = null; } };
   return (
     <>
       <button
-        onTouchStart={(e) => { e.stopPropagation(); start(); }}
-        onTouchEnd={(e) => { e.stopPropagation(); cancel(); }}
-        onTouchMove={cancel}
-        onClick={(e) => { e.stopPropagation(); if (lp.current.touch) { lp.current.touch = false; return; } setOpen(true); }}
-        // userSelect/touchCallout none: the 450ms long-press that opens the sheet is also iOS's
-        // "select text" gesture — disabling selection here stops the tap from highlighting the number.
+        // [contact-tap] A TAP opens Call/Text. userSelect/touchCallout:none already stops the tap from
+        // triggering iOS text-selection / the callout on the number, so no long-press is needed. It used
+        // to REQUIRE a 450ms long-press (touchend cancelled the timer + click bailed), so a normal tap
+        // did nothing — Dan: "clicking needs to do something".
+        onTouchStart={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
         style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", ...style }}>{disp}</button>
       <Sheet open={open} onClose={() => setOpen(false)} align="bottom" maxWidth={420}>
         <div style={{ padding: "6px 4px 8px", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
@@ -1452,19 +1449,16 @@ function PhoneLink({ number, style }) {
 
 // Long-press (touch) or click (desktop) to open the device mail app, pre-addressed to the client.
 function EmailLink({ email, style }) {
-  const lp = useRef({ timer: null, touch: false });
   if (!email) return null;
-  const go = () => { if (typeof window !== "undefined") window.location.href = `mailto:${email}`; };
-  const start = () => { lp.current.touch = true; lp.current.timer = setTimeout(() => { go(); }, 450); };
-  const cancel = () => { if (lp.current.timer) { clearTimeout(lp.current.timer); lp.current.timer = null; } };
+  // [contact-tap] A TAP opens the mail app pre-addressed. It's a native mailto: anchor so the OS handles
+  // it (the web view isn't navigated away). It used to REQUIRE a 450ms long-press, so a normal tap did
+  // nothing — Dan: "clicking needs to do something".
   return (
-    <button
-      onTouchStart={(e) => { e.stopPropagation(); start(); }}
-      onTouchEnd={(e) => { e.stopPropagation(); cancel(); }}
-      onTouchMove={cancel}
-      onClick={(e) => { e.stopPropagation(); if (lp.current.touch) { lp.current.touch = false; return; } go(); }}
-      // userSelect/touchCallout none: the long-press to open mail is also iOS's text-select gesture.
-      style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", ...style }}>{email}</button>
+    <a
+      href={`mailto:${email}`}
+      onTouchStart={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", ...style }}>{email}</a>
   );
 }
 
