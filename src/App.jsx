@@ -3112,6 +3112,49 @@ function App() {
     if (!overlaid) return serverList;
     return (serverList || []).map((a) => byId.get(String(a && a.id)) || a);
   };
+  // [done-durable] A COMPLETED appointment (status "done", from checkout / mark-done) has the SAME
+  // write-durability gap the check-in had: the "done" persists only via flushApptsNow/debounce, both
+  // gated on loadedRef+session+staffApptsLoaded — so in cache-degraded mode (loadedRef=false) or on a
+  // dropped write, the "done" lives ONLY in memory. The next authoritative reload then REPLACES it with
+  // the server's stale "confirmed" (reconcileCheckinOutbox protects only in-service, and even treats
+  // "done" as "landed"). That is the deploy-reload done→confirmed revert. Same fix shape as checkin: a
+  // tiny durable record of any locally-"done" appt the server baseline hasn't stored as done, OVERLAID
+  // onto every server apply and re-saved until the server confirms. DERIVED from live state, so a refund
+  // / undo-checkout (appt no longer "done" locally) drops itself — a legitimate done→confirmed is never
+  // blocked. A time cap bounds the protection so a genuine cross-device reversal reconverges (see below).
+  // Kept in its OWN outbox so it can't destabilize the guarded checkin-durable path.
+  const doneLoggedRef = useRef(new Set());
+  const DONE_OUTBOX_KEY = `vero_done_outbox_${SHOP_ID}`;
+  const DONE_PROTECT_MS = 24 * 60 * 60 * 1000; // overlay a not-yet-landed "done" for up to 24h — covers any
+  // realistic degraded/offline/deploy window, then yields so a real cross-device refund can win.
+  const doneOutboxRead = () => { try { const raw = localStorage.getItem(DONE_OUTBOX_KEY); const v = raw ? JSON.parse(raw) : []; return Array.isArray(v) ? v : []; } catch (e) { return []; } };
+  const doneOutboxWrite = (box) => { try { localStorage.setItem(DONE_OUTBOX_KEY, JSON.stringify((Array.isArray(box) ? box : []).slice(-300))); } catch (e) {} };
+  // Overlay un-acknowledged completions onto a server snapshot. READ-ONLY (the derived effect below is
+  // the sole writer). A server row already "done" is landed (skipped); a deliberate LOCAL downgrade
+  // (refund/undo → no longer "done" locally) is respected; an entry past the protect window is ignored.
+  const reconcileDoneOutbox = (serverList) => {
+    const box = doneOutboxRead();
+    if (!box.length) return serverList;
+    const now = Date.now();
+    const byId = new Map((serverList || []).map((a) => [String(a && a.id), a]));
+    const localById = new Map((apptsRef.current || []).map((a) => [String(a && a.id), a]));
+    let overlaid = false;
+    for (const e of box) {
+      const sv = byId.get(String(e && e.id));
+      if (!sv) continue;                                   // gone on server — nothing to protect
+      if (sv.status === "done") continue;                  // server caught up → landed
+      if (e.at && (now - e.at) > DONE_PROTECT_MS) continue; // past the window → let the server win
+      const loc = localById.get(String(e.id));
+      if (loc && loc.status !== "done") continue;          // deliberate local downgrade (refund/undo) → don't resurrect
+      byId.set(String(e.id), { ...sv, status: "done",
+        serviceEndedAt: sv.serviceEndedAt != null ? sv.serviceEndedAt : e.serviceEndedAt,
+        visitCountedAt: sv.visitCountedAt || e.visitCountedAt }); // money (paid) has its OWN durable outbox — untouched here
+      overlaid = true;
+      if (!doneLoggedRef.current.has(e.id)) { doneLoggedRef.current.add(e.id); try { Sentry.captureMessage("done-durable: re-applied a completed visit the server had dropped", { level: "warning", tags: { area: "done-durable" }, extra: { apptId: String(e.id) } }); } catch (x) {} }
+    }
+    if (!overlaid) return serverList;
+    return (serverList || []).map((a) => byId.get(String(a && a.id)) || a);
+  };
   // Hydrate one table read-only from cache after a failed load. Blocks all saves (degraded state) and
   // sets lastRemoteRef to the same reference so the save effect sees "no change" and never writes.
   const hydrateFromCache = (table, current, setter) => {
@@ -3119,7 +3162,7 @@ function App() {
     const c = readCache(table);
     if (!c || !c.length) return false;
     lastRemoteRef.current[table] = c;
-    setter(table === "appointments" ? reconcileCheckinOutbox(c) : c); // [checkin-durable] keep a live visit visible on a cache cold-boot
+    setter(table === "appointments" ? reconcileDoneOutbox(reconcileCheckinOutbox(c)) : c); // [checkin-durable]+[done-durable] keep a live/completed visit visible on a cache cold-boot
     loadedRef.current = false;                          // degraded: block every save until a clean reload
     setUsingCache(true);
     return true;
@@ -3245,7 +3288,7 @@ function App() {
       if (table === "appointments" || table === "clients") {
         lastRemoteRef.current[table] = list;
         const set = tableSetters[table];
-        if (set) set(table === "appointments" ? reconcileCheckinOutbox(list) : list); // [checkin-durable] protect a live visit from a background refetch
+        if (set) set(table === "appointments" ? reconcileDoneOutbox(reconcileCheckinOutbox(list)) : list); // [checkin-durable]+[done-durable] protect a live/completed visit from a background refetch
         writeCache(table, list);
         setUsingCache(false);
         if (table === "appointments") { staffApptsLoadedRef.current = true; setSaveFailed(false); }
@@ -3330,7 +3373,7 @@ function App() {
     // silently roll it back to "confirmed". Baseline (lastRemoteRef, set above) stays the RAW server copy,
     // so the overlaid-local difference re-triggers a save that lands the check-in; the cache is written RAW
     // too, so the derived outbox effect keeps a correct picture on a later cold-boot.
-    const localAp = reconcileCheckinOutbox(serverAp);
+    const localAp = reconcileDoneOutbox(reconcileCheckinOutbox(serverAp)); // [checkin-durable]+[done-durable]
     if (!sameRowset(localAp, apptsRef.current)) setAppts(localAp);
     staffClientsLoadedRef.current = true;
     staffApptsLoadedRef.current = true;
@@ -3917,6 +3960,68 @@ function App() {
       if (!unlanded) return;
       // Re-save the CURRENT local state: if the visit is still in progress it re-asserts the check-in;
       // if the owner reset it (entry not yet pruned) it correctly saves the reset. Either way, honest.
+      if (flushApptsNow) flushApptsNow(apptsRef.current || []);
+    };
+    drain();
+    const onOnline = () => drain();
+    if (typeof window !== "undefined") window.addEventListener("online", onOnline);
+    const id = setInterval(drain, 25000);
+    return () => { if (typeof window !== "undefined") window.removeEventListener("online", onOnline); clearInterval(id); };
+  }, [session]);
+  // [done-durable] SOLE WRITER of the done-outbox. Mirrors the checkin derived writer: ADDITIVE, with
+  // PROOF-BASED removal, re-run on every mirror ([syncHealth]) and every local edit ([appts]).
+  //   • ADD  — an appt "done" LOCALLY that the server baseline hasn't stored as done yet (preserving the
+  //            original `at` so the protect window is measured from first completion, not each re-derive).
+  //   • DROP — server stored it done (landed); a deliberate LOCAL downgrade (present locally, no longer
+  //            "done" → refund/undo); a FULL load proving it gone from BOTH sides (deleted); or the entry
+  //            aged past the protect window (a genuine cross-device reversal is allowed to win).
+  useEffect(() => {
+    try {
+      const now = Date.now();
+      const local = apptsRef.current || [];
+      const base = new Map((lastRemoteRef.current.appointments || []).map((a) => [String(a && a.id), a]));
+      const localById = new Map(local.map((a) => [String(a && a.id), a]));
+      const box = doneOutboxRead();
+      const prevAt = new Map(box.map((e) => [String(e && e.id), e && e.at]));
+      const next = [];
+      const added = new Set();
+      // 1. Completions still "done" LOCALLY the server baseline hasn't stored as done.
+      for (const a of local) {
+        if (a && a.status === "done") {
+          const sv = base.get(String(a.id));
+          if (!sv || sv.status !== "done") {
+            const at = prevAt.get(String(a.id)) || now;
+            if ((now - at) <= DONE_PROTECT_MS) { next.push({ id: String(a.id), serviceEndedAt: a.serviceEndedAt, visitCountedAt: a.visitCountedAt, at }); added.add(String(a.id)); }
+          }
+        }
+      }
+      // 2. Preserve existing entries whose appt isn't in `local` yet — UNLESS proven resolved / aged out.
+      for (const e of box) {
+        const id = String(e && e.id);
+        if (added.has(id)) continue;
+        const sv = base.get(id);
+        if (sv && sv.status === "done") continue;                        // server stored it → landed
+        if (localById.has(id)) continue;                                  // present locally but not "done" → deliberate downgrade
+        if (loadedRef.current && staffApptsLoadedRef.current && !sv) continue; // fully loaded and gone from both → deleted
+        if (e.at && (now - e.at) > DONE_PROTECT_MS) continue;             // aged past the window → drop
+        next.push(e);                                                     // not-yet-loaded / offline → keep
+      }
+      const same = next.length === box.length && next.every((n) => box.some((b) => String(b.id) === n.id && b.serviceEndedAt === n.serviceEndedAt));
+      if (!same) doneOutboxWrite(next);
+    } catch (e) {}
+  }, [appts, syncHealth]);
+  // [done-durable] Keep re-saving a pending completion until the server confirms it — the "done" must
+  // land even if the first save was blocked (cache mode) or dropped. Stops the instant the server
+  // baseline shows the appt as done. Mirrors the checkin drain (mount / online / 25s interval).
+  useEffect(() => {
+    if (!session) return;
+    const drain = () => {
+      if (!loadedRef.current || !staffApptsLoadedRef.current) return;
+      const box = doneOutboxRead();
+      if (!box.length) return;
+      const base = new Map((lastRemoteRef.current.appointments || []).map((a) => [String(a && a.id), a]));
+      const unlanded = box.some((e) => { const sv = base.get(String(e && e.id)); return sv && sv.status !== "done"; });
+      if (!unlanded) return;
       if (flushApptsNow) flushApptsNow(apptsRef.current || []);
     };
     drain();
