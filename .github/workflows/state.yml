@@ -1,0 +1,22 @@
+# Manual "print live prod state" button. Runs scripts/state.mjs inside Actions using the
+# repo's SUPABASE_SERVICE_ROLE_KEY secret, so a session without local prod creds can still
+# read the live ground truth (client counts, imported batches, SMS last-send, reminder
+# config). Read-only — touches nothing. Output is counts/config only, no client PII.
+# Trigger from the Actions tab (or via API). Requires the SUPABASE_SERVICE_ROLE_KEY repo secret.
+name: state
+on:
+  workflow_dispatch: {}
+jobs:
+  state:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install supabase client
+        run: npm i --no-save @supabase/supabase-js@2
+      - name: Print live state
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/state.mjs
