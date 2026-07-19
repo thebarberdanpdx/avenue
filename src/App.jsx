@@ -27217,7 +27217,9 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               </div>
             )}
             <div ref={scrollTopRef} style={{ overflowY: "auto", flex: 1 }}>
-            <div style={{ opacity: appt.status === "done" ? 0.5 : 1, transition: "opacity .2s" }}>
+            {/* [done-no-dim] a completed/paid appointment renders at FULL opacity — Dan explicitly does
+                NOT want the done sheet faded/greyed out (2026-07-19). Do NOT re-add an opacity dim here. */}
+            <div>
               {/* status + check-in */}
               <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
