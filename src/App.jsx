@@ -66,6 +66,25 @@ function runningLateText(business, { client, provider, range }) {
     .replace(/\{range\}/g, String(range == null ? "" : range));
 }
 
+// review-taptext: a Google review request, self-sent the SAME way as running-late — opens the barber's
+// OWN Messages pre-typed with the shop's saved review link, and they hit send. Nothing is automated, so
+// it never touches SMS consent. Defaults ship so it works out of the box; owner edits link + wording in
+// Settings → Google Reviews. Handles {client}/{first} (name) and {link}.
+const DEFAULT_REVIEW_LINK = "https://g.page/r/CaFnft4o82oDEBE/review";
+const DEFAULT_REVIEW_MESSAGE = "Hi {client}, I appreciate you coming in for your haircut! I was just wondering if you wouldn't mind leaving a super quick Google review? I'd really appreciate it. Here's the link just in case — thank you 🙏\n\n{link}";
+const DEFAULT_REVIEW = { enabled: true, link: DEFAULT_REVIEW_LINK, message: DEFAULT_REVIEW_MESSAGE };
+function reviewText(business, { client }) {
+  const rv = (business && business.review) || {};
+  const tpl = rv.message || DEFAULT_REVIEW_MESSAGE;
+  const link = (rv.link != null && String(rv.link).trim() !== "") ? rv.link : DEFAULT_REVIEW_LINK;
+  const first = client || "there";
+  return String(tpl)
+    .replace(/\{client\}/g, first)
+    .replace(/\{first\}/g, first)
+    .replace(/\{shop\}/g, (business && business.name) || "the shop")
+    .replace(/\{link\}/g, link);
+}
+
 // visit-stamp: return the client with lastVisit advanced to this visit's date and visits bumped by one,
 // so the rebook / overdue radar (which reads client.lastVisit + cadenceDays) builds from real checkouts.
 // PURE + idempotency lives at the call site (gated on the appt not already being counted → visitCountedAt),
@@ -388,6 +407,8 @@ const DEFAULT_BUSINESS = {
     ranges: ["5–10", "10–15"],       // delay options offered to choose from
     message: "Hi {client}, it's {provider} at {shop} — I'm just wrapping up and running about {range} min behind. Thanks so much for your patience, see you soon!",
   },
+  // ---- Google review request (Calendar & Appointments → Google Reviews) — self-sent tap-to-text ----
+  review: DEFAULT_REVIEW,
   // ---- "It's been a while" buffer: add FREE chair time for clients overdue past a threshold ----
   // Wired in the booking paths (audit #27): a returning client whose last visit is older than
   // `thresholdWeeks` gets `addMinutes` of extra time reserved on their next appointment. Never a
@@ -16672,6 +16693,32 @@ function WaitingRoomEditor({ w, onChange }) {
 }
 
 // Running Late Alerts — the "5 min left, want to tell your next client?" prompt.
+function ReviewEditor({ r, onChange }) {
+  const set = (patch) => onChange({ ...r, ...patch });
+  const on = r.enabled !== false;
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+        <div><div style={{ fontSize: 15.5, fontWeight: 600 }}>Ask for Google reviews</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>After a visit, a one-tap button on the finished appointment opens your own Messages, pre-typed with your review link — you tap send.</div></div>
+        <Toggle on={on} onClick={() => set({ enabled: !on })} />
+      </div>
+      {on && (<>
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Your Google review link</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>Paste it once — every request uses it. Get it from your Google Business Profile → “Ask for reviews” (or “Get more reviews”), then copy the link. You can change it here anytime.</div>
+          <input value={r.link || ""} onChange={(e) => set({ link: e.target.value })} placeholder="https://g.page/r/…/review" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+        </div>
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
+          <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Message to the client</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>This opens pre-typed in your own Messages when you tap “Ask for Google review” — you tap send. Nothing is sent automatically.</div>
+          <textarea value={r.message || ""} onChange={(e) => set({ message: e.target.value })} rows={5} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", resize: "vertical", lineHeight: 1.5 }} />
+          <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.5 }}>Tags you can use: <strong style={{ color: "var(--sub)" }}>{"{client}"}</strong> first name, <strong style={{ color: "var(--sub)" }}>{"{link}"}</strong> your review link.</div>
+        </div>
+      </>)}
+    </div>
+  );
+}
+
 function RunningLateEditor({ r, onChange }) {
   const set = (patch) => onChange({ ...r, ...patch });
   const ranges = r.ranges || ["5–10", "10–15"];
@@ -21361,6 +21408,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       status: form.runningLate?.enabled === false ? "Off" : `On · ${form.runningLate?.thresholdMin || 5} min warning`,
       keywords: "running late behind next client wrapping up notify prompt delay minutes message schedule overrun",
       editor: <RunningLateEditor r={form.runningLate || {}} onChange={(rl) => setForm({ ...form, runningLate: { ...(form.runningLate || {}), ...rl } })} />,
+    },
+    {
+      id: "reviews", title: "Google Reviews", smart: true, icon: Star, category: "Calendar & Appointments",
+      explain: <>After a haircut, ask happy clients for a Google review in one tap — it opens your own Messages pre-typed with your review link, and you just hit send. Reviews are one of the biggest things that bring new clients through the door, and doing it by hand (you tap send) keeps it personal and outside the automated-texting rules.</>,
+      status: form.review?.enabled === false ? "Off" : "On",
+      keywords: "google review reviews rating stars reputation feedback ask request link testimonial word of mouth marketing five star",
+      editor: <ReviewEditor r={form.review || DEFAULT_REVIEW} onChange={(rv) => setForm({ ...form, review: { ...(form.review || DEFAULT_REVIEW), ...rv } })} />,
     },
     {
       id: "overduebuffer", title: "It's Been a While", smart: true, icon: Clock, category: "Calendar & Appointments",
@@ -26946,6 +27000,21 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     if (!nextClient) return;
     openLateText(nextClient, nextClient.lateNotified);
   };
+  // review-taptext: ask THIS (completed) client for a Google review — mirrors openLateText exactly.
+  // Marks reviewAsked on tap (records that a prefilled text was OPENED, per Dan — NOT whether it was
+  // actually sent). No link saved → nudge to Settings; no phone → honest toast; never a broken sms:.
+  const openReviewText = () => {
+    const rv = (business && business.review) || {};
+    const link = (rv.link != null && String(rv.link).trim() !== "") ? rv.link : DEFAULT_REVIEW_LINK;
+    if (!link) { showToast("Add your Google review link in Settings → Google Reviews first."); return; }
+    const rec = (clients || []).find((c) => c.id === appt.clientId) || null;
+    const first = String(appt.name || "there").split(" ")[0];
+    const phone = String((rec && rec.phone) || appt.phone || "").trim();
+    if (!phone) { showToast(`No phone on file to text ${first}.`); return; }
+    onUpdate && onUpdate(appt.id, { reviewAsked: Date.now() });
+    if (typeof window !== "undefined") window.location.href = smsLink(phone, reviewText(business, { client: first }), IS_IOS);
+  };
+  const toggleReviewAsked = () => onUpdate && onUpdate(appt.id, { reviewAsked: appt.reviewAsked ? null : Date.now() });
   const cascadeYes = () => {
     if (!lateCascade) return;
     const ranges = (business?.runningLate?.ranges) || ["5–10", "10–15"];
@@ -27090,6 +27159,28 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   <button onClick={() => onSetStatus(appt.id, "in-service", `${appt.name} is in the chair.`)} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", border: "none", background: "var(--text)", color: "var(--bg)", fontWeight: 700, fontSize: 16, padding: "15px", borderRadius: 14, marginTop: 16, cursor: "pointer", animation: "lobbyStart 2.4s ease-in-out infinite" }}>Start service</button>
                 )}
               </div>
+
+              {/* GOOGLE REVIEW REQUEST — completed appointments only; sits at the top of the body, above
+                  ON/AT. Tap opens the barber's OWN Messages pre-typed (tap-to-text, like running-late) and
+                  marks a ✓; re-askable; the box toggles by hand. Hidden when turned off in Settings. */}
+              {appt.status === "done" && ((business && business.review) ? business.review.enabled !== false : true) && (
+                <div style={{ padding: "16px 18px 2px" }}>
+                  {appt.reviewAsked ? (
+                    <div style={{ display: "flex", gap: 11, alignItems: "center", padding: "13px 15px", borderRadius: 13, background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))" }}>
+                      <button onClick={toggleReviewAsked} title="Tap to unmark" aria-label="Unmark review requested" style={{ flexShrink: 0, width: 27, height: 27, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer" }}><Check size={15} strokeWidth={3} /></button>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, letterSpacing: 1.1, textTransform: "uppercase", fontWeight: 700, color: "var(--gold)" }}>Google review requested{typeof appt.reviewAsked === "number" ? " · " + new Date(appt.reviewAsked).toLocaleDateString([], { month: "short", day: "numeric" }) : ""}</div>
+                      <button className="lift" onClick={openReviewText} style={{ flexShrink: 0, background: "none", border: "1px solid color-mix(in srgb, var(--gold) 45%, var(--border))", color: "var(--gold)", borderRadius: 9, padding: "7px 12px", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Ask again</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <button className="lift" onClick={openReviewText} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--panel)", border: "1px solid color-mix(in srgb, var(--gold) 45%, var(--border))", color: "var(--gold)", borderRadius: 13, padding: "13px 15px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}><Star size={16} /> Ask for Google review</button>
+                      <button onClick={toggleReviewAsked} title="Mark as asked" aria-label="Mark review requested" style={{ flexShrink: 0, width: 46, height: 46, borderRadius: 12, border: "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                        <span style={{ width: 18, height: 18, borderRadius: 5, border: "2px solid var(--faint)", display: "block" }} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* PROGRESS CARD — live in-service timer; gated by Calendar Settings */}
               {appt.status === "in-service" && ((business && business.calendar) ? business.calendar.progressCard !== false : true) && (
