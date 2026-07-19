@@ -319,11 +319,11 @@ const hexById = (id) => (SERVICE_PALETTE.find((c) => c.id === id) || SERVICE_PAL
 const DEFAULT_BUSINESS = {
   name: "",
   legalName: "",
-  address: "2077 NE Town Center Dr",
-  address2: "Suite 120",
-  cityZip: "Beaverton, OR 97006",
-  email: "hello@meridianstudio.com",
-  phones: [{ id: "ph1", label: "Main", number: "(503) 555-0142" }],
+  address: "",
+  address2: "",
+  cityZip: "",
+  email: "",
+  phones: [{ id: "ph1", label: "Main", number: "" }],
   logoText: "", // optional custom logo wordmark (falls back to business name)
   showAddonPhotos: true, // owner preference toggle
   aiCutHelper: false, // when ON, shows "Show us a photo" + "I'm not sure" on Pick Your Cut (needs reference photos uploaded first)
@@ -14239,6 +14239,11 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // Open the live client booking flow in a new tab, deep-linked straight to THIS service's
   // questions/add-ons screen — so the owner sees exactly what a client sees while editing.
   const previewBooking = () => { try { const base = window.location.origin + "/book"; window.open(form.id ? base + "?preview_svc=" + encodeURIComponent(form.id) : base, "_blank"); } catch (e) {} };
+  // Real, shareable direct link to THIS service on the live booking page. Carries the shop id
+  // (so it resolves the right tenant) + preview_svc (jumps straight to this service). This is
+  // the SAME deep-link the owner "Preview" uses, pointed at production.
+  const directBookLink = `https://gotvero.com/book?shop=${_shopIdFromUrl()}&preview_svc=${encodeURIComponent(form.id || "")}`;
+  const copyDirectLink = () => { try { navigator.clipboard.writeText(directBookLink); showToast("Link copied."); } catch (e) { showToast("Couldn't copy — long-press the link to copy it."); } };
   // Mangomint-style single link at the BOTTOM of the whole Add-ons screen.
   const previewLink = (
     <div style={{ borderTop: "1px solid var(--line)", marginTop: 24, paddingTop: 20 }}>
@@ -14837,8 +14842,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       <div style={{ marginTop: 18 }}>
         <FieldLabel>Direct link</FieldLabel>
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 13px" }}>
-          <span style={{ flex: 1, fontSize: 14, color: "var(--gold)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>booking.meridian.app/{(business.name || "studio").toLowerCase().replace(/\s+/g, "")}/{form.id}</span>
-          <button onClick={() => showToast("Link copied.")} style={{ background: "none", color: "var(--sub)" }}><Copy size={16} /></button>
+          <span style={{ flex: 1, fontSize: 14, color: "var(--gold)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{directBookLink.replace(/^https:\/\//, "")}</span>
+          <button onClick={copyDirectLink} style={{ background: "none", color: "var(--sub)" }}><Copy size={16} /></button>
         </div>
       </div>
       {b.confirmSheet && (
@@ -28557,7 +28562,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const firstName = (live.name || "").split(" ")[0] || "this client";
   const saveBirthday = (iso) => setClients(clients.map((c) => c.id === live.id ? { ...c, birthday: iso || undefined } : c));
   const fmtBday = (v) => { if (!v) return null; const d = new Date(v); if (isNaN(d.getTime())) return String(v); return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
-  const [pfTab, setPfTab] = useState("timeline"); // timeline | gallery | pricing | family
+  const [pfTab, setPfTab] = useState(null); // null = card overview; "timeline" | "gallery" | "pricing" | "family" = that section open WITHIN the card (back arrow returns to overview)
   const [openMember, setOpenMember] = useState(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [mName, setMName] = useState("");
@@ -28788,6 +28793,9 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       {/* Onyx-Ivory redesign (bite #1): palette overridden on the vars above so the whole subtree
           recolors; this rule forces Hanken everywhere so no hardcoded serif (Fraunces/Bodoni) leaks in. */}
       <style>{".cp-onyx,.cp-onyx *{font-family:'Hanken Grotesk',sans-serif !important}.cp-onyx ::selection{background:#e9e9e7}"}</style>
+      {/* CARD OVERVIEW — header, contact, lifetime, and the Details rows. Hidden while a section
+          is open so the section takes over the card (back arrow returns here). */}
+      {!pfTab && (<>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button onClick={() => setMenuOpen(true)} style={{ background: "none", border: "none", color: "#B4B3AE", cursor: "pointer", padding: 4 }}><MoreHorizontal size={20} /></button>
       </div>
@@ -28848,6 +28856,17 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           </button>
         ); })}
       </div>
+      </>)}
+
+      {/* FOCUSED SECTION HEADER — shown in place of the overview when a Details row is open. */}
+      {pfTab && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0 14px" }}>
+          <button onClick={() => { setPfTab(null); setOpenMember(null); setEditingNote(false); }} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: "6px 2px", cursor: "pointer", color: "#161616", fontSize: 15, fontWeight: 600 }} aria-label="Back to client">
+            <ChevronLeft size={20} /> {live.name}
+          </button>
+          <span style={{ marginLeft: "auto", fontSize: 13, letterSpacing: 1.4, textTransform: "uppercase", color: "#B4B3AE", fontWeight: 700 }}>{({ timeline: "Timeline", gallery: "Photos", pricing: "Pricing & duration", family: "Family" })[pfTab] || ""}</span>
+        </div>
+      )}
 
       {picker && <StaffPhotoPicker hasPhoto={!!live.photo} startTab="upload" noStock onFail={() => showToast && showToast("Couldn't use that photo — please try again.")} onClose={() => setPicker(false)} onPick={setClientPhoto} onRemove={removeClientPhoto} />}
       {galPicker && <PhotoPicker startTab="upload" onFail={() => showToast && showToast("Couldn't use that photo — please try again.")} onClose={() => setGalPicker(false)} onPick={addGalleryPhoto} />}
