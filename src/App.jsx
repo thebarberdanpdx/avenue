@@ -20335,6 +20335,20 @@ function AddOnsEditor({ services, setServices, providers, business, setBusiness,
     materialize(nextLib);
     setEditing(null); setForm(null); showToast("Add-on removed.");
   };
+  // [addon-lib-reorder] Move an add-on up/down in the library. Library array order IS the display
+  // order, so we reorder the array and immediately re-materialize — that rewrites every service's
+  // add-on groups in the new library order (materialize already builds `mine` in nextLib order), so
+  // all services stay in sync. No numeric order field (avoids the undefined-order regression).
+  const move = (id, dir) => {
+    const i = lib.findIndex((a) => a.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= lib.length) return;
+    const nextLib = lib.slice();
+    const [it] = nextLib.splice(i, 1);
+    nextLib.splice(j, 0, it);
+    setBusiness({ ...business, addOnsLibrary: nextLib });
+    materialize(nextLib);
+  };
   const toggleSvc = (id) => setForm((f) => ({ ...f, services: (f.services || []).includes(id) ? f.services.filter((x) => x !== id) : [...(f.services || []), id] }));
 
   // shared premium style idiom (matches ProductsEditor)
@@ -20452,19 +20466,27 @@ function AddOnsEditor({ services, setServices, providers, business, setBusiness,
 
   return (
     <div className="fade-up">
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 8 }}>Build once, attach to any service. Clients get asked while booking — required ones must be answered before they can continue.</p>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 8 }}>Build once, attach to any service. Clients get asked while booking — required ones must be answered before they can continue. Use the arrows to set the order — every service shows its add-ons in this order.</p>
       {lib.length === 0 && <p style={{ fontSize: 14.5, color: "var(--faint)", padding: "26px 0", textAlign: "center", fontStyle: "italic" }}>No add-ons yet.</p>}
       {lib.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 4 }}>
-          {lib.map((a) => (
-            <button key={a.id} onClick={() => { setForm(JSON.parse(JSON.stringify(a))); setEditing(a.id); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "16px 18px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
-              <span style={{ width: 50, height: 50, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{a.photo ? <img src={imgUrl(a.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={18} style={{ color: "var(--faint)" }} />}</span>
-              <span style={{ minWidth: 0, flex: 1 }}>
-                <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500 }}>{a.name}</span>
-                <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 4, letterSpacing: 0.2 }}>{a.required ? "Required · " : ""}{(a.services || []).length ? (a.services || []).map(svcName).join(", ") : "Not attached yet"}</span>
-              </span>
-              <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, flexShrink: 0 }}>${Number(a.price) || 0}</span>
-            </button>
+          {lib.map((a, idx) => (
+            <div key={a.id} style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
+              <button onClick={() => { setForm(JSON.parse(JSON.stringify(a))); setEditing(a.id); }} className="lift" style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "16px 18px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
+                <span style={{ width: 50, height: 50, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{a.photo ? <img src={imgUrl(a.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={18} style={{ color: "var(--faint)" }} />}</span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500 }}>{a.name}</span>
+                  <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 4, letterSpacing: 0.2 }}>{a.required ? "Required · " : ""}{(a.services || []).length ? (a.services || []).map(svcName).join(", ") : "Not attached yet"}</span>
+                </span>
+                <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, flexShrink: 0 }}>${Number(a.price) || 0}</span>
+              </button>
+              {lib.length > 1 && (
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, flexShrink: 0 }}>
+                  <button onClick={() => move(a.id, -1)} disabled={idx === 0} aria-label="Move up" style={{ background: "none", border: "none", color: idx === 0 ? "var(--faint)" : "var(--sub)", padding: "4px 3px", cursor: idx === 0 ? "default" : "pointer", opacity: idx === 0 ? 0.35 : 1, display: "flex" }}><ChevronUp size={20} /></button>
+                  <button onClick={() => move(a.id, 1)} disabled={idx === lib.length - 1} aria-label="Move down" style={{ background: "none", border: "none", color: idx === lib.length - 1 ? "var(--faint)" : "var(--sub)", padding: "4px 3px", cursor: idx === lib.length - 1 ? "default" : "pointer", opacity: idx === lib.length - 1 ? 0.35 : 1, display: "flex" }}><ChevronDown size={20} /></button>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
