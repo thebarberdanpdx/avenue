@@ -72,7 +72,7 @@ const CUT_DESC_LINE = (src.match(/const CONSOLIDATE_CUT_DESC = "[^"]*";/) || [])
 if (!CUT_DESC_LINE) throw new Error("resolvers.test: CONSOLIDATE_CUT_DESC not found in src/App.jsx — refusing to pass");
 const SHOP_TZ_LINE = (src.match(/const SHOP_TZ = "[^"]*";/) || [])[0];
 if (!SHOP_TZ_LINE) throw new Error("resolvers.test: SHOP_TZ not found in src/App.jsx — refusing to pass");
-const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig", "impParseCSV", "impDigits", "impGuess", "impGuessMap", "impPhone", "impBlocked", "impMoney", "resolveAuthStaff", "ownerAccessResilient", "clientListComparator"];
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig", "impParseCSV", "impDigits", "impGuess", "impGuessMap", "impPhone", "impBlocked", "impMoney", "resolveAuthStaff", "ownerAccessResilient", "clientListComparator", "statusPatch"];
 const extraSrc = CUT_DESC_LINE + "\n" + SHOP_TZ_LINE + "\n" + EXTRA.map(grab).join("\n");
 // computeFreeSlots has a destructuring parameter ({...}), which grab()'s brace-matcher
 // mistakes for the body — extract it by anchors instead. It depends on hoursForDate +
@@ -632,4 +632,36 @@ test("resolveAuthStaff: falls back to the first owner so a signed-in owner keeps
   // A feed with pulseRole stripped (sanitized) → no owner to fall back to → null (handled by the fail-safe).
   const stripped = [{ id: "dan", name: "Dan", role: "Master Barber" }, { id: "heather", name: "Heather", role: "Stylist" }];
   assert.equal(R.resolveAuthStaff("someoneelse@gmail.com", stripped), null);
+});
+
+// ─── statusPatch: reverting to a pre-service status resets the running timer ──
+// Root cause (Dan): the elapsed timer derives purely from serviceStartedAt. Moving an in-service
+// appt BACK to Confirmed left the old timestamp, so the next "Start service" continued the timer
+// instead of restarting it. statusPatch clears the timer on any pre-service status.
+test("statusPatch: in-service stamps serviceStartedAt only when not already set", () => {
+  const fresh = R.statusPatch({}, "in-service");
+  assert.equal(fresh.status, "in-service");
+  assert.ok(typeof fresh.serviceStartedAt === "number" && fresh.serviceStartedAt > 0); // fresh start stamped
+  const already = R.statusPatch({ serviceStartedAt: 111 }, "in-service");
+  assert.equal(already.status, "in-service");
+  assert.ok(!("serviceStartedAt" in already)); // keeps the running timer — never restarts a live visit
+});
+test("statusPatch: reverting a started visit to a pre-service status clears the timer", () => {
+  for (const st of ["confirmed", "checked-in", "unconfirmed"]) {
+    const p = R.statusPatch({ serviceStartedAt: 111, serviceEndedAt: 222, pendingDurationSave: 30 }, st);
+    assert.equal(p.status, st);
+    assert.equal(p.serviceStartedAt, null, `${st} clears serviceStartedAt`);
+    assert.equal(p.serviceEndedAt, null, `${st} clears serviceEndedAt`);
+    assert.equal(p.pendingDurationSave, null, `${st} clears pendingDurationSave`);
+  }
+});
+test("statusPatch: a pre-service status on an appt that never started is a no-op on timer fields", () => {
+  const p = R.statusPatch({}, "confirmed");
+  assert.equal(p.status, "confirmed");
+  assert.ok(!("serviceStartedAt" in p)); // nothing to clear — don't write nulls onto a clean appt
+});
+test("statusPatch: done freezes the timer (never cleared)", () => {
+  const p = R.statusPatch({ serviceStartedAt: 111, serviceEndedAt: 222 }, "done");
+  assert.equal(p.status, "done");
+  assert.ok(!("serviceStartedAt" in p)); // done keeps the elapsed record for history
 });
