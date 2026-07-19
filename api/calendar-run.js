@@ -73,11 +73,18 @@ function reconcileFeedServer(currentAppts, events, opts) {
   const providerId = opts.providerId || null;
   const feedId = opts.feedId;
   const tz = opts.tz || DEFAULT_TZ;
+  // [synced-appt-preserve] MUST match reconcileFeed() in src/App.jsx. A synced appt that has been
+  // WORKED (client attached / non-"confirmed" status / checked in-out / paid / line items) is a REAL
+  // appointment — a re-import must NEVER rebuild it back to a bare "confirmed" mirror. ROOT BUG this
+  // fixes: the daily cron reset every synced appt's status to "confirmed" and dropped clientId/paid/
+  // serviceStartedAt/serviceEndedAt, so a checked-out synced appt reverted + lost its checkout.
+  const worked = (a) => !!(a && (a.clientId || (a.status && a.status !== "confirmed") || a.serviceStartedAt != null || a.serviceEndedAt != null || (a.paid && Number(a.paid.total) > 0) || (Array.isArray(a.lineItems) && a.lineItems.length > 0)));
   const toAppt = (ev, ex) => {
     const { name, service } = splitSummary(ev.summary);
     const start = localMins(ev.start, tz);
     let end = ev.end ? localMins(ev.end, tz) : null;
     if (end == null || end <= start) end = start + 30;
+    if (ex && worked(ex)) return { ...ex, source: "sync", _synced: true, syncUid: ev.uid, syncFeed: feedId }; // real appt — preserve verbatim, only re-tag
     return {
       id: ex ? ex.id : ("sync_" + feedId + "_" + hashStr(ev.uid).toString(36)),
       source: "sync", _synced: true, syncUid: ev.uid, syncFeed: feedId,
@@ -104,7 +111,11 @@ function reconcileFeedServer(currentAppts, events, opts) {
     else if (ex.start !== appt.start || ex.end !== appt.end || ex.bookedFor !== appt.bookedFor || ex.title !== appt.title || ex.providerId !== appt.providerId) moved++;
     kept.push(appt);
   }
-  const toCancel = mine.filter((a) => a.syncUid && !incomingUids.has(a.syncUid));
+  // [synced-appt-preserve] a WORKED appt whose outside event vanished is a real record — never delete
+  // it; keep it (still tagged). Only bare, untouched mirror blocks are cancel/delete candidates.
+  const vanished = mine.filter((a) => a.syncUid && !incomingUids.has(a.syncUid));
+  const keptWorkedOrphans = vanished.filter(worked);
+  const toCancel = vanished.filter((a) => !worked(a));
   const emptyFeed = incoming.length === 0 && mine.length > 0;
   const tooMany = toCancel.length > Math.max(5, Math.ceil(mine.length * 0.34));
   if (emptyFeed || tooMany) {
@@ -112,7 +123,7 @@ function reconcileFeedServer(currentAppts, events, opts) {
     const brandNew = kept.filter((a) => !byUid.has(a.syncUid));
     return { next: [...rest, ...safe, ...brandNew], changes: { added, moved, cancelled: 0 }, blocked: true, blockedCount: toCancel.length };
   }
-  return { next: [...rest, ...kept], changes: { added, moved, cancelled: toCancel.length }, blocked: false, blockedCount: 0 };
+  return { next: [...rest, ...kept, ...keptWorkedOrphans], changes: { added, moved, cancelled: toCancel.length }, blocked: false, blockedCount: 0 };
 }
 
 async function syncShop(supabase, shop) {
