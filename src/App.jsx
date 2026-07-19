@@ -26054,10 +26054,8 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
   }, []);
   const WARN = "#D89A4B";   // amber — 10 min or less left
   const URGENT = "#C8702E"; // burnt amber — 5 min or less, or over (warm, never red)
-  const C = 264;            // circumference for r=42
+  const RC = 2 * Math.PI * 54; // ring circumference for r=54
   const totalSec = secondsInto != null ? secondsInto : (minutesInto || 0) * 60;
-  const mm = Math.floor(totalSec / 60), ss = totalSec % 60;
-  const over = minutesLeft < 0;
   const min10 = minutesLeft <= 10;
   const min5 = minutesLeft <= 5;
   const stage = min5 ? URGENT : (min10 ? WARN : CUT);
@@ -26067,78 +26065,68 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
   const tagLabel = min10 ? "Wrapping up" : "Cutting";
   const leftBig = minutesLeft > 0 ? `${minutesLeft}` : (minutesLeft === 0 ? "0" : `+${Math.abs(minutesLeft)}`);
   const leftLab = minutesLeft >= 0 ? "min left" : "min over";
-  const pillBg = minutesLeft <= 5 ? "#D89A2E" : "#E8B04B";
   const showLatePrompt = (min10 || startedLate) && nextClient;
-  // "Up next" line — synced to the barber's calendar so a gap is obvious at a glance.
-  const upGap = (upNext && !upNext.waiting && nowMin != null) ? (upNext.start - nowMin) : null;
-  const upGapLabel = upGap == null ? "" : upGap <= 0 ? "now" : upGap < 60 ? `in ${upGap} min` : `in ${Math.floor(upGap / 60)}h${upGap % 60 ? " " + (upGap % 60) + "m" : ""}`;
+  // "Next" is one relationship, not a second countdown: when THIS cut should finish (projEnd = now +
+  // minutesLeft) vs when the next client is due. Buffer = the gap → "8 min to spare" / "3 min over".
+  const projEnd = nowMin != null ? nowMin + minutesLeft : null;
+  const buffer = (upNext && !upNext.waiting && projEnd != null) ? (upNext.start - projEnd) : null;
+  const bufferLabel = !upNext ? "" : upNext.waiting ? "checked in" : buffer == null ? "" : buffer >= 0 ? `${buffer} min to spare` : `${Math.abs(buffer)} min over`;
+  const behind = (buffer != null && buffer < 0) || min10;
+  const nextFirst = nextClient ? String(nextClient.name || "").trim().split(/\s+/)[0] : "";
   return (
-    <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
-      <div style={{ background: "radial-gradient(120% 120% at 50% 0%, #26241F 0%, #1A1916 62%)", border: "1px solid #34322C", borderRadius: 18, padding: 18, boxShadow: "0 14px 36px rgba(18,14,8,.34)", color: "#F4EFE4" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 16 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 8, background: `color-mix(in srgb, ${tagColor} 18%, transparent)`, border: `1px solid color-mix(in srgb, ${tagColor} 45%, transparent)`, color: tagColor, fontSize: 13, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", padding: "5px 12px 5px 10px", borderRadius: 30 }}>
-            <span style={{ position: "relative", width: 9, height: 9 }}>
-              <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: `color-mix(in srgb, ${tagColor} 45%, transparent)`, animation: "pulse 1.7s var(--ease) infinite" }} />
+    <div style={{ padding: "18px 18px", borderBottom: `1px solid ${T.line}` }}>
+      <div style={{ background: "radial-gradient(120% 120% at 50% 0%, #221F1A 0%, #191712 62%)", border: "1px solid #322F29", borderRadius: 20, padding: "24px 22px 22px", color: "#F1ECE0" }}>
+        {/* Centered header: status · client · service · one countdown ring */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 9, color: tagColor, fontSize: 11.5, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
+            <span style={{ position: "relative", width: 7, height: 7 }}>
+              <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: `color-mix(in srgb, ${tagColor} 40%, transparent)`, animation: "pulse 2.1s var(--ease) infinite" }} />
               <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: tagColor }} />
             </span>
             {tagLabel}
           </span>
-          {name && <span style={{ fontSize: 15, fontWeight: 600, marginLeft: "auto", color: "#F4EFE4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "55%" }}>{name}</span>}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <div style={{ position: "relative", width: 104, height: 104, flexShrink: 0 }}>
-            <svg width="104" height="104" style={{ transform: "rotate(-90deg)" }}>
-              <circle cx="52" cy="52" r="42" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="7" />
-              <circle cx="52" cy="52" r="42" fill="none" stroke={ringColor} strokeWidth="7" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - pct / 100)} style={{ transition: "stroke-dashoffset 1s linear, stroke .4s", filter: `drop-shadow(0 0 5px color-mix(in srgb, ${ringColor} 55%, transparent))` }} />
+          {name && <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.01em", color: "#F7F2E7", marginTop: 15, textWrap: "balance" }}>{name}</div>}
+          {title && <div style={{ fontSize: 13.5, color: "rgba(241,236,224,.52)", marginTop: 8 }}>{title}</div>}
+          <div style={{ position: "relative", width: 124, height: 124, marginTop: 24 }}>
+            <svg width="124" height="124" style={{ transform: "rotate(-90deg)" }}>
+              <circle cx="62" cy="62" r="54" fill="none" stroke="rgba(241,236,224,.11)" strokeWidth="3" />
+              <circle cx="62" cy="62" r="54" fill="none" stroke={ringColor} strokeWidth="3" strokeLinecap="round" strokeDasharray={RC} strokeDashoffset={RC * (1 - pct / 100)} style={{ transition: "stroke-dashoffset 1s linear, stroke .4s" }} />
             </svg>
-            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 26, lineHeight: 1, color: "#FBF7EE", fontVariantNumeric: "tabular-nums" }}>{mm}:{String(ss).padStart(2, "0")}</span>
-              <span style={{ fontSize: 10.5, letterSpacing: 2, color: "rgba(244,239,228,.5)", textTransform: "uppercase", marginTop: 4 }}>in chair</span>
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5 }}>
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 38, lineHeight: 1, color: "#F9F4EA", fontVariantNumeric: "tabular-nums" }}>{leftBig}</span>
+              <span style={{ fontSize: 10, letterSpacing: 2, color: "rgba(241,236,224,.5)", textTransform: "uppercase" }}>{leftLab}</span>
             </div>
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {title && <div style={{ fontSize: 16, fontWeight: 600, color: "#F4EFE4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>}
-            <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginTop: 10 }}>
-              <span style={{ fontSize: 21, fontWeight: 600, color: min10 ? stage : "#F4EFE4", fontVariantNumeric: "tabular-nums" }}>{leftBig}</span>
-              <span style={{ fontSize: 13, color: "rgba(244,239,228,.55)" }}>{leftLab}</span>
-            </div>
-            <div style={{ fontSize: 13, color: "rgba(244,239,228,.5)", marginTop: 3 }}>{dur} min booked</div>
           </div>
         </div>
-        {/* Up next — synced to the barber's calendar (gap-aware), independent of when the timer was started.
-            Shown big so the next client is always clear at a glance. */}
-        <div style={{ marginTop: 15, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,.09)" }}>
-          <div style={{ fontSize: 12, letterSpacing: 1.8, textTransform: "uppercase", color: "rgba(244,239,228,.5)", fontWeight: 700, marginBottom: 7 }}>Next in the chair</div>
-          {upNext ? (
-            <>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                <span style={{ fontSize: 20, fontWeight: 600, color: "#F4EFE4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{upNext.name}</span>
-                <span style={{ marginLeft: "auto", fontSize: 16, fontWeight: 600, color: tagColor, whiteSpace: "nowrap", flexShrink: 0 }}>{upNext.waiting ? "checked in" : fmtTime(upNext.start)}</span>
-              </div>
-              {!upNext.waiting && upGapLabel && (
-                <div style={{ fontSize: 13, color: "rgba(244,239,228,.6)", marginTop: 3 }}>{upGapLabel === "now" ? "Due now" : `Starts ${upGapLabel}`}</div>
-              )}
-            </>
-          ) : (
-            <div style={{ fontSize: 15, color: "rgba(244,239,228,.5)", fontStyle: "italic" }}>Open chair after this</div>
+        <div style={{ height: 1, background: "rgba(241,236,224,.10)", margin: "22px 0" }} />
+        {/* Next — a time + your buffer, never a second countdown */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11, letterSpacing: 1.8, textTransform: "uppercase", color: "rgba(241,236,224,.34)", fontWeight: 700, marginBottom: 7 }}>Next</div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: "#F1ECE0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{upNext ? upNext.name : "Open chair after this"}</div>
+          </div>
+          {upNext && (
+            <div style={{ textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: "#F1ECE0" }}>{upNext.waiting ? "Waiting" : fmtTime(upNext.start)}</div>
+              {bufferLabel && <div style={{ fontSize: 12.5, marginTop: 3, color: behind ? WARN : "rgba(241,236,224,.5)", fontWeight: behind ? 600 : 400 }}>{bufferLabel}</div>}
+            </div>
           )}
         </div>
+        {/* Running behind — kept from the old popup, minus the tacky box. onLetThemKnow opens the
+            barber's OWN Messages pre-typed (the existing running-late tap-to-text); nothing auto-sends. */}
+        {showLatePrompt && (
+          lateNotified ? (
+            <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ fontSize: 13.5, color: tagColor, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}><Check size={15} style={{ flexShrink: 0 }} /> Heads-up sent · running {lateNotified} min behind</div>
+              {onSendAgain && <button className="lift" onClick={onSendAgain} style={{ flexShrink: 0, background: "none", border: `1px solid color-mix(in srgb, ${WARN} 55%, transparent)`, color: "#F1ECE0", borderRadius: 10, padding: "7px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Send again</button>}
+            </div>
+          ) : (
+            <button className="lift" onClick={onLetThemKnow} style={{ marginTop: 16, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", border: `1px solid color-mix(in srgb, ${WARN} 55%, transparent)`, color: WARN, borderRadius: 12, padding: "13px 16px", fontSize: 14.5, fontWeight: 600, lineHeight: 1.35, cursor: "pointer" }}>
+              {nextFirst ? `Text ${nextFirst} you're running a few min behind →` : "Let them know you're behind →"}
+            </button>
+          )
+        )}
       </div>
-      {showLatePrompt && (
-        <div style={{ marginTop: 12, border: `1.5px solid ${pillBg}`, borderRadius: 14, background: T.panel, padding: "15px 16px" }}>
-          {lateNotified ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <div style={{ fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}><Check size={15} style={{ flexShrink: 0 }} /> Notified · running {lateNotified} min behind</div>
-              {onSendAgain && <button className="lift" onClick={onSendAgain} style={{ flexShrink: 0, background: "none", border: `1px solid ${pillBg}`, color: T.text, borderRadius: 9, padding: "6px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Send again</button>}
-            </div>
-          ) : (
-            <>
-              <div style={{ fontSize: 14, color: T.text, marginBottom: 12, lineHeight: 1.45 }}>{startedLate ? `This one started about ${startedLateBy} min late. ` : ""}{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running a few minutes behind?</div>
-              <button className="lift" onClick={onLetThemKnow} style={{ width: "100%", background: pillBg, color: "#3a2e10", padding: "13px", borderRadius: 11, fontSize: 14, fontWeight: 700, border: "none" }}>Let them know</button>
-            </>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -26466,7 +26454,13 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const startedLateBy = appt.serviceStartedAt != null
     ? Math.round((new Date(appt.serviceStartedAt).getHours() * 60 + new Date(appt.serviceStartedAt).getMinutes()) - appt.start)
     : 0;
-  const startedLate = startedLateBy >= 5;
+  // Sanity guardrail [inservice-sane-late]: only treat it as "running late" inside a believable window.
+  // A gap of hours (a stale/forgotten "Start service", an appt left open overnight, a test row) is NOT
+  // "a few minutes behind" — screaming "779 min late" and offering a running-behind text is nonsense.
+  // Past the cap we suppress the late nudge AND the "began on time?" snap chip; the sheet still shows a
+  // calm "Started HH:MM · Edit" so it's always correctable. (Root-caused 2026-07-19: the 133/779-min screen.)
+  const LATE_SANE_MAX = 180;
+  const startedLate = startedLateBy >= 5 && startedLateBy <= LATE_SANE_MAX;
 
   // ---- theme tokens: read straight from the active app theme ----
   const T = {
