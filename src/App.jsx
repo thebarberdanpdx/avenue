@@ -23115,7 +23115,20 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     return () => { clearTimeout(t); window.removeEventListener("resize", measure); window.removeEventListener("orientationchange", measure); };
   }, []);
 
-  const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts((cur) => { const next = cur.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a)); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; }); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } setTimeout(() => handleFreedSlot(freed), 350); } };
+  // [timer-reset-on-revert] The elapsed timer is derived purely from serviceStartedAt. Moving an appt
+  // to a PRE-service status (Confirmed / In lobby / Unconfirmed) must clear the running-timer fields —
+  // otherwise a later "Start service" keeps the OLD serviceStartedAt (the `!serviceStartedAt` guard
+  // below sees it's already set) and the timer continues instead of restarting. Same "back like they
+  // haven't come in" reset the refund→confirmed paths already do. reconcileCheckinOutbox respects this
+  // deliberate local downgrade, so the durable-checkin overlay won't resurrect the old start time.
+  const statusPatch = (a, status) => {
+    if (status === "in-service") return { status, ...(a.serviceStartedAt ? {} : { serviceStartedAt: Date.now() }) };
+    if ((status === "confirmed" || status === "checked-in" || status === "unconfirmed") && a.serviceStartedAt != null) {
+      return { status, serviceStartedAt: null, serviceEndedAt: null, pendingDurationSave: null };
+    }
+    return { status };
+  };
+  const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts((cur) => { const next = cur.map((a) => (a.id === id ? { ...a, ...statusPatch(a, status) } : a)); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; }); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, ...statusPatch(o, status) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } setTimeout(() => handleFreedSlot(freed), 350); } };
   // open checkout instead of silently completing
   // #16: an appointment that already carries a payment (checked out once, or a status reverted after
   // payment) must open in balance-only (reopen) mode — never the full-price charge flow — so it can
