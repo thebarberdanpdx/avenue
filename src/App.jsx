@@ -28672,6 +28672,21 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const [mName, setMName] = useState("");
   const [mNote, setMNote] = useState("");
   const [menuOpen, setMenuOpen] = useState(false); // kebab menu (block / unblock)
+  // [client-edit-details] Edit the core contact fields (name / phone / email) in place — the card had
+  // NO way to fix a wrong name or number before (phone/email were tap-to-call/email links only).
+  const [editContact, setEditContact] = useState(false);
+  const [cName, setCName] = useState("");
+  const [cPhone, setCPhone] = useState("");
+  const [cEmail, setCEmail] = useState("");
+  const openContactEdit = () => { setCName(live.name || ""); setCPhone(live.phone || ""); setCEmail(live.email || ""); setEditContact(true); };
+  const saveContact = () => {
+    const name = cName.trim() || live.name; // never let the name go blank
+    const next = clients.map((c) => c.id === live.id ? { ...c, name, phone: cPhone.trim(), email: cEmail.trim() } : c);
+    setClients(next);
+    if (flushClientsNow) queueMicrotask(() => flushClientsNow(next)); // durable — a corrected number can't be lost to a swipe-away
+    setEditContact(false); showToast("Client details saved.");
+  };
+  const cEditInput = { width: "100%", boxSizing: "border-box", background: "#F5F5F3", border: "1px solid #E7E6E3", borderRadius: 10, padding: "10px 12px", color: "#161616", fontSize: 15.5, fontFamily: "inherit" };
   const family = live.family || [];
   const addFamilyMember = () => {
     if (!mName.trim()) return;
@@ -28900,8 +28915,15 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       {/* CARD OVERVIEW — header, contact, lifetime, and the Details rows. Hidden while a section
           is open so the section takes over the card (back arrow returns here). */}
       {!pfTab && (<>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button onClick={() => setMenuOpen(true)} style={{ background: "none", border: "none", color: "#B4B3AE", cursor: "pointer", padding: 4 }}><MoreHorizontal size={20} /></button>
+      <div style={{ display: "flex", justifyContent: editContact ? "space-between" : "flex-end", alignItems: "center" }}>
+        {editContact ? (
+          <>
+            <button onClick={() => setEditContact(false)} style={{ background: "none", border: "none", color: "#8C8B87", cursor: "pointer", padding: 4, fontSize: 15.5, fontFamily: "inherit" }}>Cancel</button>
+            <button onClick={saveContact} style={{ background: "#161616", border: "none", color: "#fff", cursor: "pointer", padding: "8px 18px", borderRadius: 20, fontSize: 15, fontWeight: 600, fontFamily: "inherit" }}>Done</button>
+          </>
+        ) : (
+          <button onClick={() => setMenuOpen(true)} style={{ background: "none", border: "none", color: "#B4B3AE", cursor: "pointer", padding: 4 }}><MoreHorizontal size={20} /></button>
+        )}
       </div>
 
       {/* header: ring monogram · name · pill · since */}
@@ -28912,7 +28934,9 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           </span>
           <span style={{ position: "absolute", bottom: 0, right: 2, width: 24, height: 24, borderRadius: "50%", background: "#161616", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #fff" }}><Camera size={12} /></span>
         </button>
-        <div style={{ fontSize: 27, fontWeight: 800, letterSpacing: "-0.5px", marginTop: 14, color: "#161616" }}>{live.name}</div>
+        {editContact
+          ? <input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Client name" style={{ ...cEditInput, marginTop: 14, textAlign: "center", fontSize: 22, fontWeight: 700, maxWidth: 320 }} />
+          : <div style={{ fontSize: 27, fontWeight: 800, letterSpacing: "-0.5px", marginTop: 14, color: "#161616" }}>{live.name}</div>}
         {pillLabel && <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 11, padding: "5px 12px", border: `1px solid ${isBlocked ? "rgba(155,35,35,0.4)" : "rgba(0,0,0,0.16)"}`, borderRadius: 20, color: isBlocked ? "#9B2323" : "#333", fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase" }}>{!isBlocked && "★ "}{pillLabel}</div>}
         <div style={{ fontSize: 13.5, color: "#8C8B87", marginTop: 10 }}>{sinceLabel && sinceLabel !== "—" ? `Client since ${sinceLabel}` : "New client"}{provider && provider.name ? ` · with ${provider.name}` : ""}</div>
       </div>
@@ -28928,8 +28952,12 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {/* CONTACT */}
       <div style={cpSec}><span style={cpSecBar} /><span style={cpSecTx}>Contact</span></div>
-      <div style={cpField}><div style={cpFieldL}>Phone</div><div style={cpFieldV}>{live.phone ? <PhoneLink number={live.phone} /> : <span style={{ color: "#B4B3AE" }}>Not on file</span>}</div></div>
-      <div style={cpField}><div style={cpFieldL}>Email</div><div style={cpFieldV}>{live.email ? <EmailLink email={live.email} /> : <span style={{ color: "#B4B3AE" }}>Not on file</span>}</div></div>
+      <div style={cpField}><div style={cpFieldL}>Phone</div><div style={cpFieldV}>{editContact
+        ? <input value={cPhone} onChange={(e) => setCPhone(e.target.value)} type="tel" inputMode="tel" placeholder="Phone number" style={cEditInput} />
+        : (live.phone ? <PhoneLink number={live.phone} /> : <span style={{ color: "#B4B3AE" }}>Not on file</span>)}</div></div>
+      <div style={cpField}><div style={cpFieldL}>Email</div><div style={cpFieldV}>{editContact
+        ? <input value={cEmail} onChange={(e) => setCEmail(e.target.value)} type="email" inputMode="email" autoCapitalize="off" placeholder="Email address" style={cEditInput} />
+        : (live.email ? <EmailLink email={live.email} /> : <span style={{ color: "#B4B3AE" }}>Not on file</span>)}</div></div>
       <div style={cpField}><div style={cpFieldL}>Birthday</div><div style={cpFieldV}>{editBday ? (
         <input type="date" autoFocus value={live.birthday ? String(live.birthday).slice(0, 10) : ""} onChange={(e) => saveBirthday(e.target.value ? new Date(e.target.value + "T12:00:00").toISOString() : "")} onBlur={() => setEditBday(false)} style={{ background: "#F5F5F3", border: "1px solid #E7E6E3", borderRadius: 9, padding: "6px 10px", color: "#161616", fontSize: 14 }} />
       ) : (
@@ -29166,8 +29194,9 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {/* ============ KEBAB MENU ============ */}
       <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} align="center" maxWidth={380}>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 14 }}>{live.name}</h2>
-        <button onClick={() => { setMenuOpen(false); setDeletePrompt(true); }} style={{ width: "100%", textAlign: "left", background: "none", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", fontSize: 16, color: "#c0392b", fontFamily: FONT_BODY, cursor: "pointer" }}>Delete client…</button>
+        <div style={{ fontFamily: FONT_BODY, fontSize: 13, letterSpacing: 0.4, color: "var(--sub)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>{live.name}</div>
+        <button onClick={() => { setMenuOpen(false); openContactEdit(); }} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", background: "none", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", fontSize: 16, color: "var(--text)", fontFamily: FONT_BODY, cursor: "pointer", marginBottom: 10 }}><Edit2 size={17} /> Edit details</button>
+        <button onClick={() => { setMenuOpen(false); setDeletePrompt(true); }} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", background: "none", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", fontSize: 16, color: "#c0392b", fontFamily: FONT_BODY, cursor: "pointer" }}><Trash2 size={17} /> Delete client…</button>
       </Sheet>
       <Sheet open={deletePrompt} onClose={() => setDeletePrompt(false)} align="center" maxWidth={420}>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Delete {firstName}?</h2>
