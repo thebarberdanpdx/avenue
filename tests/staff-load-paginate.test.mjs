@@ -60,26 +60,31 @@ test("fetchAll returns NULL (not a partial set) if any page errors", async () =>
 });
 
 // --- delete-rail (mirrors api/calendar-pull mode:"sync") ---------------------------------------------
-const delThreshold = (existingSyncedCount) => Math.max(5, Math.ceil(existingSyncedCount * 0.34));
+const delThreshold = (existingSyncedCount) => Math.max(100, Math.ceil(existingSyncedCount * 0.5));
 const shouldHold = (existingSyncedCount, toDeleteCount) => toDeleteCount > delThreshold(existingSyncedCount);
 
 test("delete-rail HOLDS a truncation-scale deletion (2500 synced, would delete 1500)", () => {
   assert.equal(shouldHold(2500, 1500), true);
 });
-test("delete-rail ALLOWS a normal small removal (100 synced, delete 3)", () => {
-  assert.equal(shouldHold(100, 3), false);
+test("delete-rail ALLOWS a normal removal (300 synced, delete 20)", () => {
+  assert.equal(shouldHold(300, 20), false);
 });
-test("delete-rail floor is 5 for tiny shops (10 synced, delete 4 allowed, 6 held)", () => {
-  assert.equal(shouldHold(10, 4), false); // max(5, ceil(3.4)=4) = 5; 4 <= 5
-  assert.equal(shouldHold(10, 6), true);  // 6 > 5
+test("delete-rail does NOT false-positive on a legit MULTI-FEED removal (review finding: 50 synced, delete 18)", () => {
+  // Two feeds each cancelling near their own ~34% cap aggregate to 18/50 = 36%. The per-feed client rail
+  // caps each feed at ~34%, so a non-truncated aggregate can never reach the 50% server bar → never blocked.
+  assert.equal(shouldHold(50, 18), false);
 });
-test("delete-rail boundary: exactly at threshold is allowed, one over is held", () => {
-  const n = 1000; const t = delThreshold(n); // 340
+test("delete-rail: any aggregate at/under the per-feed 34% cap stays under the 50% bar", () => {
+  for (const n of [30, 100, 500, 2000]) assert.equal(shouldHold(n, Math.ceil(n * 0.34)), false, `n=${n}`);
+});
+test("delete-rail floor is 100 for small shops (150 synced: 95 allowed, 130 held)", () => {
+  assert.equal(shouldHold(150, 95), false);  // max(100, 75) = 100
+  assert.equal(shouldHold(150, 130), true);
+});
+test("delete-rail boundary: exactly at threshold allowed, one over held", () => {
+  const n = 1000; const t = delThreshold(n); // max(100, 500) = 500
   assert.equal(shouldHold(n, t), false);
   assert.equal(shouldHold(n, t + 1), true);
-});
-test("delete-rail lets a small shop delete everything when it's under the floor", () => {
-  assert.equal(shouldHold(4, 4), false); // 4 synced, delete all 4 — under the floor of 5
 });
 
 // --- source guard -----------------------------------------------------------------------------------
