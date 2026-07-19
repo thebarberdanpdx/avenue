@@ -23025,15 +23025,21 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     setOpen(ap);
     if (onDeepLinkHandled) onDeepLinkHandled();
   }, [deepLinkApptId, appts]);
-  // Rebook from the client card: open the new-appointment form prefilled with this client + service.
-  useEffect(() => {
-    if (!rebookSeed) return;
-    const c = (clients || []).find((x) => x.id === rebookSeed.clientId) || null;
-    const s = (services || []).find((x) => x.id === rebookSeed.serviceId) || null;
-    const pid = rebookSeed.providerId || (c && c.provider) || (providers[1] || providers[0] || {}).id;
+  // Rebook: open the new-appointment form prefilled with this client + service + barber (everything
+  // EXCEPT day/time), on the selected day at the earliest clean open slot — the picker lets staff move
+  // it. Used by the client-card "Rebook" AND the appointment sheet's ••• "Rebook — new day & time".
+  const openRebookForm = (seed) => {
+    if (!seed) return;
+    const c = (clients || []).find((x) => x.id === seed.clientId) || null;
+    const s = (services || []).find((x) => x.id === seed.serviceId) || null;
+    const pid = seed.providerId || (c && c.provider) || (providers[1] || providers[0] || {}).id;
     const dur = s ? getDuration(c, s, pid) : 30;
     const start = earliestOpenSlot(pid, selectedDate, dur);
     setNewApptSlot({ providerId: pid, start, initialClient: c, initialService: s, rebook: true });
+  };
+  useEffect(() => {
+    if (!rebookSeed) return;
+    openRebookForm(rebookSeed);
     if (onRebookHandled) onRebookHandled();
   }, [rebookSeed]);
   const [drag, setDrag] = useState(null);     // { id, deltaMin } while dragging
@@ -24490,6 +24496,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           isOwner={isOwner}
           me={me}
           onClose={() => setOpen(null)}
+          onRebook={(a) => { setOpen(null); openRebookForm({ clientId: a.clientId, serviceId: a.serviceId, providerId: a.providerId }); }}
           appts={appts}
           onSetStatus={setStatus}
           onCheckout={startCheckout}
@@ -26468,7 +26475,7 @@ function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, sho
   );
 }
 
-function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onRefund, onUpdate, onDelete, onOpenClient, showToast, shopId }) {
+function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onRefund, onUpdate, onDelete, onOpenClient, onRebook, showToast, shopId }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
@@ -27459,8 +27466,10 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   )}
                   {canEditPrice && savedCard && <MenuItem T={T} icon={<CreditCard size={17} />} label="Charge no-show fee" onClick={() => { setMenuOpen(false); setChargeOpen(true); }} />}
                   <Divider T={T} />
-                  <MenuItem T={T} icon={<Repeat size={17} />} label="Make Repeating" onClick={() => { setMenuOpen(false); showToast("Repeating appointment set up."); }} />
-                  <MenuItem T={T} icon={<Copy size={17} />} label="Duplicate / Rebook" onClick={() => { setMenuOpen(false); showToast("Rebooked — duplicate created."); }} />
+                  {/* "Make Repeating" (recurring appointments) was a fake stub — it only toasted
+                      "Repeating appointment set up." and did nothing, which could make staff think a
+                      client is on recurring books when they aren't. Removed until it's built for real. */}
+                  {onRebook && <MenuItem T={T} icon={<Copy size={17} />} label="Rebook — new day & time" onClick={() => { setMenuOpen(false); onRebook(appt); }} />}
                   <MenuItem T={T} icon={<Bell size={17} />} label="Resend Notifications" onClick={() => { setMenuOpen(false); showToast("Confirmation re-sent to client."); }} />
                   <Divider T={T} />
                   <div style={{ padding: "6px 16px 4px", fontSize: 14, letterSpacing: 1.2, color: T.faint }}>SET STATUS</div>
