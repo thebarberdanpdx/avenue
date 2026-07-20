@@ -121,6 +121,7 @@ try {
 //    this check FAILS and blocks the deploy, so a "done" fix can't silently un-ship. Add to this list
 //    whenever you fix a painful regression you never want to come back.
 const GUARDS = [
+  { needle: "appt-name-live-resolve", label: "appointment name resolves to live client/member name (renames reflect on calendar)" },
   { needle: "table === 'providers' && rows.length", label: "staff email/phone save-backstop (never blank on save)" },
   { needle: "!hasStoredSession()", label: "staff email/phone load-gate (sanitized feed can't overwrite owner)" },
   { needle: "setTabNonce(", label: "bottom-tab tap resets to tab root" },
