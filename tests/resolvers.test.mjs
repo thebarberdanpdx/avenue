@@ -72,7 +72,7 @@ const CUT_DESC_LINE = (src.match(/const CONSOLIDATE_CUT_DESC = "[^"]*";/) || [])
 if (!CUT_DESC_LINE) throw new Error("resolvers.test: CONSOLIDATE_CUT_DESC not found in src/App.jsx — refusing to pass");
 const SHOP_TZ_LINE = (src.match(/const SHOP_TZ = "[^"]*";/) || [])[0];
 if (!SHOP_TZ_LINE) throw new Error("resolvers.test: SHOP_TZ not found in src/App.jsx — refusing to pass");
-const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig", "impParseCSV", "impDigits", "impGuess", "impGuessMap", "impPhone", "impBlocked", "impMoney", "resolveAuthStaff", "ownerAccessResilient", "clientListComparator", "statusPatch"];
+const EXTRA = ["resolveDiscount", "apptHoldsSlot", "apptDisplayName", "splitCutStyleServices", "consolidateHaircutMenu", "hoursForDate", "computeCheckoutMoney", "shopWallToInstant", "computeRegisterSale", "idemSig", "impParseCSV", "impDigits", "impGuess", "impGuessMap", "impPhone", "impBlocked", "impMoney", "resolveAuthStaff", "ownerAccessResilient", "clientListComparator", "statusPatch", "teamScope"];
 const extraSrc = CUT_DESC_LINE + "\n" + SHOP_TZ_LINE + "\n" + EXTRA.map(grab).join("\n");
 // computeFreeSlots has a destructuring parameter ({...}), which grab()'s brace-matcher
 // mistakes for the body — extract it by anchors instead. It depends on hoursForDate +
@@ -664,4 +664,22 @@ test("statusPatch: done freezes the timer (never cleared)", () => {
   const p = R.statusPatch({ serviceStartedAt: 111, serviceEndedAt: 222 }, "done");
   assert.equal(p.status, "done");
   assert.ok(!("serviceStartedAt" in p)); // done keeps the elapsed record for history
+});
+
+// ─── teamScope: per-event staff text/email recipient ───────────────────────
+// Each event's `to` wins; falls back to the legacy shop-wide bookingAlertScope, then "assigned".
+// So an existing shop keeps its one global choice on every event until a row is customized.
+test("teamScope: per-event `to` overrides the global scope", () => {
+  const sa = { bookingAlertScope: "all", newBooking: { push: true, text: true, to: "assigned" }, canceled: { push: true, email: true } };
+  assert.equal(R.teamScope(sa, "newBooking"), "assigned"); // row override wins
+  assert.equal(R.teamScope(sa, "canceled"), "all");        // no row `to` → global
+});
+test("teamScope: falls back to global bookingAlertScope, then to 'assigned'", () => {
+  assert.equal(R.teamScope({ bookingAlertScope: "ownerPlus" }, "rescheduled"), "ownerPlus");
+  assert.equal(R.teamScope({}, "newBooking"), "assigned");     // nothing set → default
+  assert.equal(R.teamScope(null, "newBooking"), "assigned");   // no staffAlerts at all
+});
+test("teamScope: a legacy boolean event (no object) uses the global scope", () => {
+  const sa = { bookingAlertScope: "all", newBooking: true };
+  assert.equal(R.teamScope(sa, "newBooking"), "all"); // boolean event has no per-event `to`
 });
