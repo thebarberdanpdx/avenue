@@ -466,7 +466,8 @@ const DEFAULT_BUSINESS = {
   // ---- Automated messages: editable wording per event ----
   // Merge tags {client} {provider} {service} {date} {time} {business} get filled in automatically.
   messages: [
-    { id: "booked", label: "Appointment Booked", channel: "email", subject: "Your Booking Information", timing: "Right after booking", enabled: true,
+    { id: "booked", label: "Appointment Booked", channel: "both", subject: "Your Booking Information", timing: "Right after booking", enabled: true,
+      smsBody: "{business}: Hi {client}! You're confirmed for {date} at {time} with {provider}.\n\n{cancel link}",
       body: "Hi {client},\n\nYou're all set! Here is your booking information for {business}:\n\n{appointment}\n\nCancellation policy:\n{policy}\n\nOur address is:\n{location}\n\n{cancel link}" },
     { id: "remind2d", label: "Reminder - 2 days before", channel: "email", timing: "2 days before", enabled: true,
       body: "Hi {client} - just a couple of days until your {service} with {provider} at {business}. We're looking forward to seeing you on {date} at {time}.\n\nNeed to move it? No problem:\n{cancel link}" },
@@ -5177,7 +5178,7 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject, ex
       arriveUrl: (typeof window !== "undefined" && appt.manageToken) ? `${window.location.origin}/manage?t=${appt.manageToken}&a=1` : "",
     };
     if (extra && typeof extra === "object") Object.assign(ctx, extra); // e.g. {amount} for a payment receipt
-    fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel: m.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: m.subject || subject || `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
+    fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel: m.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: m.subject || subject || `${business.name}: ${m.label}`, template: m.body, smsTemplate: m.smsBody, context: ctx }) }).catch(() => {});
   } catch (e) {}
 }
 
@@ -9850,7 +9851,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
       // template's channel (email + text). Email now actually lands because the appt carries the
       // booker's email (see booking); text still works off a.phone as before.
       const channel = msgId === "canceled" ? "email" : (m.channel || "email");
-      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel, to: { email: (a.email || "").trim(), phone: (a.phone || "").trim(), smsOptOut: false }, subject: m.subject || `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
+      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel, to: { email: (a.email || "").trim(), phone: (a.phone || "").trim(), smsOptOut: false }, subject: m.subject || `${business.name}: ${m.label}`, template: m.body, smsTemplate: m.smsBody, context: ctx }) }).catch(() => {});
     } catch (e) {}
   };
 
