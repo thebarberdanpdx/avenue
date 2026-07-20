@@ -6834,8 +6834,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     try { fireApptNotify({ msgId: "canceled", appt, business, providers, contact: { email: appt.email || (matched && matched.email) || "", phone: appt.phone || (matched && matched.phone) || "" } }); } catch (e) {}
     try { fireStaffPush({ shopId, title: "Appointment canceled", appt, event: "canceled", business }); } catch (e) {}
   };
-  const lblStyle = { fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 10px" };
-  const avStyle = { width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 14, color: "var(--text)", flexShrink: 0 };
+  // [client-home-redesign] bold, dark section labels (was faint grey) + filled people avatars.
+  const lblStyle = { fontFamily: "'Jost', sans-serif", fontSize: 15, letterSpacing: -0.2, color: "var(--text)", fontWeight: 800, margin: "34px 2px 14px" };
+  const avStyle = { width: 42, height: 42, borderRadius: "50%", background: "var(--panel2, #F0F0F0)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 700, color: "var(--text)", flexShrink: 0 };
 
   // [outage-honest-menu] The load has FINISHED but we never got a real menu (server failed AND no
   // last-synced cache on this device) — so `services` is still the in-code DEFAULT_SERVICES demo
@@ -6885,53 +6886,60 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: "var(--bg)" }}>
         <div style={{ width: "100%", maxWidth: 480, padding: "30px 22px 60px" }}>
           <div className="fade-up">
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{business.name}</div>
-            <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1.05, margin: "12px 0 0", color: "var(--text)" }}>Welcome back,<br />{firstName}.</h1>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 2.2, textTransform: "uppercase", color: "var(--sub)", fontWeight: 700 }}>{business.name}</div>
+            <h1 style={{ fontFamily: "'Jost', sans-serif", fontSize: 30, fontWeight: 800, letterSpacing: "-0.9px", lineHeight: 1.06, margin: "9px 0 0", color: "var(--text)" }}>Welcome back,<br />{firstName}.</h1>
 
             <div style={lblStyle}>{upcoming.length > 1 ? `Your upcoming visits (${upcoming.length})` : "Your next visit"}</div>
-            {upcoming.length ? upcoming.map((v, vi) => { const locked = insideManageWindow(v); const shopPh = (business.phones && business.phones[0] && business.phones[0].number) || business.phone || ""; const lockedBtn = { background: "transparent", border: "1px solid var(--line)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--faint)", cursor: "default", opacity: 0.55 }; return (
-              <div key={v.id} style={{ border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginTop: vi ? 10 : 0 }}>
-                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.05, color: "var(--text)" }}>{fmtHomeDate(v)} · {fmtHomeTime(v)}</div>
-                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text2)", marginTop: 5 }}>{svcLabel(v)} · with {provFirst(v.providerId)}{v.familyMemberId ? ` · for ${personLabel(v)}` : ""}</div>
-                {locked && (
-                  <div style={{ background: "var(--panel2, #F4F2EC)", borderRadius: 10, padding: "9px 12px", marginTop: 12, fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5 }}>
-                    Your visit is less than {manageWindowHrs} hours away, so it can't be changed or cancelled online. {shopPh ? <>Need to? <a href={`tel:${String(shopPh).replace(/[^0-9+]/g, "")}`} style={{ color: "var(--text)", fontWeight: 500 }}>Call {shopPh}</a>.</> : "Please call us and we'll help."}
+            {upcoming.length ? upcoming.map((v, vi) => { const locked = insideManageWindow(v); const shopPh = (business.phones && business.phones[0] && business.phones[0].number) || business.phone || ""; const actLink = { background: "transparent", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13.5, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", cursor: "pointer" }; return (
+              <div key={v.id} style={{ border: "1px solid var(--border)", borderRadius: 20, padding: "22px 20px", marginTop: vi ? 12 : 0 }}>
+                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.12, color: "var(--text)" }}>{fmtHomeDate(v)} · {fmtHomeTime(v)}</div>
+                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, color: "var(--sub)", marginTop: 7 }}>{svcLabel(v)} · with {provFirst(v.providerId)}{v.familyMemberId ? ` · for ${personLabel(v)}` : ""}</div>
+                {locked ? (
+                  // GUARD cancel-window-lock: inside the change window, no reschedule/cancel online — show the call-us note, keep notes & photos.
+                  <>
+                    <div style={{ marginTop: 16, paddingTop: 15, borderTop: "1px solid var(--line)", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--sub)", lineHeight: 1.5 }}>
+                      Less than {manageWindowHrs} hours away, so it can't be changed or cancelled online. {shopPh ? <>Need to? <a href={`tel:${String(shopPh).replace(/[^0-9+]/g, "")}`} style={{ color: "var(--text)", fontWeight: 600 }}>Call {shopPh}</a>.</> : "Please call us and we'll help."}
+                    </div>
+                    <div style={{ marginTop: 14 }}><button onClick={() => openExtras(v)} style={actLink}>Add notes &amp; photos</button></div>
+                  </>
+                ) : (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+                    <button onClick={() => { if (insideManageWindow(v)) { setHomeAction({ type: "locked", appt: v }); return; } if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "reschedule", appt: v }); }} style={actLink}>Reschedule</button>
+                    <button onClick={() => openExtras(v)} style={actLink}>Notes &amp; photos</button>
+                    <button onClick={() => { if (insideManageWindow(v)) { setHomeAction({ type: "locked", appt: v }); return; } if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "cancel", appt: v }); }} style={{ ...actLink, color: "var(--faint)", fontWeight: 500 }}>Cancel</button>
                   </div>
                 )}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: locked ? 12 : 14, paddingTop: locked ? 0 : 13, borderTop: locked ? "none" : "1px solid var(--line)" }}>
-                  <button disabled={locked} onClick={() => { if (insideManageWindow(v)) { setHomeAction({ type: "locked", appt: v }); return; } if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "reschedule", appt: v }); }} style={locked ? lockedBtn : { background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Reschedule</button>
-                  <button disabled={locked} onClick={() => { if (insideManageWindow(v)) { setHomeAction({ type: "locked", appt: v }); return; } setReschedPrev(v); bookForPerson(v.familyMemberId ? { id: v.familyMemberId, name: personLabel(v) } : { id: null }); }} style={locked ? lockedBtn : { background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Change service</button>
-                  <button onClick={() => openExtras(v)} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Add notes &amp; photos</button>
-                  <button disabled={locked} onClick={() => { if (insideManageWindow(v)) { setHomeAction({ type: "locked", appt: v }); return; } if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "cancel", appt: v }); }} style={locked ? lockedBtn : { background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 400, color: "var(--sub)", cursor: "pointer" }}>Cancel</button>
-                </div>
               </div>
             ); }) : (
-              <div style={{ border: "1px solid var(--line)", borderRadius: 16, padding: "18px 18px", fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>No upcoming visit yet — book your next one below.</div>
+              <div style={{ border: "1px dashed var(--border2, var(--border))", borderRadius: 20, padding: "26px 20px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.2px" }}>No visit booked yet</div>
+                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, color: "var(--sub)", marginTop: 6 }}>Book your next one below — takes a minute.</div>
+              </div>
             )}
 
-            <button className="lift" onClick={bookFromHome} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.8, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, marginTop: 18, border: "none", cursor: "pointer" }}>Book an appointment</button>
+            <button className="lift" onClick={bookFromHome} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 15.5, letterSpacing: 0.1, fontWeight: 700, borderRadius: 15, marginTop: 16, border: "none", cursor: "pointer" }}>Book an appointment</button>
 
             {business?.familyBooking?.enabled !== false && (
               <>
                 <div style={lblStyle}>Your people</div>
-                <div style={{ border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ border: "1px solid var(--border)", borderRadius: 20, overflow: "hidden" }}>
                   {people.map((p, i) => (
-                    <button key={p.id || "self"} onClick={() => { setReschedPrev(null); bookForPerson(p); }} style={{ width: "100%", background: "transparent", borderTop: i ? "1px solid var(--line)" : "none", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: "15px 18px", display: "flex", alignItems: "center", gap: 13, cursor: "pointer", textAlign: "left" }}>
+                    <button key={p.id || "self"} onClick={() => { setReschedPrev(null); bookForPerson(p); }} style={{ width: "100%", background: "transparent", borderTop: i ? "1px solid var(--line)" : "none", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: "15px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", textAlign: "left" }}>
                       <span style={avStyle}>{(p.name || "?").trim().charAt(0).toUpperCase()}</span>
                       <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{p.isMember ? p.name : firstName}</span>
-                        <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)" }}>{p.isMember ? (p.note || "Family") : "You"}</span>
+                        <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.1px", color: "var(--text)" }}>{p.isMember ? p.name : firstName}</span>
+                        <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{p.isMember ? (p.note || "Family") : "You"}</span>
                       </span>
-                      <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: "var(--border)" }}>&#8594;</span>
+                      <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 19, color: "var(--faint)" }}>&#8250;</span>
                     </button>
                   ))}
-                  <button onClick={() => { setShowHome(false); setHomeAction(null); setGroupPeople([]); setShowWhoFor(true); setNewMemberName(""); setNewMemberNote(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", borderTop: "1px solid var(--line)", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: "15px 18px", display: "flex", alignItems: "center", gap: 13, cursor: "pointer", textAlign: "left" }}>
-                    <span style={{ ...avStyle, color: "var(--sub)", fontSize: 16 }}>+</span>
+                  <button onClick={() => { setShowHome(false); setHomeAction(null); setGroupPeople([]); setShowWhoFor(true); setNewMemberName(""); setNewMemberNote(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", borderTop: "1px solid var(--line)", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: "15px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", textAlign: "left" }}>
+                    <span style={{ ...avStyle, background: "transparent", border: "1px dashed var(--border2, var(--border))", color: "var(--sub)", fontSize: 20, fontWeight: 500 }}>+</span>
                     <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>Add someone</span>
-                      <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)" }}>Kids, partner, siblings</span>
+                      <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.1px", color: "var(--text)" }}>Add someone</span>
+                      <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>Kids, partner, siblings</span>
                     </span>
-                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: "var(--border)" }}>&#8594;</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 19, color: "var(--faint)" }}>&#8250;</span>
                   </button>
                 </div>
               </>
@@ -6940,17 +6948,17 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {past.length > 0 && (
               <>
                 <div style={lblStyle}>Book again</div>
-                <div style={{ border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ border: "1px solid var(--border)", borderRadius: 20, overflow: "hidden" }}>
                   {shownServices.map(({ appt: a, count }, i) => {
                     const price = svcCurrentPrice(a);
                     return (
                       <button key={(a.serviceId || "") + (a.familyMemberId || "") + i} onClick={() => bookAgain(a)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderTop: i ? "1px solid var(--line)" : "none", borderLeft: "none", borderRight: "none", borderBottom: "none", background: "transparent", textAlign: "left", cursor: "pointer" }}>
                         <span style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{svcLabel(a)}{a.familyMemberId ? ` · ${personLabel(a)}` : ""}</span>
-                          <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>Last {fmtHomeShort(a)} · booked {count} time{count === 1 ? "" : "s"}</span>
+                          <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.1px", color: "var(--text)" }}>{svcLabel(a)}{a.familyMemberId ? ` · ${personLabel(a)}` : ""}</span>
+                          <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>Last {fmtHomeShort(a)} · booked {count} time{count === 1 ? "" : "s"}</span>
                         </span>
-                        {price != null && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--text)", flexShrink: 0 }}>${price}</span>}
-                        <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, fontWeight: 600, letterSpacing: 0.3, color: "var(--text)", flexShrink: 0, borderBottom: "1px solid var(--text)", paddingBottom: 1 }}>Book again</span>
+                        {price != null && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--text)", flexShrink: 0 }}>${price}</span>}
+                        <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, fontWeight: 700, letterSpacing: 0.2, color: "var(--text)", flexShrink: 0, borderBottom: "1.5px solid var(--text)", paddingBottom: 1 }}>Book again</span>
                       </button>
                     );
                   })}
@@ -6961,8 +6969,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               </>
             )}
 
-            <div style={{ textAlign: "center", marginTop: 28 }}>
-              <button onClick={signOutClient} style={{ background: "none", border: "none", fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--faint)", cursor: "pointer" }}>Not {firstName}? Sign out</button>
+            <div style={{ textAlign: "center", marginTop: 30 }}>
+              <button onClick={signOutClient} style={{ background: "none", border: "none", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--faint)", cursor: "pointer" }}>Not {firstName}? Sign out</button>
             </div>
           </div>
         </div>
