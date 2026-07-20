@@ -27784,7 +27784,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   <Divider T={T} />
                   <div style={{ padding: "6px 16px 4px", fontSize: 14, letterSpacing: 1.2, color: T.faint }}>SET STATUS</div>
                   {APPT_STATUSES.filter((s) => s.id !== "done").map((s) => (
-                    <button key={s.id} onClick={() => { if (s.id === "cancelled") { setMenuOpen(false); setCancelNotify(false); setCancelConfirm(true); return; } onSetStatus(appt.id, s.id, `Marked ${s.label.toLowerCase()}.`); setMenuOpen(false); if (s.id === "no-show" && canEditPrice && savedCard) setChargeOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", background: appt.status === s.id ? T.chip : "none", color: T.text, fontSize: 16.5, textAlign: "left" }}>
+                    <button key={s.id} onClick={() => { if (s.id === "cancelled") { setMenuOpen(false); setCancelNotify(false); setCancelConfirm(true); return; } const noShowNoCard = s.id === "no-show" && !savedCard; onSetStatus(appt.id, s.id, noShowNoCard ? "Marked no-show — no card on file to charge." : `Marked ${s.label.toLowerCase()}.`); setMenuOpen(false); if (s.id === "no-show" && canEditPrice && savedCard) setChargeOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", background: appt.status === s.id ? T.chip : "none", color: T.text, fontSize: 16.5, textAlign: "left" }}>
                       <span style={{ width: 12, height: 12, borderRadius: "50%", background: s.dot }} /> {s.label}
                     </button>
                   ))}
