@@ -8352,7 +8352,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const usualProv = providers.find((p) => p.id === (lastAppt?.providerId || who.provider)) || providers[1];
           if (!usualSvc) { setShowUsual(false); setStep(1); return null; }
           const usualLine2 = lastAppt && lastAppt.lineItems && lastAppt.lineItems[0] ? lastAppt.lineItems[0] : null;
-          const lastPhoto = (who.gallery && who.gallery.length) ? who.gallery[who.gallery.length - 1].photo : null;
           // Build the cart entry for their usual (used by every action). Re-validate the saved cut style /
           // add-on answers against the service's CURRENT groups so a since-removed option can't linger.
           const validAddons = {};
@@ -8401,13 +8400,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.2, letterSpacing: "-0.2px", color: "var(--text)" }}>Good to see you, {who.name.split(" ")[0]}.</h2>
               <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 26px", fontWeight: 400, lineHeight: 1.55 }}>{rhythmLine}</p>
 
+              {/* [no-last-cut-photo] The returning-client welcome card shows NO photo. It used to render
+                  the client's most recent gallery image labeled "YOUR LAST CUT" — but a gallery can hold a
+                  seed/stock or non-cut image, so it showed a stranger's haircut as "your last cut" (Dan,
+                  2026-07-19: "I don't know where this photo is coming from. I don't want it there."). */}
               <div style={{ border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden", marginBottom: 18 }}>
-                {lastPhoto && (
-                  <div style={{ width: "100%", height: 150, overflow: "hidden", position: "relative" }}>
-                    <img src={imgUrl(lastPhoto, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                    <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", color: "#fff", fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.5, fontWeight: 600, padding: "5px 11px", borderRadius: 20 }}>YOUR LAST CUT</div>
-                  </div>
-                )}
                 <div style={{ padding: "22px 20px", textAlign: "center" }}>
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--text)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your usual</div>
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.2, lineHeight: 1.2, color: "var(--text)" }}>{usualSvc.name}</div>
