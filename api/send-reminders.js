@@ -138,7 +138,7 @@ async function handler(req, res) {
         const textBody = renderPlainText(m.body, ctx);
         const htmlBody = renderEmailHtml(m.body, ctx);
         const via = [];
-        try { if (ch.email) { await sendEmail({ to: email, subject: `${business}: ${m.label}`, text: textBody, html: htmlBody }); via.push("email"); } } catch (e) { failed++; }
+        try { if (ch.email) { await sendEmail({ to: email, subject: `${business}: ${m.label}`, text: textBody, html: htmlBody, fromName: business, replyTo: shopEmail }); via.push("email"); } } catch (e) { failed++; }
         try { if (ch.sms) { await sendSms({ to: phone, text: textBody }); via.push("sms"); } } catch (e) { failed++; }
 
         if (via.length) {
@@ -179,7 +179,7 @@ async function handler(req, res) {
       const textBody = `Hi ${first}! Here is your reminder to book with ${business}! Book: ${bookUrl}`;
       const via = [];
       try { if (ch.sms) { await sendSms({ to: phone, text: textBody + "\nReply STOP to opt out." }); via.push("sms"); } } catch (e) { failed++; }
-      try { if (ch.email && !via.length) { await sendEmail({ to: email, subject: `${business}: time to book your next visit`, text: textBody, html: renderEmailHtml(textBody, {}) }); via.push("email"); } } catch (e) { failed++; }
+      try { if (ch.email && !via.length) { await sendEmail({ to: email, subject: `${business}: time to book your next visit`, text: textBody, html: renderEmailHtml(textBody, {}), fromName: business, replyTo: shopEmail }); via.push("email"); } } catch (e) { failed++; }
 
       if (via.length) {
         await supa.from("message_log").update({ via: via.join("+"), sent_at: new Date().toISOString() }).eq("id", logId);

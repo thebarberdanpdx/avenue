@@ -88,7 +88,7 @@ async function handler(req, res) {
       const ctx = { client: String(c.name || "there").split(" ")[0], business };
       const subject = `${business}: ${msg.label || "Happy birthday!"}`;
       try {
-        await sendEmail({ to: email, subject, text: renderPlainText(msg.body, ctx), html: renderEmailHtml(msg.body, ctx) });
+        await sendEmail({ to: email, subject, text: renderPlainText(msg.body, ctx), html: renderEmailHtml(msg.body, ctx), fromName: business, replyTo: settings.email || "" });
         await supa.from("message_log").insert({ id: logId, shop_id: shop.id, appt_id: `bday__${row.id}`, message_id: "birthday", via: "email", sent_at: new Date().toISOString() });
         sent++;
       } catch (e) { failed++; }
