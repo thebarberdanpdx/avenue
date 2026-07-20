@@ -466,8 +466,8 @@ const DEFAULT_BUSINESS = {
   // ---- Automated messages: editable wording per event ----
   // Merge tags {client} {provider} {service} {date} {time} {business} get filled in automatically.
   messages: [
-    { id: "booked", label: "Appointment Booked", channel: "both", timing: "Right after booking", enabled: true,
-      body: "You're all set, {client} - we can't wait to see you.\n\n{appointment}\n\n{location}\n\nPlans change, and that's okay. You can reschedule or cancel anytime here:\n{cancel link}\n\nSee you soon,\n{business}" },
+    { id: "booked", label: "Appointment Booked", channel: "email", subject: "Your Booking Information", timing: "Right after booking", enabled: true,
+      body: "Hi {client},\n\nYou're all set! Here is your booking information for {business}:\n\n{appointment}\n\nCancellation policy:\n{policy}\n\nOur address is:\n{location}\n\n{cancel link}" },
     { id: "remind2d", label: "Reminder - 2 days before", channel: "email", timing: "2 days before", enabled: true,
       body: "Hi {client} - just a couple of days until your {service} with {provider} at {business}. We're looking forward to seeing you on {date} at {time}.\n\nNeed to move it? No problem:\n{cancel link}" },
     { id: "remind24h", label: "Reminder - 1 day before", channel: "text", timing: "1 day before", enabled: true,
@@ -476,10 +476,10 @@ const DEFAULT_BUSINESS = {
       body: "Today's the day, {client}! {provider} will be ready for your {service} at {time}. Can't wait to see you.\n\n{cancel link}" },
     { id: "checkin", label: "Reminder - 15 minutes before", channel: "text", timing: "15 minutes before", enabled: true,
       body: "{business}: See you in 15 min, {client}!\n\n{checkin link}" },
-    { id: "canceled", label: "Appointment Canceled", channel: "email", timing: "When canceled", enabled: true,
-      body: "Your {service} on {date} at {time} has been canceled, {client}. We'd love to see you again - book anytime at {business}." },
-    { id: "rescheduled", label: "Appointment Rescheduled", channel: "both", timing: "When rescheduled", enabled: true,
-      body: "Updated! Your {service} with {provider} is now {date} at {time}. See you then, {client}." },
+    { id: "canceled", label: "Appointment Canceled", channel: "email", subject: "Your Booking has been Canceled", timing: "When canceled", enabled: true,
+      body: "Hi {client},\n\nThe below booking with {business} has been canceled:\n\n{appointment}\n\nCancellation policy:\n{policy}" },
+    { id: "rescheduled", label: "Appointment Rescheduled", channel: "email", subject: "Your Appointment was Rescheduled", timing: "When rescheduled", enabled: true,
+      body: "Hi {client},\n\nYour appointment at {business} was rescheduled:\n\n{appointment}\n\nCancellation policy:\n{policy}\n\nOur address is:\n{location}\n\n{cancel link}" },
     { id: "waitlist", label: "Waitlist - Slot Opened", channel: "both", timing: "When a slot opens", enabled: true,
       body: "Good news {client} - an earlier {service} spot opened on {date} at {time}. It's first come, so tap here to grab it before it's taken: {book link}" },
     { id: "deposit", label: "Payment Received", channel: "email", timing: "When paid at booking", enabled: true,
@@ -5169,7 +5169,7 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject, ex
       service: appt.serviceName || appt.title || "your appointment",
       addons: Array.isArray(appt.addonLabels) ? appt.addonLabels.map(cleanServiceLabel).filter(Boolean) : [],
       date: dateStr, time: `${h12}:${String(mn).padStart(2, "0")} ${ap}`, provider: prov.name || appt.providerName || "your staff member",
-      address: [business.address, business.address2].filter(Boolean).join(", "),
+      address: [business.address, business.address2, business.cityZip].filter(Boolean).join(", "),
       phone: (business.phones && business.phones[0] && business.phones[0].number) || "",
       email: business.email || "", policy: business.policy || "",
       locName: (business.multiLocation && business.locations && business.locations[0] && business.locations[0].name) || business.name || "",
@@ -5177,7 +5177,7 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject, ex
       arriveUrl: (typeof window !== "undefined" && appt.manageToken) ? `${window.location.origin}/manage?t=${appt.manageToken}&a=1` : "",
     };
     if (extra && typeof extra === "object") Object.assign(ctx, extra); // e.g. {amount} for a payment receipt
-    fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel: m.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: subject || `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
+    fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel: m.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: m.subject || subject || `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
   } catch (e) {}
 }
 
@@ -9839,7 +9839,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
         client: String(a.name || "there").split(" ")[0], business: business.name || "your shop",
         service: a.serviceName || a.title || "your appointment", addons: Array.isArray(a.addonLabels) ? a.addonLabels.map(cleanServiceLabel).filter(Boolean) : [],
         date: dateStr, time: `${h12}:${String(mn).padStart(2, "0")} ${ap}`, provider: pv.name || a.providerName || "your staff member",
-        address: [business.address, business.address2].filter(Boolean).join(", "),
+        address: [business.address, business.address2, business.cityZip].filter(Boolean).join(", "),
         phone: (business.phones && business.phones[0] && business.phones[0].number) || "",
         email: business.email || "", policy: business.policy || "",
         locName: (business.multiLocation && business.locations && business.locations[0] && business.locations[0].name) || business.name || "",
@@ -9850,7 +9850,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
       // template's channel (email + text). Email now actually lands because the appt carries the
       // booker's email (see booking); text still works off a.phone as before.
       const channel = msgId === "canceled" ? "email" : (m.channel || "email");
-      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel, to: { email: (a.email || "").trim(), phone: (a.phone || "").trim(), smsOptOut: false }, subject: `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
+      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel, to: { email: (a.email || "").trim(), phone: (a.phone || "").trim(), smsOptOut: false }, subject: m.subject || `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
     } catch (e) {}
   };
 
