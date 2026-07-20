@@ -226,7 +226,10 @@ async function handler(req, res) {
   const ch = resolveChannels({ channel: b.channel || "email", smsLive: SMS_LIVE, email, phone, smsOptOut: (to.smsOptOut === true) || recipientOptedOut });
 
   const results = {};
-  try { if (ch.email) { await sendEmail({ to: email, subject: b.subject || "Your appointment", text, html }); results.email = "sent"; } }
+  // Sender shows the shop NAME; replies route to the shop's contact email (both from the render context).
+  const fromName = String(ctx.business || "").trim();
+  const replyTo = String(ctx.email || "").trim();
+  try { if (ch.email) { await sendEmail({ to: email, subject: b.subject || "Your appointment", text, html, fromName, replyTo }); results.email = "sent"; } }
   catch (e) { results.email = "error: " + e.message; }
   try { if (ch.sms) { await sendSms({ to: phone, text }); results.sms = "sent"; } }
   catch (e) { results.sms = "error: " + e.message; }
