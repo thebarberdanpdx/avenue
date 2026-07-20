@@ -18636,6 +18636,14 @@ function PayoutsView({ showToast }) {
   const card = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "20px 20px" };
   const linkBtn = { background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, cursor: "pointer", padding: "6px 2px" };
   const canInstant = d && Number(d.instantAvailable) > 0;
+  const hair = { height: 1, background: "var(--line)", margin: "20px 0" };
+  // Hero = everything on its way to the bank (cleared + still-clearing). A small negative
+  // "available" (e.g. leftover refund/test fees) nets DOWN against pending, so the owner sees
+  // the real amount coming rather than a scary sub-zero "available" number in isolation.
+  const availCents = d ? (Number(d.available) || 0) : 0;
+  const pendCents = d ? (Number(d.pending) || 0) : 0;
+  const comingCents = availCents + pendCents;
+  const heroLabel = comingCents > 0 ? "Coming to your bank" : comingCents === 0 ? "You're all paid up" : "Current balance";
 
   return (
     <div style={{ padding: "4px 2px 24px" }}>
@@ -18653,62 +18661,69 @@ function PayoutsView({ showToast }) {
 
       {!state.loading && !state.error && d && (
         <>
-          {/* Balance + schedule */}
-          <div style={{ ...card, marginBottom: 16 }}>
+          {/* One calm surface — balance, schedule & payouts on a single card (hairline dividers, no nested boxes) */}
+          <div style={{ ...card, borderRadius: 16, padding: "22px 20px" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
               <div>
-                <div style={{ fontSize: 13.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>Current balance</div>
-                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, lineHeight: 1, color: "var(--text)" }}>{money(d.available, d.currency)}</div>
-                {Number(d.pending) > 0 && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 8 }}>{money(d.pending, d.currency)} still clearing</div>}
+                <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{heroLabel}</div>
+                <div style={{ fontFamily: "var(--font-body)", fontSize: 34, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.05, color: "var(--text)", marginTop: 7, fontVariantNumeric: "tabular-nums" }}>{money(comingCents, d.currency)}</div>
+                {pendCents > 0
+                  ? <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 8, fontVariantNumeric: "tabular-nums" }}>{money(pendCents, d.currency)} still clearing</div>
+                  : comingCents < 0
+                    ? <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 8 }}>A small fee your next sales will cover.</div>
+                    : null}
               </div>
-              <button onClick={load} aria-label="Refresh" style={{ background: "none", border: "1px solid var(--border)", borderRadius: 10, color: "var(--sub)", padding: "8px 10px", cursor: "pointer", flexShrink: 0 }}><RefreshCw size={15} /></button>
+              <button onClick={load} aria-label="Refresh" style={{ background: "none", border: "1px solid var(--border)", borderRadius: 10, color: "var(--faint)", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}><RefreshCw size={15} /></button>
             </div>
-            <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)", display: "flex", alignItems: "flex-start", gap: 9 }}>
-              <Clock size={15} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
-              <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{scheduleLine(d.schedule)}</div>
-            </div>
+
+            <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.62, marginTop: 18 }}>{scheduleLine(d.schedule)}</div>
             {d.payoutsEnabled === false && (
               <div style={{ marginTop: 12, fontSize: 13.5, color: "#C2563F", lineHeight: 1.5 }}>Payouts are paused on your Stripe account — finish verification in Stripe to start getting paid.</div>
             )}
             {/* Pay me now — SECONDARY, only when there are instant-eligible funds. Never the default action. */}
             {canInstant && (
-              <button onClick={() => setInstant({ amount: d.instantAvailable, busy: false, error: "" })} style={{ marginTop: 16, display: "inline-flex", alignItems: "center", gap: 8, background: "none", border: "1px solid var(--border)", borderRadius: 12, color: "var(--text)", padding: "11px 15px", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>
+              <button onClick={() => setInstant({ amount: d.instantAvailable, busy: false, error: "" })} style={{ marginTop: 14, display: "inline-flex", alignItems: "center", gap: 8, background: "none", border: "1px solid var(--border)", borderRadius: 12, color: "var(--text)", padding: "10px 14px", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>
                 <Zap size={15} style={{ color: "var(--gold)" }} /> Pay me now · {money(d.instantAvailable, d.currency)}
               </button>
             )}
-          </div>
 
-          {/* Recent payouts */}
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "0 0 9px 4px" }}>
-            <div style={{ fontSize: 13.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Recent payouts</div>
-            <button onClick={openLedger} style={linkBtn}>View all transactions ›</button>
-          </div>
-          {(d.payouts || []).length === 0 ? (
-            <div style={{ ...card, color: "var(--sub)", fontSize: 13.5, lineHeight: 1.5 }}>No payouts yet. Once you take payments, your automatic payouts will show up here.</div>
-          ) : (
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
-              {d.payouts.map((p, i) => (
-                <button key={p.id} onClick={() => openDetail(p)} style={{ width: "100%", textAlign: "left", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "15px 18px", borderTop: i > 0 ? "1px solid var(--line)" : "none", borderLeft: "none", borderRight: "none", borderBottom: "none", color: "var(--text)" }}>
-                  <div>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{money(p.amount, p.currency)}</div>
-                    <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>
-                      {p.status === "paid" ? `Paid ${dayLabel(p.arrivalDate)}` : `${statusLabel(p.status)} · expected ${dayLabel(p.arrivalDate)}`}
-                      {p.method === "instant" ? " · instant" : ""}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.5, color: statusColor(p.status), border: `1px solid color-mix(in srgb, ${statusColor(p.status)} 40%, transparent)`, borderRadius: 30, padding: "5px 11px", whiteSpace: "nowrap" }}>{statusLabel(p.status)}</span>
-                    <ChevronRight size={17} style={{ color: "var(--faint)" }} />
-                  </div>
-                </button>
-              ))}
+            <div style={hair} />
+
+            {/* Recent payouts — same surface, hairline rows */}
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 2 }}>
+              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500 }}>Recent payouts</div>
+              <button onClick={openLedger} style={{ ...linkBtn, color: "var(--text2)", fontWeight: 500, padding: "3px 0" }}>View all transactions ›</button>
             </div>
-          )}
+            {(d.payouts || []).length === 0 ? (
+              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, padding: "8px 0 2px" }}>No payouts yet. Once you take payments, your automatic payouts will show up here.</div>
+            ) : (
+              <div>
+                {d.payouts.map((p, i) => {
+                  const problem = p.status === "failed" || p.status === "canceled";
+                  return (
+                  <button key={p.id} onClick={() => openDetail(p)} style={{ width: "100%", textAlign: "left", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: i > 0 ? "14px 0" : "8px 0 14px", borderTop: i > 0 ? "1px solid var(--line)" : "none", borderLeft: "none", borderRight: "none", borderBottom: "none", color: "var(--text)" }}>
+                    <div>
+                      <div style={{ fontSize: 15.5, fontWeight: 600, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{money(p.amount, p.currency)}</div>
+                      <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3 }}>
+                        {p.status === "paid" ? dayLabel(p.arrivalDate) : `expected ${dayLabel(p.arrivalDate)}`}
+                        {p.method === "instant" ? " · instant" : ""}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: problem ? "#C2563F" : "var(--sub)", whiteSpace: "nowrap" }}>{statusLabel(p.status)}</span>
+                      <ChevronRight size={17} style={{ color: "var(--faint)" }} />
+                    </div>
+                  </button>
+                  );
+                })}
+              </div>
+            )}
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-            <a href="https://dashboard.stripe.com/payouts" target="_blank" rel="noopener noreferrer" style={{ ...linkBtn, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>Manage account in Stripe <ArrowUpRight size={15} /></a>
+            <div style={hair} />
+
+            <a href="https://dashboard.stripe.com/payouts" target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text2)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>Manage account in Stripe <ArrowUpRight size={15} /></a>
+            <div style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.55, marginTop: 7 }}>Balances, payouts and transactions come straight from Stripe. To change your bank account or payout schedule, use “Manage account in Stripe”.</div>
           </div>
-          <div style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginTop: 8, padding: "0 4px" }}>Balances, payouts and transactions come straight from Stripe. To change your bank account or payout schedule, use “Manage account in Stripe”.</div>
         </>
       )}
 
