@@ -80,7 +80,7 @@ export default withErrorReporting(handler, "push");
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   if (!originAllowed(req)) return res.status(403).json({ error: "forbidden" });
-  const { shopId, title, body, data, clientId } = req.body || {};
+  const { shopId, title, body, data, clientId, scope, providerId } = req.body || {};
   if (!shopId || !title) return res.status(400).json({ error: "missing shopId or title" });
 
   // Bound abuse: anyone reaching this URL could push arbitrary alerts to a shop's staff
@@ -95,9 +95,57 @@ async function handler(req, res) {
   }
 
   const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-  const { data: rows, error } = await supa.from("device_tokens").select("token").eq("shop_id", shopId);
+  const { data: rows, error } = await supa.from("device_tokens").select("*").eq("shop_id", shopId);
   if (error) return res.status(500).json({ error: "token lookup: " + error.message });
-  const tokens = [...new Set((rows || []).map((r) => r.token).filter(Boolean))];
+  let tokenRows = (rows || []).filter((r) => r && r.token);
+
+  // [per-person-push] When the caller passes a recipient scope, deliver the in-app pop-up to the SAME
+  // staff the text/email side targets — matched by the auth identity each device registered under
+  // (save_device_token stores the token against the signed-in staff user). This is READ-ONLY and
+  // FAIL-OPEN at every branch: if we can't CONFIDENTLY identify a device's owner as a NON-recipient,
+  // we keep it — so a staff alert is never silently dropped. Worst case = today's shop-wide behavior.
+  if (scope) {
+    try {
+      const { data: prows } = await supa.from("providers").select("data").eq("shop_id", shopId);
+      const provs = (prows || []).map((r) => r.data).filter((p) => p && p.id && p.id !== "anyone" && p.isProvider !== false && !p.archived);
+      const owner = provs.find((p) => p.pulseRole === "owner");
+      const assigned = providerId ? provs.find((p) => p.id === providerId) : null;
+      let recip;
+      if (scope === "all") recip = provs;
+      else if (scope === "ownerPlus") recip = [assigned, owner];
+      else recip = [assigned || owner];
+      const norm = (e) => String(e || "").trim().toLowerCase();
+      const recipEmails = new Set(recip.filter(Boolean).map((p) => norm(p.email)).filter(Boolean));
+      const allEmails = new Set(provs.map((p) => norm(p.email)).filter(Boolean));
+      // Map staff emails → the auth user ids their devices registered under.
+      let users = [];
+      try { const { data: ul } = await supa.auth.admin.listUsers({ page: 1, perPage: 200 }); users = (ul && ul.users) || []; } catch (e) { users = []; }
+      const recipUserIds = new Set();
+      const staffUserIds = new Set();
+      for (const u of users) {
+        const em = norm(u.email);
+        if (!em) continue;
+        if (recipEmails.has(em)) recipUserIds.add(String(u.id));
+        if (allEmails.has(em)) staffUserIds.add(String(u.id));
+      }
+      // Schema-agnostic: match a token row to an owner by scanning its values for a known staff user id
+      // (device_tokens stores the id under some column we don't hardcode).
+      const rowVals = (r) => Object.values(r || {}).map((v) => (v == null ? "" : String(v)));
+      // Only narrow if we could actually identify recipients AND at least one device as staff-owned —
+      // otherwise the mapping isn't reliable here, so fall open to shop-wide.
+      const anyIdentified = recipUserIds.size > 0 && tokenRows.some((r) => rowVals(r).some((v) => staffUserIds.has(v)));
+      if (anyIdentified) {
+        tokenRows = tokenRows.filter((r) => {
+          const vals = rowVals(r);
+          if (vals.some((v) => recipUserIds.has(v))) return true;  // a recipient's device
+          if (vals.some((v) => staffUserIds.has(v))) return false; // a known non-recipient's device
+          return true;                                             // unidentifiable → keep (fail open)
+        });
+      }
+    } catch (e) { /* any failure → leave tokenRows shop-wide */ }
+  }
+
+  const tokens = [...new Set(tokenRows.map((r) => r.token).filter(Boolean))];
   if (!tokens.length) return res.status(200).json({ sent: 0, note: "no devices registered" });
 
   let providerToken;
