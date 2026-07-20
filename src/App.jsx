@@ -15880,11 +15880,12 @@ const TEAM_ALERTS = [
 // Notifications center — the team/biz side only (business.staffAlerts). Each event routes to any
 // of three channels independently: in-app push, text, or email. Client-facing messages live in ONE
 // place — the "Automated Messages" card (business.messages) — so nothing is ever shown twice.
-function NotificationsCenter({ form, setForm }) {
+function NotificationsCenter({ form, onCommitAlerts }) {
   const sa = { newBooking: true, canceled: true, rescheduled: true, checkedIn: true, emailStaffOnBooking: true, bookingAlertScope: "assigned", ...(form.staffAlerts || {}) };
-  // Writing a per-event {push,text,email} object supersedes any legacy boolean for that event.
-  const setEvent = (k, next) => setForm({ ...form, staffAlerts: { ...sa, [k]: next } });
-  const setScope = (v) => setForm({ ...form, staffAlerts: { ...sa, bookingAlertScope: v } });
+  // [notif-autosave] Every change commits immediately (no "Save changes" button to miss). Writing a
+  // per-event {push,text,email} object supersedes any legacy boolean for that event.
+  const setEvent = (k, next) => onCommitAlerts({ ...sa, [k]: next });
+  const setScope = (v) => onCommitAlerts({ ...sa, bookingAlertScope: v });
   const CHAN = [["push", "In-app"], ["text", "Text"], ["email", "Email"]];
   // team-channel-matrix (guard): in-app / text / email are chosen per event; teamCh() reads both the
   // legacy boolean shape and this per-event object shape, and fireStaffPush honors all three channels.
@@ -21336,6 +21337,15 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const hasChanges = JSON.stringify(form) !== JSON.stringify(baseBiz);
 
   const save = (msg) => { setBusiness(form); showToast(msg || "Settings saved."); setOpenCard(null); };
+  // [notif-autosave] Notification prefs are toggles/pickers — they must STICK the instant they're tapped,
+  // not depend on scrolling to the "Save changes" button (leaving the screen without it discarded the
+  // change — the "who gets the text isn't saving" bug). Commit straight to business (the shops-save
+  // debounce + background flush persist it) AND keep the working `form` in sync so a later Save of some
+  // other field can't clobber it back.
+  const commitStaffAlerts = (nextSA) => {
+    setForm((f) => ({ ...f, staffAlerts: nextSA }));
+    setBusiness((b) => ({ ...b, staffAlerts: nextSA }));
+  };
   // Multi-screen editors (Messages, Menu, Staff, Locations, Website, Import) register a
   // popper here. Back tries the editor's internal screen first; only when the editor is at
   // its own root does back actually leave the editor. This makes every back go exactly one
@@ -21438,7 +21448,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "notifications", fullBleed: true, title: "Notifications", icon: Bell, category: "Business Setup",
       status: "Who gets told what",
       keywords: "notifications alerts sms text email push reminders confirmation canceled rescheduled waitlist birthday client staff team who gets notified by what method",
-      editor: <NotificationsCenter form={form} setForm={setForm} />,
+      editor: <NotificationsCenter form={form} onCommitAlerts={commitStaffAlerts} />,
     },
     {
       id: "appearance", title: "Logo & Branding", icon: ImageIcon, category: "Business Setup",
