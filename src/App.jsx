@@ -26562,64 +26562,54 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
   }, []);
   const WARN = "#D89A4B";   // amber — 10 min or less left
   const URGENT = "#C8702E"; // burnt amber — 5 min or less, or over (warm, never red)
-  const RC = 2 * Math.PI * 54; // ring circumference for r=54
-  const totalSec = secondsInto != null ? secondsInto : (minutesInto || 0) * 60;
   const min10 = minutesLeft <= 10;
   const min5 = minutesLeft <= 5;
   const stage = min5 ? URGENT : (min10 ? WARN : CUT);
-  const pct = Math.min(100, Math.max(0, dur > 0 ? (totalSec / (dur * 60)) * 100 : 0));
-  const ringColor = stage;
   const tagColor = stage;
   const tagLabel = min10 ? "Wrapping up" : "Cutting";
   const leftBig = minutesLeft > 0 ? `${minutesLeft}` : (minutesLeft === 0 ? "0" : `+${Math.abs(minutesLeft)}`);
   const leftLab = minutesLeft >= 0 ? "min left" : "min over";
   const showLatePrompt = (min10 || startedLate) && nextClient;
-  // "Next" is one relationship, not a second countdown: when THIS cut should finish (projEnd = now +
-  // minutesLeft) vs when the next client is due. Buffer = the gap → "8 min to spare" / "3 min over".
-  const projEnd = nowMin != null ? nowMin + minutesLeft : null;
-  const buffer = (upNext && !upNext.waiting && projEnd != null) ? (upNext.start - projEnd) : null;
-  const bufferLabel = !upNext ? "" : upNext.waiting ? "checked in" : buffer == null ? "" : buffer >= 0 ? `${buffer} min to spare` : `${Math.abs(buffer)} min over`;
-  const behind = (buffer != null && buffer < 0) || min10;
   const nextFirst = nextClient ? String(nextClient.name || "").trim().split(/\s+/)[0] : "";
+  const GREEN = "#9AC46B"; // mild green — the two glanceable countdowns (Dan's pick)
+  const cutWord = title && !String(title).toLowerCase().includes("cut") ? "service" : "cut";
+  // Relative "in X min" until the next client — from the barber's calendar, not the timer.
+  const upGap = (upNext && !upNext.waiting && nowMin != null) ? (upNext.start - nowMin) : null;
+  const upGapLabel = upGap == null ? "" : upGap <= 0 ? "due now" : upGap < 60 ? `in ${upGap} min` : `in ${Math.floor(upGap / 60)}h${upGap % 60 ? " " + (upGap % 60) + "m" : ""}`;
   return (
     <div style={{ padding: "18px 18px", borderBottom: `1px solid ${T.line}` }}>
-      <div style={{ background: "radial-gradient(120% 120% at 50% 0%, #221F1A 0%, #191712 62%)", border: "1px solid #322F29", borderRadius: 20, padding: "24px 22px 22px", color: "#F1ECE0" }}>
-        {/* Centered header: status · client · service · one countdown ring */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 9, color: tagColor, fontSize: 11.5, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
-            <span style={{ position: "relative", width: 7, height: 7 }}>
-              <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: `color-mix(in srgb, ${tagColor} 40%, transparent)`, animation: "pulse 2.1s var(--ease) infinite" }} />
-              <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: tagColor }} />
-            </span>
-            {tagLabel}
+      <div style={{ background: "#0E0D0B", border: "1px solid #2A2824", borderRadius: 20, padding: "20px 20px 18px", color: "#F1ECE0" }}>
+        {/* Status */}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 9, color: tagColor, fontSize: 11.5, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
+          <span style={{ position: "relative", width: 7, height: 7 }}>
+            <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: `color-mix(in srgb, ${tagColor} 40%, transparent)`, animation: "pulse 2.1s var(--ease) infinite" }} />
+            <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: tagColor }} />
           </span>
-          {name && <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.01em", color: "#F7F2E7", marginTop: 15, textWrap: "balance" }}>{name}</div>}
-          {title && <div style={{ fontSize: 13.5, color: "rgba(241,236,224,.52)", marginTop: 8 }}>{title}</div>}
-          <div style={{ position: "relative", width: 124, height: 124, marginTop: 24 }}>
-            <svg width="124" height="124" style={{ transform: "rotate(-90deg)" }}>
-              <circle cx="62" cy="62" r="54" fill="none" stroke="rgba(241,236,224,.11)" strokeWidth="3" />
-              <circle cx="62" cy="62" r="54" fill="none" stroke={ringColor} strokeWidth="3" strokeLinecap="round" strokeDasharray={RC} strokeDashoffset={RC * (1 - pct / 100)} style={{ transition: "stroke-dashoffset 1s linear, stroke .4s" }} />
-            </svg>
-            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5 }}>
-              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 38, lineHeight: 1, color: "#F9F4EA", fontVariantNumeric: "tabular-nums" }}>{leftBig}</span>
-              <span style={{ fontSize: 10, letterSpacing: 2, color: "rgba(241,236,224,.5)", textTransform: "uppercase" }}>{leftLab}</span>
-            </div>
+          {tagLabel}
+        </span>
+        {/* IN THE CHAIR — client + big bold green time-left (glanceable countdown #1) */}
+        <div style={{ marginTop: 15 }}>
+          <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", fontWeight: 700, color: "rgba(241,236,224,.34)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>In the chair{name ? ` · ${name}` : ""}</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+            <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 56, lineHeight: 0.85, color: GREEN, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" }}>{leftBig}</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: GREEN }}>{leftLab}</span>
+            <span style={{ width: "100%", fontSize: 12.5, color: "rgba(241,236,224,.32)", marginTop: 3, letterSpacing: 0.5, textTransform: "uppercase" }}>on this {cutWord}</span>
           </div>
         </div>
-        <div style={{ height: 1, background: "rgba(241,236,224,.10)", margin: "22px 0" }} />
-        {/* Next — a time + your buffer, never a second countdown */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, letterSpacing: 1.8, textTransform: "uppercase", color: "rgba(241,236,224,.34)", fontWeight: 700, marginBottom: 7 }}>Next</div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: "#F1ECE0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{upNext ? upNext.name : "Open chair after this"}</div>
-          </div>
-          {upNext && (
-            <div style={{ textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
-              <div style={{ fontSize: 17, fontWeight: 600, color: "#F1ECE0" }}>{upNext.waiting ? "Waiting" : fmtTime(upNext.start)}</div>
-              {bufferLabel && <div style={{ fontSize: 12.5, marginTop: 3, color: behind ? WARN : "rgba(241,236,224,.5)", fontWeight: behind ? 600 : 400 }}>{bufferLabel}</div>}
+        <div style={{ height: 1, background: "rgba(241,236,224,.10)", margin: "18px 0" }} />
+        {/* NEXT UP — name + big bold green time (glanceable countdown #2) */}
+        {upNext ? (
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", fontWeight: 700, color: "rgba(241,236,224,.34)" }}>Next up</div>
+            <div style={{ fontSize: 17, fontWeight: 600, color: "rgba(252,248,239,.82)", marginTop: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{upNext.name}</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginTop: 7 }}>
+              <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 40, lineHeight: 0.9, color: GREEN, fontVariantNumeric: "tabular-nums" }}>{upNext.waiting ? "Waiting" : fmtTime(upNext.start)}</span>
+              {!upNext.waiting && upGapLabel && <span style={{ fontSize: 18, fontWeight: 700, color: GREEN }}>{upGapLabel}</span>}
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: 15, color: "rgba(241,236,224,.5)", fontStyle: "italic" }}>Open chair after this</div>
+        )}
         {/* Message the next client. When genuinely behind (<=10 min left or a late start) it's a loud
             amber alert; otherwise it's a quiet, ALWAYS-available heads-up so the barber can warn the
             next client EARLY — sometimes you can tell at the start of a cut that you'll run long. Both
