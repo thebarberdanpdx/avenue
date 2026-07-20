@@ -171,6 +171,10 @@ async function handler(req, res) {
   const ctx = b.context || {};
   const text = b.template ? renderPlainText(b.template, ctx) : (b.body || "");
   const html = b.template ? renderEmailHtml(b.template, ctx) : undefined;
+  // Optional separate SMS body. The boxed email template flattens into a long, multi-segment
+  // (costly) text, so a caller can pass a short `smsTemplate` for the SMS while the email keeps
+  // the rich boxed layout. Falls back to the email text when no smsTemplate is given.
+  const smsText = b.smsTemplate ? renderPlainText(b.smsTemplate, ctx) : text;
   if (!text) return res.status(400).json({ error: "nothing to send" });
 
   const email = String(to.email || "").trim();
@@ -231,7 +235,7 @@ async function handler(req, res) {
   const replyTo = String(ctx.email || "").trim();
   try { if (ch.email) { await sendEmail({ to: email, subject: b.subject || "Your appointment", text, html, fromName, replyTo }); results.email = "sent"; } }
   catch (e) { results.email = "error: " + e.message; }
-  try { if (ch.sms) { await sendSms({ to: phone, text }); results.sms = "sent"; } }
+  try { if (ch.sms) { await sendSms({ to: phone, text: smsText }); results.sms = "sent"; } }
   catch (e) { results.sms = "error: " + e.message; }
 
   return res.status(200).json({ ok: true, smsLive: SMS_LIVE, results });
