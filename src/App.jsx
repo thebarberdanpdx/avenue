@@ -5563,6 +5563,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // background version bump can't hard-reload the "You're confirmed" page out from under them.
   useEffect(() => { if (onHoldReload) onHoldReload(step === 8); return () => { if (onHoldReload) onHoldReload(false); }; }, [step]);
   const [showAllVisits, setShowAllVisits] = useState(false); // expand the recent-visits list on the home
+  const [showAllPast, setShowAllPast] = useState(false); // [client-past-visits] expand the full past-visits history on the home
   const [homeAction, setHomeAction] = useState(null); // { type: "cancel" | "reschedule", appt, person } — confirm sheet on the home next-visit card
   // Change/cancel window — ONE resolver shared by every manage surface (cancelWindowMinutes).
   // Reschedule / change-service / cancel on a visit inside the window are refused online with
@@ -6770,7 +6771,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setCart([]); setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
     setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setBookedId(null); setCameFromUsual(false);
     setPhotos([]); setClientNote(""); setSelfie(null); setBookedClientId(null); setBookedToken(null); galleryCapturedRef.current = false;
-    setConsult(null); setShowAllVisits(false); setHomeAction(null); setReschedPrev(null); setShowHome(true);
+    setConsult(null); setShowAllVisits(false); setShowAllPast(false); setHomeAction(null); setReschedPrev(null); setShowHome(true);
     refreshMyAppts();
   };
   const bookForPerson = (person) => {
@@ -6812,7 +6813,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     else bookForPerson({ id: null });
   };
   const signOutClient = () => {
-    setShowHome(false); setMatched(null); setMyAppts([]); setShowAllVisits(false); setHomeAction(null); setReschedPrev(null);
+    setShowHome(false); setMatched(null); setMyAppts([]); setShowAllVisits(false); setShowAllPast(false); setHomeAction(null); setReschedPrev(null);
     setBookingFor(null); setActiveMember(null); setCart([]); setShowWhoFor(false); setShowUsual(false);
     setSimpleStep(null); setSimpleCat(null); setSimplePref(null); setStep(0);
     setUsePhone(true); setShowCodeEntry(false); setCodeEntry(""); setClientEmail(""); setLoginNoMatch(null);
@@ -6968,6 +6969,25 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   })}
                   {pastServices.length > 3 && (
                     <button onClick={() => setShowAllVisits((v) => !v)} style={{ width: "100%", background: "transparent", borderTop: "1px solid var(--line)", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: 13, fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", letterSpacing: 0.3, cursor: "pointer" }}>{showAllVisits ? "Show less" : `See all ${pastServices.length} services \u2192`}</button>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* [client-past-visits] their appointment history on the home — a couple by default, expand for the rest.
+                View-only (service · date · barber, NO price). Uses `past` (all past appts, self+family, newest first). */}
+            {past.length > 0 && (
+              <>
+                <div style={lblStyle}>Past visits</div>
+                <div style={{ border: "1px solid var(--border)", borderRadius: 20, overflow: "hidden" }}>
+                  {(showAllPast ? past : past.slice(0, 2)).map((a, i) => (
+                    <div key={a.id} style={{ padding: "14px 18px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.1px", color: "var(--text)" }}>{svcLabel(a)}{a.familyMemberId ? ` · ${personLabel(a)}` : ""}</div>
+                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--sub)", marginTop: 3 }}>{fmtHomeShort(a)} · with {provFirst(a.providerId)}</div>
+                    </div>
+                  ))}
+                  {past.length > 2 && (
+                    <button onClick={() => setShowAllPast((v) => !v)} style={{ width: "100%", background: "transparent", borderTop: "1px solid var(--line)", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: 14, fontFamily: "'Jost', sans-serif", fontSize: 13.5, fontWeight: 500, color: "var(--sub)", letterSpacing: 0.2, cursor: "pointer" }}>{showAllPast ? "Show less" : `Show all ${past.length} visits`}</button>
                   )}
                 </div>
               </>
