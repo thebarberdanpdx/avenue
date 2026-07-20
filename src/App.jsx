@@ -2190,20 +2190,24 @@ const priceWithTimeRules = (service, providerId, dateObj, startMin) => {
 };
 // The price locked onto an appointment at booking. Existing appts without one fall back to normal pricing.
 const lockedApptPrice = (appt, service) => (appt && appt.price != null) ? appt.price : (service ? getPrice(service, appt && appt.providerId) : 0);
-// Display name for an appointment. The stored `name` is denormalized and can be a
-// placeholder ("Me", from a self-booking) — always resolve through the linked client
-// (or family member) so the calendar and sheets show the real person's name.
+// Display name for an appointment. The stored `name` is denormalized (copied at booking) and
+// goes STALE if the client — or family member — is later renamed, and can also be a placeholder
+// ("Me", from a self-booking). So always resolve through the LIVE linked client/member first, and
+// fall back to the stored name only for walk-ins / unlinked appts or before clients have loaded.
+// [appt-name-live-resolve] — a client renamed after booking must show the new name on the calendar.
 const apptDisplayName = (a, clients = []) => {
   if (!a) return "";
-  const placeholder = !a.name || a.name === "Me";
-  if (!placeholder && !a.familyMemberId) return a.name;
   const c = (clients || []).find((x) => x.id === a.clientId);
+  // Family member: their current name wins.
   if (a.familyMemberId && c) {
     const m = (c.family || []).find((f) => f.id === a.familyMemberId);
     if (m && m.name) return m.name;
   }
-  if (placeholder && c && c.name) return c.name;
-  return a.name || "Client";
+  // Linked client: the CURRENT client name wins over the denormalized copy (fixes renames).
+  if (!a.familyMemberId && c && c.name) return c.name;
+  // Fallbacks: stored name for walk-ins / unlinked / not-yet-loaded — never a bare "Me".
+  if (a.name && a.name !== "Me") return a.name;
+  return (c && c.name) || "Client";
 };
 const inputStyle = { width: "100%", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY };
 

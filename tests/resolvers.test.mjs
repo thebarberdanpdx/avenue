@@ -286,14 +286,14 @@ test("apptHoldsSlot: cancelled/done free the slot; everything else holds it", ()
   assert.equal(R.apptHoldsSlot(null), false);
 });
 
-// ─── apptDisplayName: always resolve the real person, never a placeholder ──
-test("apptDisplayName: resolves 'Me'/blank + family member through the client", () => {
+// ─── apptDisplayName: always resolve the LIVE person (a rename must win over the stored copy) ──
+test("apptDisplayName: resolves through the live client/member, never a stale stored name or placeholder", () => {
   const clients = [{ id: "c1", name: "Dan Smith", family: [{ id: "f1", name: "Junior Smith" }] }];
-  assert.equal(R.apptDisplayName({ name: "Alex", clientId: "c1" }, clients), "Alex");      // real name kept
+  assert.equal(R.apptDisplayName({ name: "Alex", clientId: "c1" }, clients), "Dan Smith"); // stored copy is stale (client renamed) → live client name wins [appt-name-live-resolve]
   assert.equal(R.apptDisplayName({ name: "Me", clientId: "c1" }, clients), "Dan Smith");   // placeholder → client
   assert.equal(R.apptDisplayName({ name: "", clientId: "c1" }, clients), "Dan Smith");     // blank → client
   assert.equal(R.apptDisplayName({ name: "Me", clientId: "c1", familyMemberId: "f1" }, clients), "Junior Smith"); // family member
-  assert.equal(R.apptDisplayName({ name: "Walk-in", clientId: "x" }, clients), "Walk-in"); // unknown client, real name
+  assert.equal(R.apptDisplayName({ name: "Walk-in", clientId: "x" }, clients), "Walk-in"); // unknown/unlinked client → stored name kept
 });
 
 // ─── splitCutStyleServices: the retired cut-styles → standalone-services migration ─────────
