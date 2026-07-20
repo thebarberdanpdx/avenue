@@ -5202,6 +5202,16 @@ function teamCh(sa, k) {
   const bookOn = k === "newBooking" && (s.emailStaffOnBooking !== false);
   return { push: v !== false, text: bookOn, email: bookOn };
 }
+// [per-event-alert-scope] Who gets the TEXT/EMAIL for a given event. Per-event `to` wins; falls back to
+// the legacy shop-wide bookingAlertScope, then "assigned". So an existing shop keeps its one global
+// choice on every event until the owner customizes a row — no data migration, no behavior change.
+// (In-app push is delivered shop-wide by the push infra and is NOT scoped here — see api/push.js.)
+function teamScope(sa, k) {
+  const s = sa || {};
+  const v = s[k];
+  const to = v && typeof v === "object" ? v.to : null;
+  return to || s.bookingAlertScope || "assigned";
+}
 
 // Alert the team about a staff-side appointment event. ONE dispatcher for all three channels:
 //   - in-app / device PUSH (to the shop's registered devices) when ch.push, and
@@ -5238,7 +5248,7 @@ function fireStaffPush({ shopId, title, appt, prevAppt, event, business }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          staff: { shopId, providerId: appt.providerId || null, scope: sa.bookingAlertScope || "assigned", clientId: appt.clientId || null, event: event || "newBooking", channels: { email: !!ch.email, text: !!ch.text } },
+          staff: { shopId, providerId: appt.providerId || null, scope: teamScope(sa, event || "newBooking"), clientId: appt.clientId || null, event: event || "newBooking", channels: { email: !!ch.email, text: !!ch.text } },
           context: { client: appt.name || "A client", service: appt.title || appt.serviceName || "an appointment", when: whenStr, note: (appt.note || appt.detail || "").trim() },
         }),
       }).catch(() => {});
@@ -15885,15 +15895,18 @@ function NotificationsCenter({ form, onCommitAlerts }) {
   // [notif-autosave] Every change commits immediately (no "Save changes" button to miss). Writing a
   // per-event {push,text,email} object supersedes any legacy boolean for that event.
   const setEvent = (k, next) => onCommitAlerts({ ...sa, [k]: next });
-  const setScope = (v) => onCommitAlerts({ ...sa, bookingAlertScope: v });
+  // [per-event-alert-scope] Each event carries its own text/email recipient (`to`). Write it onto the
+  // per-event object, preserving that event's channels.
+  const setEventTo = (k, ch, v) => onCommitAlerts({ ...sa, [k]: { push: !!ch.push, text: !!ch.text, email: !!ch.email, to: v } });
   const CHAN = [["push", "In-app"], ["text", "Text"], ["email", "Email"]];
+  const WHO = [{ value: "assigned", label: "Assigned barber" }, { value: "ownerPlus", label: "You + barber" }, { value: "all", label: "All staff" }];
   // team-channel-matrix (guard): in-app / text / email are chosen per event; teamCh() reads both the
   // legacy boolean shape and this per-event object shape, and fireStaffPush honors all three channels.
   return (
     <div>
-      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 2px 16px", fontWeight: 300 }}>Pick how your team hears about each event. <b style={{ color: "var(--text)", fontWeight: 600 }}>In-app</b> pop-ups need the Vero app with notifications allowed; <b style={{ color: "var(--text)", fontWeight: 600 }}>Text</b> and <b style={{ color: "var(--text)", fontWeight: 600 }}>Email</b> go to the phone &amp; email saved in each barber's staff profile. Messages to your <i>clients</i> live under <b style={{ color: "var(--text)", fontWeight: 600 }}>Automated Messages</b>.</p>
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 2px 16px", fontWeight: 300 }}>For each event, pick the channels <i>and</i> who gets the text/email. <b style={{ color: "var(--text)", fontWeight: 600 }}>Text</b> and <b style={{ color: "var(--text)", fontWeight: 600 }}>Email</b> go to the phone &amp; email in each barber's staff profile. <b style={{ color: "var(--text)", fontWeight: 600 }}>In-app</b> pop-ups reach every signed-in device. Messages to your <i>clients</i> live under <b style={{ color: "var(--text)", fontWeight: 600 }}>Automated Messages</b>.</p>
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 12px" }}>
-        {TEAM_ALERTS.map((ev, i) => { const ch = teamCh(sa, ev.k); return (
+        {TEAM_ALERTS.map((ev, i) => { const ch = teamCh(sa, ev.k); const routed = ch.text || ch.email; return (
           <div key={ev.k} style={{ padding: "14px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
             <div style={{ fontSize: 15.5, lineHeight: 1.3 }}>{ev.label}</div>
             <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 2, marginBottom: 11 }}>{ev.desc}</div>
@@ -15902,16 +15915,16 @@ function NotificationsCenter({ form, onCommitAlerts }) {
                 <button key={c} onClick={() => setEvent(ev.k, { push: !!ch.push, text: !!ch.text, email: !!ch.email, [c]: !on })} style={{ flex: 1, padding: "9px 6px", borderRadius: 10, fontSize: 13, fontWeight: on ? 600 : 400, background: on ? "var(--wash)" : "var(--panel2)", border: "1px solid " + (on ? "var(--gold)" : "var(--border2)"), color: on ? "var(--text)" : "var(--sub)", cursor: "pointer" }}>{lbl}{c === "text" ? " *" : ""}</button>
               ); })}
             </div>
+            {routed && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 12, color: "var(--faint)", marginBottom: 6 }}>Text / email goes to</div>
+                <Segmented options={WHO} value={teamScope(sa, ev.k)} onChange={(v) => setEventTo(ev.k, ch, v)} />
+              </div>
+            )}
           </div>
         ); })}
       </div>
-
-      <p style={{ fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", margin: "22px 2px 10px" }}>Who gets the text / email</p>
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px" }}>
-        <Segmented options={[{ value: "assigned", label: "Assigned barber" }, { value: "ownerPlus", label: "You + barber" }, { value: "all", label: "All staff" }]} value={sa.bookingAlertScope || "assigned"} onChange={setScope} />
-        <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginTop: 11 }}>In-app pop-ups always reach every device signed in to this shop. This picks who gets the <b style={{ color: "var(--text)", fontWeight: 600 }}>text</b> or <b style={{ color: "var(--text)", fontWeight: 600 }}>email</b> for the events above.</p>
-      </div>
-      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>* Text sends to the phone saved in the barber's profile. If a barber has no phone (or no email) on file, that channel is simply skipped for them.</p>
+      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>* Text/email sends to the phone &amp; email saved in the barber's profile — if that channel's blank for a barber, it's simply skipped. In-app pop-ups reach every signed-in device (limiting those to specific people is a separate change — ask if you want it).</p>
     </div>
   );
 }
