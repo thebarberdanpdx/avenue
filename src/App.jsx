@@ -23354,6 +23354,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     delete committedRef.current[primary.id];
     setCheckout({ ...primary, __groupAppts: ordered });
   };
+  // Check the whole group in together — every still-"confirmed" member goes to "checked-in" at once
+  // (members already in-service or done are left as they are). One atomic setAppts + flush.
+  const checkInGroup = (gid) => {
+    let n = 0;
+    setAppts((cur) => { const next = cur.map((a) => { if (a.groupId === gid && a.status === "confirmed") { n++; return { ...a, status: "checked-in" }; } return a; }); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
+    if (showToast) showToast(n ? "Group checked in." : "Everyone's already checked in.");
+  };
   const [dayOffset, setDayOffset] = useState(0);
   // Notification deep-link: when a tapped push hands us an appointment id, jump to its day and open its detail.
   // Retries as appts load (the booking may not be in state yet at tap time); clears once it's found and opened.
@@ -24899,6 +24906,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onRemoveFromGroup={removeFromGroup}
           onCheckoutMember={(m) => { setCheckoutGroupResume(m.groupId); setGroupOpen(null); startCheckout(m); }}
           onCheckoutGroup={startGroupCheckout}
+          onCheckInGroup={checkInGroup}
           onAddToGroup={openAddToGroupForGroup}
           showToast={showToast}
         />
@@ -27004,7 +27012,7 @@ function AddToGroupSheet({ source, appts, clients, providers, onClose, onPickExi
 // groupId shown as a member card under one primary contact. Actions are lifted to
 // CalendarView (make-primary / remove / checkout / add). Styled to match
 // AppointmentSheet (panel header, gold accent) so it reads as native, not Mango.
-function GroupSheet({ groupId, appts, clients, providers, services, business, onClose, onOpenAppt, onSetPrimary, onRemoveFromGroup, onCheckoutGroup, onCheckoutMember, onAddToGroup, showToast }) {
+function GroupSheet({ groupId, appts, clients, providers, services, business, onClose, onOpenAppt, onSetPrimary, onRemoveFromGroup, onCheckoutGroup, onCheckoutMember, onAddToGroup, onCheckInGroup, showToast }) {
   const [menuFor, setMenuFor] = useState(null);
   useEffect(() => {
     const y = window.scrollY;
@@ -27031,7 +27039,8 @@ function GroupSheet({ groupId, appts, clients, providers, services, business, on
       <div style={{ position: "fixed", inset: 0, zIndex: 3000, background: "var(--bg)", display: "flex", flexDirection: "column" }} onClick={() => setMenuFor(null)}>
         <div style={{ background: "var(--panel)", borderBottom: "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 12px) 14px 12px", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text)", padding: 4, cursor: "pointer", display: "flex" }} aria-label="Back"><ChevronLeft size={24} /></button>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, color: "var(--text)" }}>Group Appointment</div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, color: "var(--text)", flex: 1 }}>Group Appointment</div>
+          {onCheckInGroup && members.some((m) => m.status === "confirmed") && <button onClick={() => onCheckInGroup(groupId)} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 30, padding: "9px 15px", fontSize: 12.5, fontWeight: 700, letterSpacing: 0.5, cursor: "pointer", flexShrink: 0 }}>CHECK IN ALL</button>}
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 16, WebkitOverflowScrolling: "touch" }}>
           <div style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
