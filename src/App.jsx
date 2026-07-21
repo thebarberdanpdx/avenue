@@ -911,23 +911,22 @@ const THEMES = [
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.035,
     canvas: "linear-gradient(176deg,#FCFBF8,#F5F3EC)",
     t: { bg:"#FAF9F6", panel:"#FFFFFF", panel2:"#F4F2EC", line:"#EFEDE6", border:"#E6E3DB", border2:"#D3CEC2", text:"#1B1A16", text2:"#3B372F", sub:"#8A857A", faint:"#B3AEA3", gold:"#34483C", onGold:"#F6F4EE", live:"#34483C", shadow:"rgba(40,34,22,.08)", overlay:"rgba(24,22,18,0.42)" } },
-  // Minty — the Mangomint-inspired look Dan approved (2026-07-21): cool near-white canvas, crisp
-  // white cards, deep navy ink, a soft lavender accent. Clean modern-SaaS feel. Note: Mango's solid
-  // navy TOP BAR is not reproduced — Vero dashboard headers are frosted-light by design in every
-  // theme; the dark booking/checkout headers use --text, so they read navy here automatically.
-  { id: "minty", name: "Minty", tagline: "Soft lavender, navy ink", cat: "Crisp & Minimal", dark: false,
+  // Minty — the Mangomint look (2026-07-21). Sampled straight from Dan's Mangomint screenshots:
+  // deep navy ink #191E49 + Mangomint's soft MINT/teal accent, crisp white cards, cool near-white
+  // canvas. Clean modern-SaaS feel. Note: Mango's solid navy TOP BAR is not reproduced — Vero
+  // dashboard headers are frosted-light by design; the dark booking/checkout headers read navy.
+  { id: "minty", name: "Minty", tagline: "Soft mint, navy ink", cat: "Crisp & Minimal", dark: false,
     disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.02,
-    canvas: "linear-gradient(176deg,#FBFBFE,#EEEFF6)",
-    grad: "linear-gradient(135deg,#9A8FE0,#8477D6)",
-    t: { bg:"#F4F5F8", panel:"#FFFFFF", panel2:"#EFEFF6", line:"#ECECF3", border:"#E4E4EE", border2:"#CACADB", text:"#1E2749", text2:"#3B4168", sub:"#6C7091", faint:"#9A9EB8", gold:"#9A8FE0", onGold:"#1E2749", live:"#8477D6", shadow:"rgba(30,39,73,.08)", overlay:"rgba(20,24,44,0.42)" } },
-  // Nectarine — the Mango/Mangomint look WITHOUT the navy header. Palette is intentionally identical
-  // to Minty (soft lavender accent, deep navy ink, white cards, cool near-white canvas); kept as its
-  // own named theme at Dan's request (2026-07-21). Minty is left untouched — the two are twins.
-  { id: "nectarine", name: "Nectarine", tagline: "Mango look — lavender, navy ink", cat: "Crisp & Minimal", dark: false,
+    canvas: "linear-gradient(176deg,#FBFDFD,#ECF1F2)",
+    grad: "linear-gradient(135deg,#5AD2C8,#3ABAB0)",
+    t: { bg:"#F4F6F7", panel:"#FFFFFF", panel2:"#EBF3F2", line:"#E9F0EF", border:"#E0E9E8", border2:"#C6D4D3", text:"#191E49", text2:"#3A3F63", sub:"#6E7186", faint:"#A6AAB6", gold:"#40C6BC", onGold:"#12163C", live:"#7FDAD2", shadow:"rgba(25,30,73,.08)", overlay:"rgba(18,22,44,0.42)" } },
+  // Nectarine — twin of Minty: the same Mangomint navy #191E49 + soft mint look, without the navy
+  // header. Kept as its own named theme at Dan's request (2026-07-21).
+  { id: "nectarine", name: "Nectarine", tagline: "Soft mint, navy ink", cat: "Crisp & Minimal", dark: false,
     disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.02,
-    canvas: "linear-gradient(176deg,#FBFBFE,#EEEFF6)",
-    grad: "linear-gradient(135deg,#9A8FE0,#8477D6)",
-    t: { bg:"#F4F5F8", panel:"#FFFFFF", panel2:"#EFEFF6", line:"#ECECF3", border:"#E4E4EE", border2:"#CACADB", text:"#1E2749", text2:"#3B4168", sub:"#6C7091", faint:"#9A9EB8", gold:"#9A8FE0", onGold:"#1E2749", live:"#8477D6", shadow:"rgba(30,39,73,.08)", overlay:"rgba(20,24,44,0.42)" } },
+    canvas: "linear-gradient(176deg,#FBFDFD,#ECF1F2)",
+    grad: "linear-gradient(135deg,#5AD2C8,#3ABAB0)",
+    t: { bg:"#F4F6F7", panel:"#FFFFFF", panel2:"#EBF3F2", line:"#E9F0EF", border:"#E0E9E8", border2:"#C6D4D3", text:"#191E49", text2:"#3A3F63", sub:"#6E7186", faint:"#A6AAB6", gold:"#40C6BC", onGold:"#12163C", live:"#7FDAD2", shadow:"rgba(25,30,73,.08)", overlay:"rgba(18,22,44,0.42)" } },
   // ===== BOLD & SLEEK — deep, dramatic dark themes =====
   { id: "noir", name: "Noir", tagline: "Midnight, lit in platinum", cat: "Bold & Sleek", dark: true,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.08,
