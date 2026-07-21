@@ -4831,10 +4831,8 @@ function PhotoPicker({ onClose, onPick, onFail, startTab }) {
 
 // Profile-picture picker for staff members: portrait grid + simulated upload.
 function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto, onFail, startTab, noStock }) {
-  // noStock (client profile pic, Dan's request): drop the STOCK sample-photo tab, but keep BOTH
-  // real options — "Take photo" (camera) and "Choose photo" (the phone's gallery). Never show the
-  // demo/stock sample photos as a real option for a client's face.
-  const [tab, setTab] = useState(noStock ? "upload" : (startTab || "library"));
+  // [no-stock-profile-pic] The stock/sample portrait library was removed (Dan): a profile picture is
+  // always the person's own photo. Opens straight to Take photo / Choose photo — no library tab anywhere.
   const camRef = useRef(null);
   const libRef = useRef(null);
   const handleFile = (e) => {
@@ -4848,26 +4846,7 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto, onFail, startTa
         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24 }}>Profile picture</div>
         <button onClick={onClose} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
       </div>
-      {!noStock && (
-      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-        <button onClick={() => setTab("library")} style={{ flex: 1, padding: 12, borderRadius: 12, background: tab === "library" ? "var(--gold)" : "var(--panel2)", color: tab === "library" ? "var(--on-gold)" : "var(--text)", fontSize: 15, letterSpacing: 1 }}>FROM LIBRARY</button>
-        <button onClick={() => setTab("upload")} style={{ flex: 1, padding: 12, borderRadius: 12, background: tab === "upload" ? "var(--gold)" : "var(--panel2)", color: tab === "upload" ? "var(--on-gold)" : "var(--text)", fontSize: 15, letterSpacing: 1 }}>UPLOAD YOUR OWN</button>
-      </div>
-      )}
-
-      {tab === "library" && (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-            {STAFF_PORTRAITS.map((id) => (
-              <button key={id} className="lift" onClick={() => { onPick(id); onClose(); }} style={{ padding: 0, borderRadius: "50%", overflow: "hidden", border: "1px solid var(--border)", aspectRatio: "1", background: "var(--panel2)" }}>
-                <img src={imgUrl(id, 240)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-              </button>
-            ))}
-          </div>
-          <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 16, lineHeight: 1.5 }}>In the live product this is where you'd upload a real headshot. Here it's a curated sample set.</p>
-        </>
-      )}
-      {tab === "upload" && (
+      {(
         <div style={{ textAlign: "center", padding: "30px 0" }}>
           <div style={{ border: "1px dashed var(--border2)", borderRadius: 8, padding: 40, marginBottom: 16 }}>
             <Upload size={32} style={{ color: "var(--faint)", marginBottom: 12 }} />
