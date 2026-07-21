@@ -23291,6 +23291,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       let next = cur.map((a) => a.id === apptId ? { ...a, groupId: null, groupPrimary: false } : a);
       // A group of one is not a group: if only a single member is left under this groupId, clear it too.
       if (gid) { const remaining = next.filter((a) => a.groupId === gid); if (remaining.length === 1) next = next.map((a) => a.groupId === gid ? { ...a, groupId: null, groupPrimary: false } : a); }
+      // Close the group screen if the group no longer exists (0 or 1 member left).
+      const stillGrouped = gid ? next.filter((a) => a.groupId === gid).length : 0;
+      if (stillGrouped < 2) queueMicrotask(() => setGroupOpen((o) => (o === gid ? null : o)));
       if (flushApptsNow) queueMicrotask(() => flushApptsNow(next));
       return next;
     });
@@ -26991,7 +26994,7 @@ function GroupSheet({ groupId, appts, clients, providers, services, business, on
               { label: "View details", fn: () => { setMenuFor(null); onOpenAppt(m); } },
               !(m.status === "done" || m.paid) && { label: "Check out", fn: () => { setMenuFor(null); onCheckoutMember(m); } },
               !m.groupPrimary && { label: "Make primary contact", fn: () => { setMenuFor(null); onSetPrimary(groupId, m.id); } },
-              members.length > 1 && { label: "Remove from group", fn: () => { setMenuFor(null); onRemoveFromGroup(m.id); } },
+              { label: members.length > 1 ? "Remove from group" : "Remove from group (dissolve)", fn: () => { setMenuFor(null); onRemoveFromGroup(m.id); } },
             ].filter(Boolean);
             return (
               <div key={m.id} style={{ ...card, marginBottom: 11, position: "relative" }}>
@@ -27570,9 +27573,9 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
             {/* [done-no-dim] a completed/paid appointment renders at FULL opacity — Dan explicitly does
                 NOT want the done sheet faded/greyed out (2026-07-19). Do NOT re-add an opacity dim here. */}
             <div>
-              {groupSize > 1 && appt.groupId && onOpenGroup && (
+              {appt.groupId && onOpenGroup && (
                 <div onClick={() => onOpenGroup(appt.groupId)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "13px 18px", borderBottom: `1px solid ${T.line}`, background: T.chip, cursor: "pointer" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 9, color: T.text, fontSize: 14.5, fontWeight: 600 }}><Users size={16} /> Part of a group of {groupSize}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, color: T.text, fontSize: 14.5, fontWeight: 600 }}><Users size={16} /> {groupSize > 1 ? `Part of a group of ${groupSize}` : "In a group — tap to add people"}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 3, color: T.accent, fontSize: 14, fontWeight: 700 }}>View group <ChevronRight size={15} /></div>
                 </div>
               )}
