@@ -920,6 +920,14 @@ const THEMES = [
     canvas: "linear-gradient(176deg,#FBFBFE,#EEEFF6)",
     grad: "linear-gradient(135deg,#9A8FE0,#8477D6)",
     t: { bg:"#F4F5F8", panel:"#FFFFFF", panel2:"#EFEFF6", line:"#ECECF3", border:"#E4E4EE", border2:"#CACADB", text:"#1E2749", text2:"#3B4168", sub:"#6C7091", faint:"#9A9EB8", gold:"#9A8FE0", onGold:"#1E2749", live:"#8477D6", shadow:"rgba(30,39,73,.08)", overlay:"rgba(20,24,44,0.42)" } },
+  // Nectarine — same Mango layout as Minty (navy ink, white cards, near-white canvas) but with the
+  // warm nectarine/mango-orange accent Dan actually wanted (2026-07-21). Greys warmed to neutral so
+  // an orange theme carries no cool/lavender residue. Navy ink + orange = complementary, intentional.
+  { id: "nectarine", name: "Nectarine", tagline: "Warm nectarine, navy ink", cat: "Crisp & Minimal", dark: false,
+    disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.02,
+    canvas: "linear-gradient(176deg,#FEFCFA,#F4F1EC)",
+    grad: "linear-gradient(135deg,#EE7C4A,#E4682F)",
+    t: { bg:"#F7F5F2", panel:"#FFFFFF", panel2:"#F3F0EB", line:"#EFEBE4", border:"#E7E2D9", border2:"#D5CFC4", text:"#1E2749", text2:"#3C4058", sub:"#6E6C72", faint:"#A4A19E", gold:"#E86F3E", onGold:"#1E2749", live:"#E4682F", shadow:"rgba(70,45,25,.08)", overlay:"rgba(30,22,14,0.42)" } },
   // ===== BOLD & SLEEK — deep, dramatic dark themes =====
   { id: "noir", name: "Noir", tagline: "Midnight, lit in platinum", cat: "Bold & Sleek", dark: true,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.08,
