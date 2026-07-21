@@ -23269,6 +23269,48 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   const [calMenuOpen, setCalMenuOpen] = useState(false); // ⋯ overflow on the calendar header
   const [open, setOpen] = useState(null);
+  // Group appointments: count of appts sharing each groupId. Only 2+ is a real group — this drives
+  // the group (2-people) icon on tiles and the group detail sheet. groupId is set at booking (client
+  // multi-person, ~6490) and by staff group-create; a lone remaining member is not shown as a group.
+  const groupCounts = useMemo(() => {
+    const m = {};
+    (appts || []).forEach((a) => { if (a && a.groupId) m[a.groupId] = (m[a.groupId] || 0) + 1; });
+    return m;
+  }, [appts]);
+  const [groupOpen, setGroupOpen] = useState(null); // groupId whose group detail sheet is open
+  // Group actions — write to appts through the calendar's atomic path (one setAppts + one flush).
+  const setGroupPrimary = (gid, apptId) => {
+    if (!gid) return;
+    setAppts((cur) => { const next = cur.map((a) => a.groupId === gid ? { ...a, groupPrimary: a.id === apptId } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
+    if (showToast) showToast("Primary contact updated.");
+  };
+  const removeFromGroup = (apptId) => {
+    setAppts((cur) => {
+      const target = cur.find((a) => a.id === apptId);
+      const gid = target && target.groupId;
+      let next = cur.map((a) => a.id === apptId ? { ...a, groupId: null, groupPrimary: false } : a);
+      // A group of one is not a group: if only a single member is left under this groupId, clear it too.
+      if (gid) { const remaining = next.filter((a) => a.groupId === gid); if (remaining.length === 1) next = next.map((a) => a.groupId === gid ? { ...a, groupId: null, groupPrimary: false } : a); }
+      if (flushApptsNow) queueMicrotask(() => flushApptsNow(next));
+      return next;
+    });
+    if (showToast) showToast("Removed from group.");
+  };
+  const [groupTarget, setGroupTarget] = useState(null); // groupId a newly-created appt should join (staff "add to group")
+  const addToGroup = (gid) => {
+    setGroupOpen(null); setGroupTarget(gid);
+    const pid = (providers.find((p) => p && p.id && p.id !== "anyone") || providers[0] || {}).id;
+    setNewApptSlot({ providerId: pid, start: earliestOpenSlot(pid, selectedDate, 30), forGroup: gid });
+  };
+  // Turn a standalone appt into a group, or add another person to its group: give it a groupId if it
+  // has none (mark it primary), then open the new-appt form for the next person (tagged via groupTarget).
+  const startGroupFromAppt = (appt) => {
+    if (!appt) return;
+    let gid = appt.groupId;
+    if (!gid) { gid = "g" + Date.now() + Math.floor(Math.random() * 1000); applyApptPatch(appt.id, { groupId: gid, groupPrimary: true }); }
+    setOpen(null); addToGroup(gid);
+  };
+  const startGroupCheckout = (gid) => { if (showToast) showToast("Group checkout — coming next."); }; // Stage 4 wires this
   const [dayOffset, setDayOffset] = useState(0);
   // Notification deep-link: when a tapped push hands us an appointment id, jump to its day and open its detail.
   // Retries as appts load (the booking may not be in state yet at tap time); clears once it's found and opened.
@@ -23306,6 +23348,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const [notifyMove, setNotifyMove] = useState(false); // drag-move: text the client the new time (default off/silent)
   const [createSlot, setCreateSlot] = useState(null); // { providerId, start } long-press to create
   const [newApptSlot, setNewApptSlot] = useState(null); // { providerId, start } → opens the pick-client+service form
+  // Clear the "add to group" target whenever the new-appt form closes (commit OR cancel), so a later
+  // normal appointment never silently joins a group the staff walked away from.
+  useEffect(() => { if (!newApptSlot) setGroupTarget(null); }, [newApptSlot]);
   const [blockSlot, setBlockSlot] = useState(null); // { providerId, start } → opens the time-block detail window
   const [hoursEdit, setHoursEdit] = useState(null); // { providerId } → opens the per-barber hours editor
   const [pressInd, setPressInd] = useState(null); // { providerId, start, y } live indicator while holding
@@ -23972,7 +24017,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       setClients((cur) => cur.map((c) => c.id === bookClient.id ? { ...c, lastActivity: new Date().toISOString() } : c));
     }
 
-    const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: (optLabels && optLabels.length) ? `${service.name} · ${optLabels.join(", ")}` : service.name, serviceName: service.name, addonLabels: optLabels || [], lineItems: [{ serviceId: service.id, cutType: null, beardType: null, addons: addons || {} }], manageToken: makeManageToken(), detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), email: bookClient ? (bookClient.email || "") : (walkInEmail || ""), hasPhotos: false, photos: 0, newClient: (!client && !!walkInName) ? true : undefined /* audit #29: a new walk-in counts toward the barber's new-client-per-day cap */ };
+    const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: (optLabels && optLabels.length) ? `${service.name} · ${optLabels.join(", ")}` : service.name, serviceName: service.name, addonLabels: optLabels || [], lineItems: [{ serviceId: service.id, cutType: null, beardType: null, addons: addons || {} }], manageToken: makeManageToken(), detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), email: bookClient ? (bookClient.email || "") : (walkInEmail || ""), hasPhotos: false, photos: 0, groupId: groupTarget || null, groupPrimary: false, newClient: (!client && !!walkInName) ? true : undefined /* audit #29: a new walk-in counts toward the barber's new-client-per-day cap */ };
     setAppts((cur) => { const next = [...cur, newAppt]; if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
     // Staff-created booking → fire the confirmation too (same engine as online bookings) —
     // unless the form's "Notify client" toggle was switched off (silent booking). Staff-side
@@ -24507,6 +24552,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 // Eyebrow shows the service alone; the cut style + add-ons get their own clean line below,
                 // so the tile never crams a truncated "HAIRCUT (SKIN FADE, FACIAL…)" into one row.
                 const svcTop = a.serviceName || (a.title || "").replace(/\s*[(·].*$/, "");
+                const isGroup = !!(a.groupId && groupCounts[a.groupId] > 1);
                 return (
                   <div key={a.id} data-appt
                     onClick={() => { const d = dragRef.current; if (d && (d.didDrag || d.scrolled)) return; setOpen(a); }}
@@ -24530,6 +24576,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     {/* quiet markers, bottom-right: ✎ note · ▱ photos · NEW · ↻ rebooked · ★ regular */}
                     {height > 54 && (
                     <div style={{ position: "absolute", bottom: 9, right: 11, display: "flex", gap: 7, alignItems: "center", color: subOn }}>
+                      {isGroup && <Users size={12} style={{ opacity: 0.9 }} />}
                       {a.hasNote && <Edit2 size={11} style={{ opacity: 0.75 }} />}
                       {a.hasPhotos && <ImageIcon size={12} style={{ opacity: 0.75 }} />}
                       {isNew && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, color: nameOn }}>NEW</span>}
@@ -24539,6 +24586,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     )}
                     {/* short tiles still flag a first-time client */}
                     {height <= 54 && isNew && <span style={{ position: "absolute", top: 6, right: 11, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, color: nameOn }}>NEW</span>}
+                    {height <= 54 && isGroup && <Users size={11} style={{ position: "absolute", top: 6, left: 11, opacity: 0.9, color: subOn }} />}
                   </div>
                 );
               })}
@@ -24776,6 +24824,28 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onUpdate={updateAppt}
           onDelete={deleteAppt}
           onOpenClient={onOpenClient}
+          showToast={showToast}
+          onOpenGroup={(gid) => { setOpen(null); setGroupOpen(gid); }}
+          onAddToGroup={startGroupFromAppt}
+          groupSize={open && open.groupId ? (groupCounts[open.groupId] || 0) : 0}
+        />
+      )}
+
+      {groupOpen && (
+        <GroupSheet
+          groupId={groupOpen}
+          appts={appts}
+          clients={clients}
+          providers={providers}
+          services={services}
+          business={business}
+          onClose={() => setGroupOpen(null)}
+          onOpenAppt={(m) => { setGroupOpen(null); setOpen(m); }}
+          onSetPrimary={setGroupPrimary}
+          onRemoveFromGroup={removeFromGroup}
+          onCheckoutMember={(m) => { setGroupOpen(null); startCheckout(m); }}
+          onCheckoutGroup={(gid) => startGroupCheckout(gid)}
+          onAddToGroup={(gid) => addToGroup(gid)}
           showToast={showToast}
         />
       )}
@@ -26737,7 +26807,103 @@ function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, sho
   );
 }
 
-function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onRefund, onUpdate, onDelete, onOpenClient, onRebook, showToast, shopId }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// GroupSheet — staff view/manage of a group appointment: every appt sharing a
+// groupId shown as a member card under one primary contact. Actions are lifted to
+// CalendarView (make-primary / remove / checkout / add). Styled to match
+// AppointmentSheet (panel header, gold accent) so it reads as native, not Mango.
+function GroupSheet({ groupId, appts, clients, providers, services, business, onClose, onOpenAppt, onSetPrimary, onRemoveFromGroup, onCheckoutGroup, onCheckoutMember, onAddToGroup, showToast }) {
+  const [menuFor, setMenuFor] = useState(null);
+  useEffect(() => {
+    const y = window.scrollY;
+    window.scrollTo(0, 0);
+    document.body.style.position = "fixed"; document.body.style.top = "0"; document.body.style.left = "0"; document.body.style.right = "0"; document.body.style.width = "100%";
+    return () => { document.body.style.position = ""; document.body.style.top = ""; document.body.style.left = ""; document.body.style.right = ""; document.body.style.width = ""; window.scrollTo(0, y); };
+  }, []);
+  const members = (appts || []).filter((a) => a && a.groupId === groupId && a.status !== "cancelled").sort((a, b) => (a.start || 0) - (b.start || 0));
+  if (!members.length) return null;
+  const primary = members.find((m) => m.groupPrimary) || members[0];
+  const primClient = (clients || []).find((c) => c.id === primary.clientId);
+  const d = primary.bookedFor ? new Date(primary.bookedFor) : null;
+  const dateStr = d ? d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) : "";
+  const money = (n) => "$" + (Math.round((Number(n) || 0) * 100) / 100).toFixed(2).replace(/\.00$/, "");
+  const groupTotal = members.reduce((s, m) => s + (Number(m.price) || 0), 0);
+  const allDone = members.every((m) => m.status === "done" || m.paid);
+  const stMeta = (m) => (m.status === "done" || m.paid) ? { label: "Done", color: "var(--gold)" }
+    : m.status === "in_service" ? { label: "In service", color: "#7A9E9F" }
+    : (m.status === "checked_in" || m.status === "arrived") ? { label: "Checked in", color: "#7A9E9F" }
+    : { label: "Confirmed", color: "var(--sub)" };
+  const card = { background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "14px 16px" };
+  return (
+    <Portal>
+      <div style={{ position: "fixed", inset: 0, zIndex: 3000, background: "var(--bg)", display: "flex", flexDirection: "column" }} onClick={() => setMenuFor(null)}>
+        <div style={{ background: "var(--panel)", borderBottom: "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 12px) 14px 12px", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text)", padding: 4, cursor: "pointer", display: "flex" }} aria-label="Back"><ChevronLeft size={24} /></button>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, color: "var(--text)" }}>Group Appointment</div>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: 16, WebkitOverflowScrolling: "touch" }}>
+          <div style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ fontSize: 15 }}><span style={{ color: "var(--sub)" }}>On </span><b style={{ color: "var(--text)" }}>{dateStr}</b></div>
+            <div style={{ color: "var(--sub)", fontWeight: 600, fontSize: 14 }}>{members.length} {members.length === 1 ? "person" : "people"}</div>
+          </div>
+          <div style={{ fontSize: 11.5, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "6px 3px 8px" }}>Primary contact</div>
+          <div style={{ ...card, marginBottom: 22, display: "flex", alignItems: "center", gap: 13 }}>
+            <Avatar size={47} photo={primClient?.photo} initial={(apptDisplayName(primary, clients) || "?").trim()[0] || "?"} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }}>{apptDisplayName(primary, clients)}</div>
+              {(primary.phone || (primClient && primClient.phone)) ? <div style={{ marginTop: 3 }}><PhoneLink number={primary.phone || primClient.phone} /></div> : null}
+              {(primary.email || (primClient && primClient.email)) ? <div style={{ marginTop: 2 }}><EmailLink email={primary.email || primClient.email} /></div> : null}
+            </div>
+          </div>
+          {members.map((m) => {
+            const prov = (providers || []).find((p) => p.id === m.providerId) || {};
+            const st = stMeta(m);
+            const items = [
+              { label: "View details", fn: () => { setMenuFor(null); onOpenAppt(m); } },
+              !(m.status === "done" || m.paid) && { label: "Check out", fn: () => { setMenuFor(null); onCheckoutMember(m); } },
+              !m.groupPrimary && { label: "Make primary contact", fn: () => { setMenuFor(null); onSetPrimary(groupId, m.id); } },
+              members.length > 1 && { label: "Remove from group", fn: () => { setMenuFor(null); onRemoveFromGroup(m.id); } },
+            ].filter(Boolean);
+            return (
+              <div key={m.id} style={{ ...card, marginBottom: 11, position: "relative" }}>
+                <div style={{ minWidth: 0, cursor: "pointer", paddingRight: 26 }} onClick={() => onOpenAppt(m)}>
+                  <div style={{ fontSize: 12, color: "var(--faint)", fontWeight: 600 }}>For <span style={{ color: "var(--text)", fontWeight: 700 }}>{apptDisplayName(m, clients)}</span></div>
+                  <div style={{ fontSize: 15.5, fontWeight: 700, color: "var(--text)", marginTop: 3 }}>{m.serviceName || (m.title || "").replace(/\s*[(·].*$/, "") || "Service"}</div>
+                  <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>with {prov.name || "staff"} · {fmtTime(m.start)}</div>
+                  <div style={{ display: "inline-block", marginTop: 10, fontSize: 11.5, fontWeight: 700, padding: "4px 11px", borderRadius: 20, color: st.color, background: "var(--panel2)" }}>{st.label}</div>
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); setMenuFor(menuFor === m.id ? null : m.id); }} style={{ position: "absolute", top: 12, right: 12, background: "none", border: "none", color: "var(--sub)", padding: 4, cursor: "pointer", display: "flex" }} aria-label="Actions"><MoreHorizontal size={20} /></button>
+                {menuFor === m.id && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 40, right: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-lg, 0 12px 30px -8px rgba(0,0,0,.28))", zIndex: 6, overflow: "hidden", minWidth: 196 }}>
+                    {items.map((it, i) => (
+                      <button key={i} onClick={it.fn} style={{ display: "block", width: "100%", textAlign: "left", padding: "13px 16px", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: "var(--text)", fontSize: 14.5, cursor: "pointer" }}>{it.label}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <button onClick={() => onAddToGroup(groupId)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: 14, marginTop: 5, background: "none", border: "1px dashed var(--border)", borderRadius: 12, color: "var(--sub)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}><Plus size={17} /> Add appointment</button>
+        </div>
+        {(() => {
+          // Interim checkout: ring each person up on the PROVEN single-checkout path (safe, no money-path
+          // rewrite). One combined charge for the whole group is the verified follow-up (Stage 4).
+          const nextUnpaid = members.find((m) => !(m.status === "done" || m.paid));
+          if (!nextUnpaid) return null;
+          const nm = (apptDisplayName(nextUnpaid, clients) || "").split(" ")[0] || "next";
+          return (
+            <div style={{ flexShrink: 0, borderTop: "1px solid var(--line)", padding: "12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px)", background: "var(--panel)" }}>
+              <button onClick={() => onCheckoutMember(nextUnpaid)} style={{ width: "100%", padding: 15, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, fontSize: 15.5, fontWeight: 700, cursor: "pointer" }}>Check out {nm} · {money(nextUnpaid.price)}</button>
+              {members.length > 1 && <div style={{ textAlign: "center", fontSize: 12.5, color: "var(--faint)", marginTop: 8 }}>Rings up one person at a time · combined ticket coming soon</div>}
+            </div>
+          );
+        })()}
+      </div>
+    </Portal>
+  );
+}
+
+function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onRefund, onUpdate, onDelete, onOpenClient, onRebook, showToast, shopId, onOpenGroup, onAddToGroup, groupSize = 0 }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
@@ -27275,6 +27441,12 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
             {/* [done-no-dim] a completed/paid appointment renders at FULL opacity — Dan explicitly does
                 NOT want the done sheet faded/greyed out (2026-07-19). Do NOT re-add an opacity dim here. */}
             <div>
+              {groupSize > 1 && appt.groupId && onOpenGroup && (
+                <div onClick={() => onOpenGroup(appt.groupId)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "13px 18px", borderBottom: `1px solid ${T.line}`, background: T.chip, cursor: "pointer" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, color: T.text, fontSize: 14.5, fontWeight: 600 }}><Users size={16} /> Part of a group of {groupSize}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 3, color: T.accent, fontSize: 14, fontWeight: 700 }}>View group <ChevronRight size={15} /></div>
+                </div>
+              )}
               {/* status + check-in */}
               <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -27781,6 +27953,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       "Repeating appointment set up." and did nothing, which could make staff think a
                       client is on recurring books when they aren't. Removed until it's built for real. */}
                   {onRebook && <MenuItem T={T} icon={<Copy size={17} />} label="Rebook — new day & time" onClick={() => { setMenuOpen(false); onRebook(appt); }} />}
+                  {onAddToGroup && appt.status !== "done" && <MenuItem T={T} icon={<Users size={17} />} label={appt.groupId ? "Add another person to group" : "Start a group (add another person)"} onClick={() => { setMenuOpen(false); onAddToGroup(appt); }} />}
                   <MenuItem T={T} icon={<Bell size={17} />} label="Resend Notifications" onClick={() => { setMenuOpen(false); showToast("Confirmation re-sent to client."); }} />
                   <Divider T={T} />
                   <div style={{ padding: "6px 16px 4px", fontSize: 14, letterSpacing: 1.2, color: T.faint }}>SET STATUS</div>
