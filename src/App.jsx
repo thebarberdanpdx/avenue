@@ -23269,6 +23269,14 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   const [calMenuOpen, setCalMenuOpen] = useState(false); // ⋯ overflow on the calendar header
   const [open, setOpen] = useState(null);
+  // Group appointments: count of appts sharing each groupId. Only 2+ is a real group — this drives
+  // the group (2-people) icon on tiles and the group detail sheet. groupId is set at booking (client
+  // multi-person, ~6490) and by staff group-create; a lone remaining member is not shown as a group.
+  const groupCounts = useMemo(() => {
+    const m = {};
+    (appts || []).forEach((a) => { if (a && a.groupId) m[a.groupId] = (m[a.groupId] || 0) + 1; });
+    return m;
+  }, [appts]);
   const [dayOffset, setDayOffset] = useState(0);
   // Notification deep-link: when a tapped push hands us an appointment id, jump to its day and open its detail.
   // Retries as appts load (the booking may not be in state yet at tap time); clears once it's found and opened.
@@ -24507,6 +24515,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 // Eyebrow shows the service alone; the cut style + add-ons get their own clean line below,
                 // so the tile never crams a truncated "HAIRCUT (SKIN FADE, FACIAL…)" into one row.
                 const svcTop = a.serviceName || (a.title || "").replace(/\s*[(·].*$/, "");
+                const isGroup = !!(a.groupId && groupCounts[a.groupId] > 1);
                 return (
                   <div key={a.id} data-appt
                     onClick={() => { const d = dragRef.current; if (d && (d.didDrag || d.scrolled)) return; setOpen(a); }}
@@ -24530,6 +24539,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     {/* quiet markers, bottom-right: ✎ note · ▱ photos · NEW · ↻ rebooked · ★ regular */}
                     {height > 54 && (
                     <div style={{ position: "absolute", bottom: 9, right: 11, display: "flex", gap: 7, alignItems: "center", color: subOn }}>
+                      {isGroup && <Users size={12} style={{ opacity: 0.9 }} />}
                       {a.hasNote && <Edit2 size={11} style={{ opacity: 0.75 }} />}
                       {a.hasPhotos && <ImageIcon size={12} style={{ opacity: 0.75 }} />}
                       {isNew && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, color: nameOn }}>NEW</span>}
@@ -24539,6 +24549,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     )}
                     {/* short tiles still flag a first-time client */}
                     {height <= 54 && isNew && <span style={{ position: "absolute", top: 6, right: 11, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, color: nameOn }}>NEW</span>}
+                    {height <= 54 && isGroup && <Users size={11} style={{ position: "absolute", top: 6, left: 11, opacity: 0.9, color: subOn }} />}
                   </div>
                 );
               })}
