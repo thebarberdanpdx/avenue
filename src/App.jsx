@@ -22228,6 +22228,7 @@ function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, prov
   const whenLabel = { early: "Morning", morning: "Morning", midday: "Midday", afternoon: "Afternoon", evening: "Evening", any: "Any time" };
   const whenWord = { early: "morning", morning: "morning", midday: "midday", afternoon: "afternoon", evening: "evening" };
   const [openId, setOpenId] = useState(null);
+  const [confirmMove, setConfirmMove] = useState(null); // { entry, slot } — "are you sure" before moving a booked client up (reschedules + texts them)
   // Booked-but-wants-earlier clients: synthesized from confirmed, still-upcoming appointments whose
   // client/owner turned on "waitlist for an earlier time." They ride at the TOP of the waitlist with a
   // colored (sage) card so staff can move them up. Source of truth is the appointment — clearing the flag
@@ -22416,11 +22417,22 @@ function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, prov
                     ) : (
                       <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
                         {openings.map((o, oi) => (
-                          <button key={oi} className="lift" onClick={() => moveUp(open, o)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%", textAlign: "left", borderRadius: 12, padding: "13px 15px", border: oi === 0 ? "1.5px solid var(--gold)" : "1px solid var(--border2)", background: oi === 0 ? "color-mix(in srgb, var(--gold) 8%, var(--panel))" : "var(--panel)", cursor: "pointer" }}>
+                          <button key={oi} className="lift" onClick={() => setConfirmMove({ entry: open, slot: o })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%", textAlign: "left", borderRadius: 12, padding: "13px 15px", border: oi === 0 ? "1.5px solid var(--gold)" : "1px solid var(--border2)", background: oi === 0 ? "color-mix(in srgb, var(--gold) 8%, var(--panel))" : "var(--panel)", cursor: "pointer" }}>
                             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>{oi === 0 && <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />}<span style={{ fontSize: 15, fontWeight: 500 }}>{slotLabel(o)}{open.anyProvider && o.providerName ? ` · ${o.providerName}` : ""}</span></span>
                             <span style={{ fontSize: 12.5, color: oi === 0 ? "var(--gold)" : "var(--sub)", fontWeight: oi === 0 ? 600 : 400 }}>{oi === 0 ? (o.best ? "soonest · no wait" : "soonest") : (o.best ? "no wait" : "open")}</span>
                           </button>
                         ))}
+                      </div>
+                    )}
+
+                    {confirmMove && (
+                      <div onClick={() => setConfirmMove(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 4000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+                        <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, padding: 22, boxShadow: "0 18px 50px rgba(0,0,0,0.3)" }}>
+                          <div style={{ fontSize: 18.5, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>Move {(confirmMove.entry.name || "this client").split(" ")[0]} up?</div>
+                          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Their {confirmMove.entry.service || "appointment"} moves to <b style={{ color: "var(--text)" }}>{slotLabel(confirmMove.slot)}{confirmMove.entry.anyProvider && confirmMove.slot.providerName ? ` · ${confirmMove.slot.providerName}` : ""}</b>, they come off the waitlist, and they get your standard reschedule text. Coordinate with them first.</div>
+                          <button onClick={() => { const c = confirmMove; setConfirmMove(null); moveUp(c.entry, c.slot); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 13, padding: "14px 0", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>Yes, move them up</button>
+                          <button onClick={() => setConfirmMove(null)} style={{ width: "100%", marginTop: 9, background: "none", border: "none", color: "var(--sub)", fontSize: 15.5, padding: 8, cursor: "pointer" }}>Cancel</button>
+                        </div>
                       </div>
                     )}
 
