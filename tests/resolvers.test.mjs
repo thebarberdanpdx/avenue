@@ -448,8 +448,24 @@ test("computeCheckoutMoney: a reopened ticket charges only the unpaid balance, a
   assert.equal(r.discountAmt, 5);   // re-applies the discount locked at first checkout
   assert.equal(r.subtotal, 45);     // 50 − 5
   assert.equal(r.balance, 15);      // 45 − 30 already paid
-  assert.equal(r.chargeBase, 15);   // only the balance is charged
-  assert.equal(r.noNewTip, true);   // reopen never re-tips
+  assert.equal(r.chargeBase, 15);   // with no new tip, only the balance is charged
+  assert.equal(r.noNewTip, false);  // reopen CAN take a new tip now (a cash tip added later)
+});
+
+test("computeCheckoutMoney: a reopened, fully-paid ticket can add a cash tip and charge only that tip", () => {
+  const r = R.computeCheckoutMoney({ lines: [{ price: 35 }], reopen: true, alreadyPaid: 35, customTip: 7 });
+  assert.equal(r.balance, 0);          // items already paid in full
+  assert.equal(r.tipAmt, 7);           // the new tip is allowed on reopen
+  assert.equal(r.chargeBase, 7);       // charge just the tip
+  assert.equal(r.nothingToCharge, false); // a tip means there IS something to charge
+});
+
+test("computeCheckoutMoney: a reopened ticket with a NEW item AND a tip charges balance + tip", () => {
+  // original $35 service already paid; reopen adds a $10 product and a $5 tip
+  const r = R.computeCheckoutMoney({ lines: [{ price: 35 }, { price: 10 }], reopen: true, alreadyPaid: 35, customTip: 5 });
+  assert.equal(r.balance, 10);         // 45 subtotal − 35 already paid
+  assert.equal(r.tipAmt, 5);
+  assert.equal(r.chargeBase, 15);      // 10 balance + 5 tip
 });
 
 test("computeCheckoutMoney: the card-on-file surcharge is added to the charge (default 1.5%)", () => {
