@@ -33,6 +33,19 @@ async function saveTable(supabase, shop, table, upserts, deleteIds) {
 
   const dels = (deleteIds || []).map((id) => String(id)).filter(Boolean);
   if (dels.length) {
+    // [native-appt-delete-rail] Defense-in-depth so a Vero-booked appointment (or client) can never be
+    // mass-deleted by a buggy or truncated client. A real cancel/delete removes one — or a few — rows per
+    // save; a single batch that would wipe an implausible fraction of the table is a corrupted/partial
+    // local list, never real usage. HOLD it and surface an error instead of silently erasing history: the
+    // rows stay on the server, the upserts above still landed, and the next full mirror pull restores the
+    // client's local list — so the bug self-heals with ZERO data loss. (The iCal feed has its own
+    // synced-only delete-rails; this protects the native booking path.)
+    const { count } = await supabase.from(table).select("id", { count: "exact", head: true }).eq("shop_id", shop);
+    const total = Number(count) || 0;
+    const cap = Math.max(50, Math.ceil(total * 0.4));
+    if (total > 0 && dels.length > cap) {
+      return { error: new Error(`delete held on '${table}': one save tried to remove ${dels.length} of ${total} rows — looks like a truncated/corrupted client, refusing to mass-delete`) };
+    }
     const { data: deleted, error: delErr } = await supabase
       .from(table)
       .delete()
