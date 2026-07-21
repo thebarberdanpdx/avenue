@@ -4772,8 +4772,8 @@ function importImageFile(file, onResult, opts) {
 // PHOTO PICKER MODAL — library + "upload your own"
 // ============================================================
 function PhotoPicker({ onClose, onPick, onFail, startTab }) {
-  const [cat, setCat] = useState("Haircuts");
-  const [tab, setTab] = useState(startTab || "library");
+  // [no-stock-photo-lib] The stock/sample photo library was removed (Dan): every photo picker opens
+  // straight to the owner's own upload (Take photo / Library). No "from library" stock tab anywhere.
   const camRef = useRef(null);
   const libRef = useRef(null);
   const handleFile = (e) => {
@@ -4787,29 +4787,7 @@ function PhotoPicker({ onClose, onPick, onFail, startTab }) {
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24 }}>Choose a photo</div>
           <button onClick={onClose} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
         </div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-          <button onClick={() => setTab("library")} style={{ flex: 1, padding: 12, borderRadius: 12, background: tab === "library" ? "var(--gold)" : "var(--panel2)", color: tab === "library" ? "var(--on-gold)" : "var(--text)", fontSize: 15, letterSpacing: 1 }}>FROM LIBRARY</button>
-          <button onClick={() => setTab("upload")} style={{ flex: 1, padding: 12, borderRadius: 12, background: tab === "upload" ? "var(--gold)" : "var(--panel2)", color: tab === "upload" ? "var(--on-gold)" : "var(--text)", fontSize: 15, letterSpacing: 1 }}>UPLOAD YOUR OWN</button>
-        </div>
-
-        {tab === "library" && (
-          <>
-            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-              {Object.keys(PHOTO_LIBRARY).map((c) => (
-                <button key={c} onClick={() => setCat(c)} style={{ padding: "7px 14px", borderRadius: 20, fontSize: 15, background: cat === c ? "var(--border)" : "transparent", color: cat === c ? "var(--text)" : "var(--sub)", border: "1px solid var(--border)" }}>{c}</button>
-              ))}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
-              {PHOTO_LIBRARY[cat].map((id) => (
-                <button key={id} className="lift" onClick={() => { onPick(id); onClose(); }} style={{ padding: 0, borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)", aspectRatio: "4/3", background: "var(--panel2)" }}>
-                  <img src={imgUrl(id)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                </button>
-              ))}
-            </div>
-            <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 16, lineHeight: 1.5 }}>In the live product this is a searchable feed of free professional photos. Here it's a curated sample set.</p>
-          </>
-        )}
-        {tab === "upload" && (
+        {(
           <div style={{ textAlign: "center", padding: "30px 0" }}>
             <div style={{ border: "1px dashed var(--border2)", borderRadius: 8, padding: 40, marginBottom: 16 }}>
               <Upload size={32} style={{ color: "var(--faint)", marginBottom: 12 }} />
