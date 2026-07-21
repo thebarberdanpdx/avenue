@@ -11188,7 +11188,7 @@ function GrowthView({ appts, scopeFilter, services, clients, onBack }) {
 // new bookings (with the client's note), moves, cancellations,
 // plus a live overdue-to-rebook entry. Read state is per-device.
 // ============================================================
-function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, providers, isOwner, me, onBack, onOpenCalendar, onOpenNudge }) {
+function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, providers, isOwner, me, onBack, onOpenCalendar, onOpenNudge, onOpenWaitlist }) {
   // Capture the seen-cut at mount so unread dots stay visible this visit, then mark everything seen.
   const seenCutRef = useRef(notifSeenAt);
   useEffect(() => { markSeen && markSeen(); }, []);
@@ -11239,6 +11239,7 @@ function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, pr
     if (n.kind === "new") return { Icon: Scissors, title: "New booking", live: true };
     if (n.kind === "moved") return { Icon: RefreshCw, title: "Rescheduled", live: false };
     if (n.kind === "note") return { Icon: n.addedNote ? Edit2 : ImageIcon, title: n.addedNote ? (n.photoCount > 0 ? "Note & photos added" : "Note added") : "Photos added", live: true };
+    if (n.kind === "opening") return { Icon: Clock, title: "Waitlist opening", live: true };
     return { Icon: X, title: "Canceled", live: false };
   };
 
@@ -11279,7 +11280,7 @@ function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, pr
               const unread = n.ts > seenCut;
               const subBits = [n.name, n.service && n.service !== n.name ? n.service : null, fmtWhen(n.when, n.start), provName(n.providerId)].filter(Boolean);
               return (
-                <button key={n.id} onClick={() => onOpenCalendar(n)} style={{ width: "100%", display: "flex", gap: 13, padding: "15px 16px 15px 18px", background: "none", border: "none", borderBottom: i < g.items.length - 1 ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left", cursor: "pointer", position: "relative" }}>
+                <button key={n.id} onClick={() => ((n.kind === "opening" && onOpenWaitlist) ? onOpenWaitlist() : onOpenCalendar(n))} style={{ width: "100%", display: "flex", gap: 13, padding: "15px 16px 15px 18px", background: "none", border: "none", borderBottom: i < g.items.length - 1 ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left", cursor: "pointer", position: "relative" }}>
                   {unread && <span style={{ position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)", width: 6, height: 6, borderRadius: "50%", background: "var(--live, var(--gold))" }} />}
                   <span style={{ width: 36, height: 36, borderRadius: "50%", background: live ? "color-mix(in srgb, var(--live, var(--gold)) 14%, transparent)" : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", color: live ? "var(--live, var(--gold))" : "var(--sub)", flexShrink: 0 }}><Icon size={16} /></span>
                   <span style={{ flex: 1, minWidth: 0 }}>
@@ -13439,6 +13440,14 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     const v = window.localStorage.getItem("vero_notif_seen");
     return v ? Number(v) : Date.now();
   });
+  // Owner in-app alert when a freed slot matches a waitlisted client (from CalendarView.handleFreedSlot).
+  // Persisted in the same bell feed; deduped by appt so one opening never stacks. Bumps the unread count.
+  const addOpeningNotif = (op) => setNotifs((cur) => {
+    if (!op || (cur || []).some((n) => n.kind === "opening" && n.apptId === op.apptId)) return cur || [];
+    const first = (op.names || "A waitlist client").split(",")[0].trim() || "A waitlist client";
+    const who = op.count > 1 ? `${first} +${op.count - 1} more` : first;
+    return [{ id: "wlop_" + op.apptId, ts: Date.now(), kind: "opening", apptId: op.apptId, providerId: op.providerId, when: op.bookedFor, start: op.start, name: who, service: "wants an earlier time" }, ...(cur || [])].slice(0, 50);
+  });
   const apptSnapRef = useRef(null);     // id -> { start, bookedFor } at last observation
   const notifReadyRef = useRef(false);  // gate so the initial backlog never floods the bell
   // Seed the baseline ~1.5s after data loads (covers appts arriving in stages), then watch.
@@ -13624,14 +13633,14 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
             `tab` so moving to another tab remounts a fresh boundary. Crashes still report to Sentry. */}
         <ErrorBoundary key={tab} label={({ pulse: "Pulse", calendar: "Calendar", clients: "Clients", messages: "Messages", waitlist: "Waitlist", menu: "Menu", settings: "Settings" })[tab] || "this screen"}>
         {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => goTab(t)} onOpenRevenue={() => navTo({ pulseDetail: "revenue" })} onOpenPayments={() => navTo({ pulseDetail: "payments" })} onOpenAppointments={() => navTo({ pulseDetail: "appointments" })} onOpenClients={() => navTo({ pulseDetail: "clients" })} onOpenServices={() => navTo({ pulseDetail: "services" })} onOpenBarbers={() => navTo({ pulseDetail: "barbers" })} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c, pulseDetail: null })} onOpenAppt={(id) => { setPulseOpenApptId(id); navTo({ tab: "calendar", pulseDetail: null, activeClient: null }); }} showToast={showToast} notifCount={unseenCount} onOpenNotifications={() => navTo({ pulseDetail: "notifications" })} />}
-        {tab === "pulse" && pulseDetail === "notifications" && <NotificationsView notifs={myNotifs} notifSeenAt={notifSeenAt} markSeen={markNotifsSeen} onClear={() => setNotifs([])} clients={clients} providers={providers} isOwner={isOwner} me={me} onBack={navBack} onOpenCalendar={(n) => { if (n && n.apptId != null) setPulseOpenApptId(n.apptId); goTab("calendar"); }} onOpenNudge={() => goTab("clients")} />}
+        {tab === "pulse" && pulseDetail === "notifications" && <NotificationsView notifs={myNotifs} notifSeenAt={notifSeenAt} markSeen={markNotifsSeen} onClear={() => setNotifs([])} clients={clients} providers={providers} isOwner={isOwner} me={me} onBack={navBack} onOpenCalendar={(n) => { if (n && n.apptId != null) setPulseOpenApptId(n.apptId); goTab("calendar"); }} onOpenNudge={() => goTab("clients")} onOpenWaitlist={() => goTab("waitlist")} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} business={business} onBack={navBack} />}
         {tab === "pulse" && pulseDetail === "payments" && <PaymentsView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={navBack} showToast={showToast} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={navBack} />}
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={navBack} onOpenNudge={() => goTab("clients")} onOpenClient={(c) => navTo({ pulseDetail: null, activeClient: c, tab: "clients" })} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={navBack} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={navBack} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} onWaitlistOpening={addOpeningNotif} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} onOpenAppt={(a) => { setPulseOpenApptId(a.id); navTo({ tab: "calendar", activeClient: null }); }} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} appts={appts} setAppts={setAppts} clients={clients} business={business} />}
@@ -23266,7 +23275,7 @@ function ColumnOrderEditor({ providers, setProviders }) {
     </div>
   );
 }
-function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId, deepLinkApptId, onDeepLinkHandled, rebookSeed, onRebookHandled, flushApptsNow, flushClientsNow, flushShopsNow }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId, deepLinkApptId, onDeepLinkHandled, rebookSeed, onRebookHandled, flushApptsNow, flushClientsNow, flushShopsNow, onWaitlistOpening }) {
   const sizeId = business?.calendarRowSize || "L";
   // Visible calendar window — configurable in Calendar Settings; falls back to 7 AM–10 PM.
   const DAY_START = ((business?.calendar?.dayStartHr ?? 7)) * 60;
@@ -23742,6 +23751,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     const opening = { id: "op" + freed.id, apptId: freed.id, providerId: freed.providerId, bookedFor: freed.bookedFor, start: freed.start, end: freed.end, offered: [] };
     if (!alreadyOpen) {
       setOpenings((cur) => (cur || []).some((o) => o.apptId === freed.id) ? (cur || []) : [opening, ...(cur || [])]);
+      // Owner in-app alert: a spot opened that a waitlisted client wants. Fires ONCE here, when the slot
+      // frees WITH matches (never in a render/loop) — the notif side dedupes again by apptId.
+      if (onWaitlistOpening) {
+        const _prov = (providers.find((p) => p.id === freed.providerId) || {}).name || "a barber";
+        const _names = matches.slice(0, 3).map((m) => (m.name || "client").split(" ")[0]).join(", ");
+        onWaitlistOpening({ apptId: freed.id, providerId: freed.providerId, bookedFor: freed.bookedFor, start: freed.start, count: matches.length, names: _names, providerName: _prov });
+      }
     }
     // #18: default is MANUAL — just record the opening so the calendar's ⋯ menu lights GREEN and the
     // owner picks who to offer by hand. If the shop turned AUTO-NOTIFY on, message every matching client
@@ -24479,6 +24495,20 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           return <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 8, fontFamily: FONT_BODY, textAlign: "left" }}>{parts.join("  ·  ")}</div>;
         })()}
       </div>
+
+      {/* Waitlist-opening banner: a spot opened that someone on the waitlist wants earlier. Tap → the
+          waitlist panel to move them up. Driven by liveOpenings (filled slots + already-offered people
+          drop off on their own). Complements the green dot on the ⋯ button. */}
+      {hasOpeningMatches && (
+        <button onClick={() => setShowWaitlistPanel(true)} className="lift" style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: "color-mix(in srgb, #16A34A 13%, var(--panel))", border: "1px solid color-mix(in srgb, #16A34A 42%, var(--border))", borderRadius: 13, padding: "11px 14px", marginBottom: 12, color: "var(--text)", cursor: "pointer", textAlign: "left", flexShrink: 0 }}>
+          <span style={{ width: 32, height: 32, borderRadius: "50%", background: "#16A34A", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Clock size={16} /></span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 14.5, fontWeight: 700 }}>{liveOpenings.length} waitlist opening{liveOpenings.length > 1 ? "s" : ""}</span>
+            <span style={{ display: "block", fontSize: 12.8, color: "var(--sub)", marginTop: 1 }}>A spot opened for someone waiting — tap to move them up.</span>
+          </span>
+          <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+        </button>
+      )}
 
       <Sheet open={calMenuOpen} onClose={() => setCalMenuOpen(false)} align="bottom" maxWidth={420}>
         <div style={{ padding: "8px 0 4px" }}>
