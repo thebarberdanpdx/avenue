@@ -23341,6 +23341,19 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     setApptPickingGroup(null); setGroupOpen(gid);
     if (showToast) showToast("Group created — now open another appointment and add it to this group.");
   };
+  // Combined group checkout — ONE ticket, ONE charge for the unpaid members' total; the Checkout writes
+  // one ledger entry per person (their barber), tip split by share. The charge itself is the proven path.
+  const startGroupCheckout = (gid) => {
+    const members = (appts || []).filter((a) => a && a.groupId === gid && a.status !== "cancelled" && !(a.status === "done" || a.paid));
+    if (!members.length) { if (showToast) showToast("Everyone in this group is already checked out."); return; }
+    if (members.length === 1) { setGroupOpen(null); startCheckout(members[0]); return; } // one left → normal single checkout
+    const primary = members.find((m) => m.groupPrimary) || members[0];
+    const enriched = members.map((m) => ({ ...m, __barberName: (providers.find((p) => p.id === m.providerId) || {}).name || "", __clientName: apptDisplayName(m, clients) }));
+    const ordered = [enriched.find((m) => m.id === primary.id), ...enriched.filter((m) => m.id !== primary.id)].filter(Boolean);
+    setGroupOpen(null);
+    delete committedRef.current[primary.id];
+    setCheckout({ ...primary, __groupAppts: ordered });
+  };
   const [dayOffset, setDayOffset] = useState(0);
   // Notification deep-link: when a tapped push hands us an appointment id, jump to its day and open its detail.
   // Retries as appts load (the booking may not be in state yet at tap time); clears once it's found and opened.
@@ -23512,6 +23525,14 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const commitCheckout = (id, summary) => {
     if (committedRef.current[id]) return;
     committedRef.current[id] = true;
+    // GROUP checkout: mark EVERY member done + paid with THEIR own share (per-barber), from the split
+    // summary the group Checkout built. Each member's ledger record was already written by recordGroupSale.
+    if (summary && Array.isArray(summary.groupMemberPaid) && summary.groupMemberPaid.length) {
+      const byId = {}; summary.groupMemberPaid.forEach((g) => { byId[g.id] = g; });
+      setAppts((cur) => { const next = cur.map((a) => byId[a.id] ? { ...a, status: "done", paid: { total: byId[a.id].total, totalLabel: `$${Number(byId[a.id].total || 0).toFixed(2)}`, tip: byId[a.id].tip || 0 }, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), visitCountedAt: a.visitCountedAt || new Date().toISOString() } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
+      summary.groupMemberPaid.forEach((g) => { const src = appts.find((a) => a.id === g.id); if (src && src.clientId && src.clientId !== "guest" && !src.visitCountedAt) { const _cad = deriveCadenceForClient(appts, src.clientId, src); setClients((curC) => curC.map((c) => c.id === src.clientId ? { ...stampVisitOnClient(c, src), ...(_cad ? { cadenceDays: _cad } : {}) } : c)); } });
+      return;
+    }
     const _visitSrc = appts.find((a) => a.id === id);
     const _countVisit = !!(_visitSrc && !_visitSrc.visitCountedAt);   // count each appt as a visit at most once
     setAppts((cur) => { const next = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null, visitCountedAt: a.visitCountedAt || new Date().toISOString() } : a); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
@@ -24877,6 +24898,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onSetPrimary={setGroupPrimary}
           onRemoveFromGroup={removeFromGroup}
           onCheckoutMember={(m) => { setCheckoutGroupResume(m.groupId); setGroupOpen(null); startCheckout(m); }}
+          onCheckoutGroup={startGroupCheckout}
           onAddToGroup={openAddToGroupForGroup}
           showToast={showToast}
         />
@@ -24913,6 +24935,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       {checkout && (
         <Checkout
           appt={checkout}
+          groupAppts={checkout && checkout.__groupAppts}
           service={services.find((s) => s.id === checkout.serviceId)}
           provider={providers.find((p) => p.id === checkout.providerId)}
           business={business}
@@ -25030,7 +25053,7 @@ function CardChargeInline({ amount, appt, onCancel, onPaid, money }) {
   );
 }
 
-function Checkout({ appt, service, provider, business, setBusiness, clients, appts, setClients, allServices = [], reopen = false, alreadyPaid = 0, showToast, onClose, onDone, onCommit, rebookOnReopen = false, flushClientsNow, flushShopsNow }) {
+function Checkout({ appt, service, provider, business, setBusiness, clients, appts, setClients, allServices = [], reopen = false, alreadyPaid = 0, showToast, onClose, onDone, onCommit, rebookOnReopen = false, flushClientsNow, flushShopsNow, groupAppts = null }) {
   // ---- auto-timing: measure actual service time, round UP to next 5 ----
   const measuredMin = appt.serviceStartedAt ? Math.round((Date.now() - appt.serviceStartedAt) / 60000) : null;
   const roundUp5 = (m) => Math.max(5, Math.ceil(m / 5) * 5);
@@ -25076,7 +25099,12 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [rebookOutcome, setRebookOutcome] = useState(null); // {kind:"calendar", date, label} → jump to the real calendar prefilled · {kind:"reminder", at, label} → schedule a "time to book" text
   const [remindPick, setRemindPick] = useState(""); // dropdown value on the rebook screen ("2w".."8w", "3m".."5m")
   // ---- POS sale lines: the appointment's locked total is the first line; more can be added ----
-  const [lines, setLines] = useState([{ id: "main", name: service?.name || appt.title || "Service", withName: provider?.name || null, price: base }]);
+  // A group ticket seeds one line PER member (each carries its own barber/client so the sale is written
+  // to the right barber's books). A single ticket keeps the one "main" line exactly as before.
+  const _isGroupInit = Array.isArray(groupAppts) && groupAppts.length > 1;
+  const [lines, setLines] = useState(_isGroupInit
+    ? groupAppts.map((m) => ({ id: "g_" + m.id, name: m.serviceName || (m.title || "").replace(/\s*[(·].*$/, "") || "Service", withName: m.__barberName || null, forName: m.__clientName || m.name || "", price: +(Number(m.price) || 0).toFixed(2), groupLine: true, memberApptId: m.id, memberClientId: m.clientId, memberStaffId: m.providerId }))
+    : [{ id: "main", name: service?.name || appt.title || "Service", withName: provider?.name || null, price: base }]);
   const [addSheet, setAddSheet] = useState(null);   // null | "service" | "product"
   const [editLineId, setEditLineId] = useState(null);
   const [prodName, setProdName] = useState("");
@@ -25090,7 +25118,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [readerAuth, setReaderAuth] = useState(null); // tap-then-tip: { id, base } after the reader AUTHORIZES the base, captured (base+tip) once the tip is chosen
   const [paidRec, setPaidRec] = useState(null);     // the ledger record written on success
   const [receiptState, setReceiptState] = useState("idle"); // idle | sending | sent | error — the optional post-pay email receipt
-  const [checkoutDiscount, setCheckoutDiscount] = useState(appt.discount || null); // applied discount preset (from the appt or chosen here)
+  const [checkoutDiscount, setCheckoutDiscount] = useState(_isGroupInit ? null : (appt.discount || null)); // applied discount preset (from the appt or chosen here); group tickets never carry a discount so the per-person split always sums to the charge
   const [showDiscPick, setShowDiscPick] = useState(false);
   // Money math (subtotal, booking credits, discount, tip, balance, charge base, card-on-file
   // surcharge) is computed by computeCheckoutMoney (defined near resolveDiscount) so it can be
@@ -25156,13 +25184,40 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     staffId: (provider && provider.id) || appt.providerId || null,
     refunded: 0,
   });
-  const payCash = () => { recordSale(makeRec("cash", null, chargeBase)); setStage("approved"); };
+  const isGroup = Array.isArray(groupAppts) && groupAppts.length > 1;
+  // Split a group ticket per person: each member's (possibly edited) line price + a proportional share
+  // of the single tip, attributed to THEIR barber. Reads `lines` so an edited price flows to the ledger.
+  const groupSplit = () => {
+    const gl = lines.filter((l) => l.groupLine);
+    const svcTotal = gl.reduce((s, l) => s + (Number(l.price) || 0), 0) || 1;
+    return gl.map((l, i) => { const svc = +(Number(l.price) || 0).toFixed(2); const tip = +(((tipAmt || 0) * svc) / svcTotal).toFixed(2); return { i, apptId: l.memberApptId, clientId: l.memberClientId, staffId: l.memberStaffId, name: l.name, clientName: l.forName || "Guest", svc, tip, amount: +(svc + tip).toFixed(2) }; });
+  };
+  // ONE ledger entry per member (right barber + appt + client), all sharing the single payment intent.
+  const recordGroupSale = (methodId, payRes) => {
+    const parts = groupSplit();
+    const pid = (payRes && payRes.id) || null;
+    const stamp = Date.now();
+    let nextClients = clients; const guestRecs = [];
+    parts.forEach((p) => {
+      const rec = { id: "pay_" + stamp.toString(36) + "_" + p.i, ts: stamp, apptId: p.apptId, type: "sale", status: "paid", method: methodId, amount: p.amount, tip: p.tip, surcharge: 0, paymentIntentId: pid, brand: (payRes && payRes.brand) || null, last4: (payRes && payRes.last4) || null, note: "Group — " + p.name, items: [{ name: p.name, price: p.svc, productId: null, qty: 1 }], staffId: p.staffId || null, refunded: 0 };
+      if (p.clientId && p.clientId !== "guest") {
+        nextClients = nextClients.map((c) => c.id === p.clientId ? { ...c, payments: [...(c.payments || []), rec] } : c);
+        try { payOutboxAdd({ id: rec.id, clientId: p.clientId, apptId: p.apptId, rec, ts: rec.ts }); } catch (e) {}
+      } else { guestRecs.push({ ...rec, clientName: p.clientName }); }
+    });
+    if (nextClients !== clients) { setClients(nextClients); if (flushClientsNow) flushClientsNow(nextClients); }
+    if (guestRecs.length && setBusiness) { const nb = { ...(business || {}), sales: [...((business && business.sales) || []), ...guestRecs] }; setBusiness(nb); if (flushShopsNow) flushShopsNow(nb); }
+    setPaidRec({ id: "pay_" + stamp.toString(36), ts: stamp, amount: +(parts.reduce((s, p) => s + p.amount, 0)).toFixed(2), tip: +(parts.reduce((s, p) => s + p.tip, 0)).toFixed(2), method: methodId });
+  };
+  // Single entry point for every payment method — group writes per-member, single writes one record.
+  const finalizeSale = (methodId, payRes, charged) => { if (isGroup) recordGroupSale(methodId, payRes); else recordSale(makeRec(methodId, payRes, charged)); };
+  const payCash = () => { finalizeSale("cash", null, chargeBase); setStage("approved"); };
   const payCardOnFile = async () => {
     if (!cofCard || payBusy) return;
     setPayBusy(true); setPayErr("");
     try {
       const res = await stripeApi({ action: "charge", customerId: cofCard.stripeCustomerId, paymentMethodId: cofCard.paymentMethodId, amount: cofTotal, description: `Checkout — ${appt.name || "client"}` });
-      if (res && res.status === "succeeded") { recordSale(makeRec("card-on-file", { id: res.id, brand: cofCard.brand, last4: cofCard.last4 }, cofTotal)); setStage("approved"); }
+      if (res && res.status === "succeeded") { finalizeSale("card-on-file", { id: res.id, brand: cofCard.brand, last4: cofCard.last4 }, cofTotal); setStage("approved"); }
       else { setPayErr(res && res.error ? res.error : `Stripe returned "${(res && res.status) || "an error"}" — the card may need to be present.`); }
     } catch (e) { setPayErr(e.message || "Charge failed."); }
     finally { setPayBusy(false); }
@@ -25182,7 +25237,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const buildCheckoutSummary = () => {
     const grandTotal = reopen ? +(alreadyPaid + (paidRec ? paidRec.amount : 0)).toFixed(2) : total;
     const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt;
-    return { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, discount: discountAmt, discountName: reopen ? ((appt.paid && appt.paid.discountName) || null) : (checkoutDiscount ? checkoutDiscount.name : null), rebookJump: (rebookOutcome && rebookOutcome.kind === "calendar") ? { date: rebookOutcome.date, label: rebookOutcome.label } : null, bookReminder: (rebookOutcome && rebookOutcome.kind === "reminder") ? { at: rebookOutcome.at, label: rebookOutcome.label } : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null };
+    return { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, discount: discountAmt, discountName: reopen ? ((appt.paid && appt.paid.discountName) || null) : (checkoutDiscount ? checkoutDiscount.name : null), rebookJump: (rebookOutcome && rebookOutcome.kind === "calendar") ? { date: rebookOutcome.date, label: rebookOutcome.label } : null, bookReminder: (rebookOutcome && rebookOutcome.kind === "reminder") ? { at: rebookOutcome.at, label: rebookOutcome.label } : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null, groupMemberPaid: isGroup ? groupSplit().map((p) => ({ id: p.apptId, total: p.amount, tip: p.tip })) : undefined };
   };
   // Optional post-payment receipt — a REAL email to the client's on-file address, sent only when the
   // owner taps "Email receipt" on the Paid screen (Dan, 2026-07-17). Best-effort: we confirm the
@@ -25287,7 +25342,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       const { data: sess } = await supabase.auth.getSession();
       const token = sess && sess.session && sess.session.access_token;
       const res = await tapToPayCharge({ amount: chargeBase, description: `Vero — ${appt.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
-      recordSale(makeRec("card", { id: res && res.id }, chargeBase));
+      finalizeSale("card", { id: res && res.id }, chargeBase);
       setStage("approved");
     } catch (e) {
       setPayErr((e && e.message) || "Tap to Pay didn't complete. Try again or pick another way.");
@@ -25300,7 +25355,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       const { data: sess } = await supabase.auth.getSession();
       const token = sess && sess.session && sess.session.access_token;
       const res = await cardReaderCharge({ amount: chargeBase, description: `Vero — ${appt.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
-      recordSale(makeRec("card", { id: res && res.id }, chargeBase));
+      finalizeSale("card", { id: res && res.id }, chargeBase);
       setStage("approved");
     } catch (e) {
       setPayErr((e && e.message) || "The reader didn't complete. Try again or pick another way.");
@@ -25344,7 +25399,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       const token = sess && sess.session && sess.session.access_token;
       const res = await cardReaderCaptureTip({ id: readerAuth.id, total: chargeBase, base: readerAuth.base, apiBase: API_BASE, authToken: token });
       const capturedDollars = (res && typeof res.captured === "number") ? +(res.captured / 100).toFixed(2) : chargeBase;
-      recordSale(makeRec("card", { id: res && res.id }, capturedDollars));
+      finalizeSale("card", { id: res && res.id }, capturedDollars);
       setReaderAuth(null);
       if (res && res.tipApplied === false && showToast) showToast("Card charged for the service — the tip couldn't be added on the card. Collect the tip another way.");
       setStage("approved");
@@ -25360,7 +25415,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     // Anything else is a manual "mark as paid" method (cash + the owner's custom labels). The
     // "m:" prefix carries the chosen label; legacy "cash" maps to a Cash record.
     const label = m && m.startsWith("m:") ? m.slice(2) : (m === "cash" ? "Cash" : m);
-    recordSale(makeRec(label, null, chargeBase)); setStage("approved");
+    finalizeSale(label, null, chargeBase); setStage("approved");
   };
 
   // ---------- 1 · SALE (full screen, editable) ----------
@@ -25402,6 +25457,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         return (
         <div key={l.id} style={{ borderTop: "1px solid var(--line)", marginTop: 16, padding: "16px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div style={{ minWidth: 0 }}>
+            {l.forName && <div style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: 0.2, color: "var(--sub)", marginBottom: 4 }}>{l.forName}</div>}
             <div style={{ fontSize: 16.5, fontWeight: 600 }}>{l.name}</div>
             {chipVals.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 8 }}>{chipVals.map((c, ci) => <span key={ci} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "6px 10px", fontSize: 13.5, color: "var(--text2)" }}>{c}</span>)}</div>}
             <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 7 }}>{l.withName ? `with ${l.withName}` : (l.id !== "main" ? "Added" : (provider ? `with ${provider.name}` : ""))}</div>
@@ -25419,8 +25475,8 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         </div>
       ); })}
 
-      {/* Mango-style add row */}
-      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
+      {/* Mango-style add row — hidden on group tickets so the per-person split always sums to the charge */}
+      {!isGroup && <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
         <div style={{ display: "flex", justifyContent: "center", gap: 26, flexWrap: "wrap" }}>
           <button onClick={() => setAddSheet(addSheet === "service" ? null : "service")} style={addLinkStyle}><span style={addPlusStyle}><Plus size={12} strokeWidth={2.6} style={{ color: "var(--gold)" }} /></span>Add service</button>
           <button onClick={() => { setProdName(""); setProdPrice(""); setAddSheet(addSheet === "product" ? null : "product"); }} style={addLinkStyle}><span style={addPlusStyle}><Plus size={12} strokeWidth={2.6} style={{ color: "var(--gold)" }} /></span>Add product</button>
@@ -25428,7 +25484,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         {!reopen && <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
           <button onClick={() => setShowDiscPick(true)} style={addLinkStyle}><span style={addPlusStyle}><Plus size={12} strokeWidth={2.6} style={{ color: "var(--gold)" }} /></span>{checkoutDiscount ? "Discount" : "More"}</button>
         </div>}
-      </div>
+      </div>}
       {addSheet === "service" && (
         <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16, maxHeight: 280, overflowY: "auto" }}>
           {(allServices || []).filter((sv) => !sv.archived).map((sv, i) => (
@@ -25617,7 +25673,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
 
   // ---------- card present — manual entry ----------
   if (stage === "card" || (stage === "charging" && pendingMethod === "card")) return screen(
-    <CardChargeInline amount={chargeBase} appt={appt} onCancel={() => { setPayErr(""); setStage(tipCfg.enabled && !reopen ? "tipPick" : "method"); }} onPaid={(payRes) => { recordSale(makeRec("card", payRes, chargeBase)); setStage("approved"); }} money={money} />);
+    <CardChargeInline amount={chargeBase} appt={appt} onCancel={() => { setPayErr(""); setStage(tipCfg.enabled && !reopen ? "tipPick" : "method"); }} onPaid={(payRes) => { finalizeSale("card", payRes, chargeBase); setStage("approved"); }} money={money} />);
 
 
   if (stage === "approving" || stage === "approved") {
@@ -27022,15 +27078,13 @@ function GroupSheet({ groupId, appts, clients, providers, services, business, on
           <button onClick={() => onAddToGroup(groupId)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: 14, marginTop: 5, background: "none", border: "1px dashed var(--border)", borderRadius: 12, color: "var(--sub)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}><Plus size={17} /> Add appointment</button>
         </div>
         {(() => {
-          // Interim checkout: ring each person up on the PROVEN single-checkout path (safe, no money-path
-          // rewrite). One combined charge for the whole group is the verified follow-up (Stage 4).
-          const nextUnpaid = members.find((m) => !(m.status === "done" || m.paid));
-          if (!nextUnpaid) return null;
-          const nm = (apptDisplayName(nextUnpaid, clients) || "").split(" ")[0] || "next";
+          const unpaid = members.filter((m) => !(m.status === "done" || m.paid));
+          if (!unpaid.length) return null;
+          const unpaidTotal = unpaid.reduce((s, m) => s + (Number(m.price) || 0), 0);
+          const single = unpaid.length === 1;
           return (
             <div style={{ flexShrink: 0, borderTop: "1px solid var(--line)", padding: "12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px)", background: "var(--panel)" }}>
-              <button onClick={() => onCheckoutMember(nextUnpaid)} style={{ width: "100%", padding: 15, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, fontSize: 15.5, fontWeight: 700, cursor: "pointer" }}>Check out {nm} · {money(nextUnpaid.price)}</button>
-              {members.length > 1 && <div style={{ textAlign: "center", fontSize: 12.5, color: "var(--faint)", marginTop: 8 }}>Rings up one person at a time · combined ticket coming soon</div>}
+              <button onClick={() => (single ? onCheckoutMember(unpaid[0]) : onCheckoutGroup(groupId))} style={{ width: "100%", padding: 15, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, fontSize: 15.5, fontWeight: 700, cursor: "pointer" }}>{single ? `Check out ${(apptDisplayName(unpaid[0], clients) || "").split(" ")[0]}` : "Check out group"} · {money(unpaidTotal)}</button>
             </div>
           );
         })()}
@@ -29873,6 +29927,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       {checkout && (
         <Checkout
           appt={checkout}
+          groupAppts={checkout && checkout.__groupAppts}
           service={services.find((s) => s.id === checkout.serviceId)}
           provider={providers.find((p) => p.id === checkout.providerId)}
           business={business}
