@@ -23296,21 +23296,30 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     });
     if (showToast) showToast("Removed from group.");
   };
-  const [groupTarget, setGroupTarget] = useState(null); // groupId a newly-created appt should join (staff "add to group")
-  const addToGroup = (gid) => {
-    setGroupOpen(null); setGroupTarget(gid);
+  const [groupTarget, setGroupTarget] = useState(null); // groupId a newly-created appt should join ("book a new person")
+  const [groupAddSource, setGroupAddSource] = useState(null); // appt we're grouping FROM — opens the "add to group" picker
+  // Grouping starts from an EXISTING appointment (Dan): open a picker of this day's other ungrouped appts.
+  const openAddToGroup = (appt) => { if (!appt) return; setOpen(null); setGroupOpen(null); setGroupAddSource(appt); };
+  const openAddToGroupForGroup = (gid) => { const mems = (appts || []).filter((a) => a.groupId === gid); const prim = mems.find((m) => m.groupPrimary) || mems[0]; if (prim) openAddToGroup(prim); };
+  // Add an existing appointment to the group: give the source a groupId if it has none (mark it primary),
+  // then tag the picked appt with the same groupId. One atomic setAppts + flush.
+  const addExistingToGroup = (pickedId) => {
+    const source = groupAddSource; if (!source || !pickedId) return;
+    let gid = source.groupId; const fresh = !gid;
+    if (fresh) gid = "g" + Date.now() + Math.floor(Math.random() * 1000);
+    setAppts((cur) => { const next = cur.map((a) => a.id === source.id ? { ...a, groupId: gid, groupPrimary: fresh ? true : (a.groupPrimary || false) } : (a.id === pickedId ? { ...a, groupId: gid, groupPrimary: false } : a)); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
+    setGroupAddSource(null); setGroupOpen(gid);
+    if (showToast) showToast("Added to the group.");
+  };
+  // Secondary option — "Book a new person": give the source a groupId, then open the create form tagged to it.
+  const addToGroupCreateNew = () => {
+    const source = groupAddSource; if (!source) return;
+    let gid = source.groupId; const fresh = !gid;
+    if (fresh) { gid = "g" + Date.now() + Math.floor(Math.random() * 1000); applyApptPatch(source.id, { groupId: gid, groupPrimary: true }); }
+    setGroupAddSource(null); setGroupTarget(gid);
     const pid = (providers.find((p) => p && p.id && p.id !== "anyone") || providers[0] || {}).id;
-    setNewApptSlot({ providerId: pid, start: earliestOpenSlot(pid, selectedDate, 30), forGroup: gid });
+    setNewApptSlot({ providerId: pid, start: earliestOpenSlot(pid, selectedDate, 30) });
   };
-  // Turn a standalone appt into a group, or add another person to its group: give it a groupId if it
-  // has none (mark it primary), then open the new-appt form for the next person (tagged via groupTarget).
-  const startGroupFromAppt = (appt) => {
-    if (!appt) return;
-    let gid = appt.groupId;
-    if (!gid) { gid = "g" + Date.now() + Math.floor(Math.random() * 1000); applyApptPatch(appt.id, { groupId: gid, groupPrimary: true }); }
-    setOpen(null); addToGroup(gid);
-  };
-  const startGroupCheckout = (gid) => { if (showToast) showToast("Group checkout — coming next."); }; // Stage 4 wires this
   const [dayOffset, setDayOffset] = useState(0);
   // Notification deep-link: when a tapped push hands us an appointment id, jump to its day and open its detail.
   // Retries as appts load (the booking may not be in state yet at tap time); clears once it's found and opened.
@@ -24826,7 +24835,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onOpenClient={onOpenClient}
           showToast={showToast}
           onOpenGroup={(gid) => { setOpen(null); setGroupOpen(gid); }}
-          onAddToGroup={startGroupFromAppt}
+          onAddToGroup={openAddToGroup}
           groupSize={open && open.groupId ? (groupCounts[open.groupId] || 0) : 0}
         />
       )}
@@ -24844,9 +24853,20 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onSetPrimary={setGroupPrimary}
           onRemoveFromGroup={removeFromGroup}
           onCheckoutMember={(m) => { setGroupOpen(null); startCheckout(m); }}
-          onCheckoutGroup={(gid) => startGroupCheckout(gid)}
-          onAddToGroup={(gid) => addToGroup(gid)}
+          onAddToGroup={openAddToGroupForGroup}
           showToast={showToast}
+        />
+      )}
+
+      {groupAddSource && (
+        <AddToGroupSheet
+          source={groupAddSource}
+          appts={appts}
+          clients={clients}
+          providers={providers}
+          onClose={() => setGroupAddSource(null)}
+          onPickExisting={addExistingToGroup}
+          onBookNew={addToGroupCreateNew}
         />
       )}
 
@@ -26808,6 +26828,47 @@ function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, sho
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AddToGroupSheet — pick an EXISTING appointment on the same day to group with the
+// source (Dan: grouping pulls from existing bookings, e.g. the two Haworths). A
+// "Book a new person" fallback opens the normal create form instead.
+function AddToGroupSheet({ source, appts, clients, providers, onClose, onPickExisting, onBookNew }) {
+  const day = source && source.bookedFor ? new Date(source.bookedFor) : null;
+  const sameDay = (a) => { if (!day || !a.bookedFor) return false; const d = new Date(a.bookedFor); return d.getFullYear() === day.getFullYear() && d.getMonth() === day.getMonth() && d.getDate() === day.getDate(); };
+  const candidates = (appts || []).filter((a) => a && a.id !== source.id && !a.groupId && a.status !== "cancelled" && a.status !== "done" && sameDay(a)).sort((a, b) => (a.start || 0) - (b.start || 0));
+  return (
+    <Portal>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 3200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 520, maxHeight: "82vh", background: "var(--bg)", borderRadius: "20px 20px 0 0", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div style={{ padding: "18px 18px 12px", borderBottom: "1px solid var(--line)" }}>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, color: "var(--text)" }}>Add to group</div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>Pick another appointment today to group with <b style={{ color: "var(--text)" }}>{apptDisplayName(source, clients)}</b>.</div>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+            {candidates.length === 0 && <div style={{ padding: "26px 20px", textAlign: "center", color: "var(--faint)", fontSize: 14, lineHeight: 1.5 }}>No other ungrouped appointments on this day.<br />Use “Book a new person” to add someone new.</div>}
+            {candidates.map((a) => {
+              const prov = (providers || []).find((p) => p.id === a.providerId) || {};
+              return (
+                <button key={a.id} onClick={() => onPickExisting(a.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%", textAlign: "left", padding: "13px 15px", marginBottom: 8, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, cursor: "pointer" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>{apptDisplayName(a, clients)}</div>
+                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.serviceName || (a.title || "").replace(/\s*[(·].*$/, "")} · with {prov.name || "staff"} · {fmtTime(a.start)}</div>
+                  </div>
+                  <Plus size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ padding: "12px 16px calc(env(safe-area-inset-bottom,0px) + 12px)", borderTop: "1px solid var(--line)", display: "flex", gap: 10 }}>
+            <button onClick={onClose} style={{ flex: 1, padding: 14, background: "none", border: "1px solid var(--border)", borderRadius: 12, color: "var(--text)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+            <button onClick={onBookNew} style={{ flex: 1, padding: 14, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Book a new person</button>
+          </div>
+        </div>
+      </div>
+    </Portal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GroupSheet — staff view/manage of a group appointment: every appt sharing a
 // groupId shown as a member card under one primary contact. Actions are lifted to
 // CalendarView (make-primary / remove / checkout / add). Styled to match
@@ -27953,7 +28014,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       "Repeating appointment set up." and did nothing, which could make staff think a
                       client is on recurring books when they aren't. Removed until it's built for real. */}
                   {onRebook && <MenuItem T={T} icon={<Copy size={17} />} label="Rebook — new day & time" onClick={() => { setMenuOpen(false); onRebook(appt); }} />}
-                  {onAddToGroup && appt.status !== "done" && <MenuItem T={T} icon={<Users size={17} />} label={appt.groupId ? "Add another person to group" : "Start a group (add another person)"} onClick={() => { setMenuOpen(false); onAddToGroup(appt); }} />}
+                  {onAddToGroup && appt.status !== "done" && <MenuItem T={T} icon={<Users size={17} />} label={appt.groupId ? "Add someone to this group" : "Group with another appointment"} onClick={() => { setMenuOpen(false); onAddToGroup(appt); }} />}
                   <MenuItem T={T} icon={<Bell size={17} />} label="Resend Notifications" onClick={() => { setMenuOpen(false); showToast("Confirmation re-sent to client."); }} />
                   <Divider T={T} />
                   <div style={{ padding: "6px 16px 4px", fontSize: 14, letterSpacing: 1.2, color: T.faint }}>SET STATUS</div>
