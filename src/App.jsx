@@ -23278,6 +23278,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     return m;
   }, [appts]);
   const [groupOpen, setGroupOpen] = useState(null); // groupId whose group detail sheet is open
+  const [checkoutGroupResume, setCheckoutGroupResume] = useState(null); // reopen this group after a member's checkout (smooth person-to-person group checkout)
   // Group actions — write to appts through the calendar's atomic path (one setAppts + one flush).
   const setGroupPrimary = (gid, apptId) => {
     if (!gid) return;
@@ -23532,6 +23533,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const finishCheckout = (id, summary) => {
     commitCheckout(id, summary);
     setCheckout(null);
+    // Group checkout: after one member is paid, hop back to the group so the next person is one tap
+    // away. Each person rings up on the PROVEN single checkout — no combined-charge money-path risk.
+    if (checkoutGroupResume) { const _g = checkoutGroupResume; setCheckoutGroupResume(null); if (!(summary && summary.rebookJump)) setTimeout(() => setGroupOpen(_g), 60); }
     const src = appts.find((a) => a.id === id);
     // Rebook hand-off: jump the calendar to the chosen day AND open the new-appointment form
     // pre-filled (client + service + barber) with the time picker up — the same settings-aware
@@ -24872,7 +24876,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onOpenAppt={(m) => { setGroupOpen(null); setOpen(m); }}
           onSetPrimary={setGroupPrimary}
           onRemoveFromGroup={removeFromGroup}
-          onCheckoutMember={(m) => { setGroupOpen(null); startCheckout(m); }}
+          onCheckoutMember={(m) => { setCheckoutGroupResume(m.groupId); setGroupOpen(null); startCheckout(m); }}
           onAddToGroup={openAddToGroupForGroup}
           showToast={showToast}
         />
@@ -24920,7 +24924,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           appts={appts}
           setClients={setClients}
           showToast={showToast}
-          onClose={() => setCheckout(null)}
+          onClose={() => { setCheckout(null); if (checkoutGroupResume) { const _g = checkoutGroupResume; setCheckoutGroupResume(null); setGroupOpen(_g); } }}
           onDone={finishCheckout}
           onCommit={commitCheckout}
           flushClientsNow={flushClientsNow}
