@@ -5156,6 +5156,11 @@ function makeManageToken() {
 function fireApptNotify({ msgId, appt, business, providers, contact, subject, extra }) {
   try {
     if (!appt || !business) return;
+    // group: only the PRIMARY contact is notified (Dan) — a non-primary member (groupPrimary === false)
+    // is muted for every client-facing message (booking, deposit, cancel, reschedule). The primary
+    // (groupPrimary === true) and any ungrouped appt still notify. Legacy groups with no primary flag
+    // are left notifying rather than silently dropping everyone.
+    if (appt.groupId && appt.groupPrimary === false) return;
     const m = (business.messages || []).find((x) => x.id === msgId);
     if (!m || !m.enabled) return;
     const email = ((contact && contact.email) || "").trim();
@@ -24881,6 +24886,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           appts={appts}
           onSetStatus={setStatus}
           onCheckout={startCheckout}
+          onCheckoutGroup={startGroupCheckout}
           onRefund={(a) => { setOpen(null); setRefundAppt(a); }}
           onUpdate={updateAppt}
           onDelete={deleteAppt}
@@ -27102,7 +27108,7 @@ function GroupSheet({ groupId, appts, clients, providers, services, business, on
   );
 }
 
-function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onRefund, onUpdate, onDelete, onOpenClient, onRebook, showToast, shopId, onOpenGroup, onAddToGroup, groupSize = 0 }) {
+function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onCheckoutGroup, onRefund, onUpdate, onDelete, onOpenClient, onRebook, showToast, shopId, onOpenGroup, onAddToGroup, groupSize = 0 }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
@@ -27705,7 +27711,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       ? <button className="lift" onClick={doNotify} title="Tap to re-send" style={{ display: "inline-flex", alignItems: "center", gap: 7, background: `color-mix(in srgb, ${STATUS_COLORS["checked-in"]} 13%, var(--panel))`, border: `1px solid color-mix(in srgb, ${STATUS_COLORS["checked-in"]} 40%, transparent)`, color: STATUS_COLORS["checked-in"], padding: "10px 16px", borderRadius: 30, fontSize: 14, letterSpacing: 0.5, fontWeight: 700, cursor: "pointer" }}><Check size={15} strokeWidth={3} /> NOTIFIED</button>
                       : <button className="lift" onClick={doNotify} style={{ background: STATUS_COLORS["checked-in"], border: "none", color: "#fff", padding: "11px 18px", borderRadius: 30, fontSize: 14, letterSpacing: 0.5, fontWeight: 700, boxShadow: "0 6px 16px -8px rgba(124,58,237,.55)" }}>NOTIFY CLIENT</button>;
                   })()}
-                  {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ background: "var(--gold)", border: "none", color: "var(--on-gold)", padding: "11px 18px", borderRadius: 30, fontSize: 14, letterSpacing: 0.5, fontWeight: 700, boxShadow: "var(--shadow)" }}>CHECKOUT</button>}
+                  {appt.status === "in-service" && <button className="lift" onClick={() => ((appt.groupId && onCheckoutGroup) ? onCheckoutGroup(appt.groupId) : onCheckout(appt))} style={{ background: "var(--gold)", border: "none", color: "var(--on-gold)", padding: "11px 18px", borderRadius: 30, fontSize: 14, letterSpacing: 0.5, fontWeight: 700, boxShadow: "var(--shadow)" }}>CHECKOUT</button>}
                 </div>
                 {/* Persistent send receipt — the toast is fleeting; this stays on the sheet so the
                     exact message (and that it truly went out) can't be missed. */}
@@ -28128,7 +28134,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     </>
                   ) : (
                     <>
-                      <MenuItem T={T} icon={<DollarSign size={17} />} label="Checkout" onClick={() => { setMenuOpen(false); onCheckout(appt); }} />
+                      <MenuItem T={T} icon={<DollarSign size={17} />} label={appt.groupId && onCheckoutGroup && groupSize > 1 ? "Check out group" : "Checkout"} onClick={() => { setMenuOpen(false); (appt.groupId && onCheckoutGroup) ? onCheckoutGroup(appt.groupId) : onCheckout(appt); }} />
                       {onRefund && apptLedgerLeft > 0.009 && <MenuItem T={T} icon={<RefreshCw size={17} />} label={`Refund… ($${apptLedgerLeft.toFixed(2)} on record)`} onClick={() => { setMenuOpen(false); onRefund(appt); }} />}
                     </>
                   )}
