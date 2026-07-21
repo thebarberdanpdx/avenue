@@ -911,22 +911,24 @@ const THEMES = [
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.035,
     canvas: "linear-gradient(176deg,#FCFBF8,#F5F3EC)",
     t: { bg:"#FAF9F6", panel:"#FFFFFF", panel2:"#F4F2EC", line:"#EFEDE6", border:"#E6E3DB", border2:"#D3CEC2", text:"#1B1A16", text2:"#3B372F", sub:"#8A857A", faint:"#B3AEA3", gold:"#34483C", onGold:"#F6F4EE", live:"#34483C", shadow:"rgba(40,34,22,.08)", overlay:"rgba(24,22,18,0.42)" } },
-  // Minty — the Mangomint-inspired look Dan approved (2026-07-21): cool near-white canvas, crisp
-  // white cards, deep navy ink, a soft lavender accent. Clean modern-SaaS feel. Note: Mango's solid
-  // navy TOP BAR is not reproduced — Vero dashboard headers are frosted-light by design in every
-  // theme; the dark booking/checkout headers use --text, so they read navy here automatically.
+  // Minty — Mangomint-inspired: deep navy ink, soft lavender accent, white cards (2026-07-21).
+  // CRISP recipe applied: the page canvas is deepened so white cards clearly separate, secondary
+  // text (sub/faint) darkened for readable hierarchy, and cards get the stronger crispShadows tier
+  // above. Minimal but with real contrast. (Mango's solid navy top bar is intentionally not used —
+  // Vero dashboard headers are frosted-light by design; dark booking/checkout headers read navy.)
   { id: "minty", name: "Minty", tagline: "Soft lavender, navy ink", cat: "Crisp & Minimal", dark: false,
     disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.02,
-    canvas: "linear-gradient(176deg,#FBFBFE,#EEEFF6)",
+    canvas: "linear-gradient(176deg,#EEEFF7,#E4E5F0)",
     grad: "linear-gradient(135deg,#9A8FE0,#8477D6)",
-    t: { bg:"#F4F5F8", panel:"#FFFFFF", panel2:"#EFEFF6", line:"#ECECF3", border:"#E4E4EE", border2:"#CACADB", text:"#1E2749", text2:"#3B4168", sub:"#6C7091", faint:"#9A9EB8", gold:"#9A8FE0", onGold:"#1E2749", live:"#8477D6", shadow:"rgba(30,39,73,.08)", overlay:"rgba(20,24,44,0.42)" } },
-  // Nectarine — the Mangomint look done right: deep navy ink #191E49 + Mangomint's soft mint/teal
-  // accent (sampled from Dan's screenshots), white cards, no navy header (2026-07-21). Minty stays lavender.
+    t: { bg:"#E9EAF2", panel:"#FFFFFF", panel2:"#EDEEF6", line:"#ECECF3", border:"#E1E2EE", border2:"#C7C7DA", text:"#1E2749", text2:"#3B4168", sub:"#565C7E", faint:"#82869F", gold:"#9A8FE0", onGold:"#1E2749", live:"#8477D6", shadow:"rgba(28,34,66,.16)", overlay:"rgba(20,24,44,0.42)" } },
+  // Nectarine — Mangomint navy #191E49 + soft mint/teal accent (sampled from Dan's screenshots),
+  // white cards, no navy header (2026-07-21). Same CRISP recipe as Minty: deeper mint-grey canvas so
+  // cards separate, darker sub/faint for readable hierarchy, stronger crispShadows tier. Minty stays lavender.
   { id: "nectarine", name: "Nectarine", tagline: "Soft mint, navy ink", cat: "Crisp & Minimal", dark: false,
     disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.02,
-    canvas: "linear-gradient(176deg,#FBFDFD,#ECF1F2)",
+    canvas: "linear-gradient(176deg,#E7EEED,#DDE8E7)",
     grad: "linear-gradient(135deg,#5AD2C8,#3ABAB0)",
-    t: { bg:"#F4F6F7", panel:"#FFFFFF", panel2:"#EBF3F2", line:"#E9F0EF", border:"#E0E9E8", border2:"#C6D4D3", text:"#191E49", text2:"#3A3F63", sub:"#6E7186", faint:"#A6AAB6", gold:"#40C6BC", onGold:"#12163C", live:"#7FDAD2", shadow:"rgba(25,30,73,.08)", overlay:"rgba(18,22,44,0.42)" } },
+    t: { bg:"#E4ECEB", panel:"#FFFFFF", panel2:"#E7F1F0", line:"#E9F0EF", border:"#D9E5E4", border2:"#C2D2D1", text:"#191E49", text2:"#3A3F63", sub:"#556079", faint:"#7E8798", gold:"#40C6BC", onGold:"#12163C", live:"#7FDAD2", shadow:"rgba(20,28,60,.16)", overlay:"rgba(18,22,44,0.42)" } },
   // ===== BOLD & SLEEK — deep, dramatic dark themes =====
   { id: "noir", name: "Noir", tagline: "Midnight, lit in platinum", cat: "Bold & Sleek", dark: true,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.08,
@@ -967,7 +969,13 @@ const buildThemeCSS = () => THEMES.map((th) => {
   const studioShadows = ["studio", "onyx"].includes(th.id)
     ? "--shadow-sm:0 1px 2px rgba(0,0,0,.06), 0 8px 22px rgba(0,0,0,.08);--shadow-lg:0 4px 12px rgba(0,0,0,.08), 0 18px 44px rgba(0,0,0,.12);--shadow-md:0 2px 6px rgba(0,0,0,.06), 0 10px 28px rgba(0,0,0,.09);"
     : "";
-  return `.theme-${th.id}{--bg:${v.bg};--canvas:${th.canvas || v.bg};--grain:${th.grain || 0};--grain-blend:${th.dark ? "overlay" : "multiply"};--panel:${v.panel};--panel2:${v.panel2};--tint:${tint};--tint2:${tint2};--wash:${wash};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--gold-grad:${grad};--on-gold:${v.onGold};--live:${v.live || v.gold};--shadow:${v.shadow};--overlay:${v.overlay};${studioShadows}--font-disp:${th.disp};--font-body:${th.body};}` + (th.id === "onyx" ? `\n.theme-onyx, .theme-onyx *{font-family:'Hanken Grotesk', sans-serif !important;}` : "");
+  // "Crisp" shadow tier for Minty/Nectarine (2026-07-21): a slightly deeper, cool-tinted lift so
+  // white cards separate cleanly from the (now-deeper) page — the "cards float" half of the crisp
+  // recipe. Scoped to those two theme classes only; every other theme falls through untouched.
+  const crispShadows = ["minty", "nectarine"].includes(th.id)
+    ? "--shadow-sm:0 2px 4px rgba(26,32,66,.05), 0 10px 24px rgba(26,32,66,.10);--shadow-md:0 3px 8px rgba(26,32,66,.06), 0 14px 32px rgba(26,32,66,.12);--shadow-lg:0 8px 18px rgba(26,32,66,.10), 0 26px 54px rgba(26,32,66,.16);"
+    : "";
+  return `.theme-${th.id}{--bg:${v.bg};--canvas:${th.canvas || v.bg};--grain:${th.grain || 0};--grain-blend:${th.dark ? "overlay" : "multiply"};--panel:${v.panel};--panel2:${v.panel2};--tint:${tint};--tint2:${tint2};--wash:${wash};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--gold-grad:${grad};--on-gold:${v.onGold};--live:${v.live || v.gold};--shadow:${v.shadow};--overlay:${v.overlay};${studioShadows}${crispShadows}--font-disp:${th.disp};--font-body:${th.body};}` + (th.id === "onyx" ? `\n.theme-onyx, .theme-onyx *{font-family:'Hanken Grotesk', sans-serif !important;}` : "");
 }).join("\n");
 
 // Portal: render full-screen overlays. Without react-dom we can't truly portal,
