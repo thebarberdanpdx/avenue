@@ -22020,15 +22020,16 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
               <div key={sectionName} style={{ marginBottom: 22 }}>
                 <div style={{ fontSize: 12, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 9px" }}>{sectionName}</div>
                 <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
-                  {inSection.map((cat, i) => (
-                    <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                  {inSection.map((cat, i) => { const Ic = cat.icon; return (
+                    <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "center", gap: 13, padding: "16px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                      {Ic && <span style={{ width: 34, height: 34, borderRadius: 10, background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Ic size={18} strokeWidth={2} style={{ color: "var(--on-gold)" }} /></span>}
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>{cat.label}</span>
                         <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.desc}</span>
                       </span>
                       <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
                     </button>
-                  ))}
+                  ); })}
                 </div>
               </div>
             );
