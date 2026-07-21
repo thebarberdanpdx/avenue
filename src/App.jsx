@@ -13446,7 +13446,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     if (!op || (cur || []).some((n) => n.kind === "opening" && n.apptId === op.apptId)) return cur || [];
     const first = (op.names || "A waitlist client").split(",")[0].trim() || "A waitlist client";
     const who = op.count > 1 ? `${first} +${op.count - 1} more` : first;
-    return [{ id: "wlop_" + op.apptId, ts: Date.now(), kind: "opening", apptId: op.apptId, providerId: op.providerId, when: op.bookedFor, start: op.start, name: who, service: "wants an earlier time" }, ...(cur || [])].slice(0, 50);
+    return [{ id: "wlop_" + op.apptId, ts: Date.now(), kind: "opening", apptId: op.apptId, providerId: op.providerId, when: op.bookedFor, start: op.start, name: who, service: op.earlier ? "wants earlier — move them up" : "a waitlist spot opened" }, ...(cur || [])].slice(0, 50);
   });
   const apptSnapRef = useRef(null);     // id -> { start, bookedFor } at last observation
   const notifReadyRef = useRef(false);  // gate so the initial backlog never floods the bell
@@ -23285,6 +23285,47 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   // appointment is cancelled or removed. NOTHING is ever sent automatically — the staff chooses who
   // (if anyone) to offer each opening to from the Waitlist panel. (Dan: no auto-texts, ever.)
   const [openings, setOpenings] = useState([]);
+  // [waitlist-earlier-openings] A booked "wants earlier" client for whom a genuinely earlier slot is open
+  // RIGHT NOW — recomputed from LIVE availability (computeFreeSlots), so it reacts to BOTH a cancellation
+  // AND the owner extending hours (both change appts/providers → this recomputes). Mirrors WaitlistView's
+  // findOpenings. Drives the owner in-app alert (effect below) + the calendar opening banner.
+  const earlierOpenings = React.useMemo(() => {
+    const realProvs = (providers || []).filter((p) => p.id !== "anyone" && p.isProvider !== false && !p.archived);
+    if (!realProvs.length) return [];
+    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+    const _DS = 7 * 60, _DE = 22 * 60;
+    const WIN = { early: [_DS, 720], morning: [_DS, 720], midday: [660, 840], afternoon: [720, 1020], evening: [1020, _DE] };
+    const fits = (win, s, e) => { const w = WIN[String(win || "any").replace(/^custom.*/, "")]; return !w || (s < w[1] && e > w[0]); };
+    const out = [];
+    (appts || []).filter((a) => a && a.wantsEarlier === true && a.status === "confirmed" && a.bookedFor && new Date(a.bookedFor) >= t0).forEach((a) => {
+      const durMin = (a.start != null && a.end != null && a.end > a.start) ? (a.end - a.start) : (() => { const svc = (services || []).find((s) => s.id === a.serviceId); const cli = (clients || []).find((c) => c.id === a.clientId); return svc ? getDuration(cli, svc, a.providerId) : 30; })();
+      const curDt = new Date(a.bookedFor);
+      const cand = a.earlierAnyProvider ? realProvs : realProvs.filter((p) => p.id === a.providerId);
+      const wins = (a.earlierDayTimes && Object.keys(a.earlierDayTimes).length) ? Object.values(a.earlierDayTimes) : [];
+      const others = (appts || []).filter((x) => x.id !== a.id);
+      const d0 = new Date(a.bookedFor); d0.setHours(0, 0, 0, 0);
+      let found = null;
+      for (const prov of cand) {
+        for (let day = new Date(t0); day <= d0 && !found; day.setDate(day.getDate() + 1)) {
+          const dd = new Date(day);
+          const slots = computeFreeSlots({ prov, date: dd, durMin, providers, appts: others, business, services });
+          for (const slot of slots) {
+            const sMin = slot.start; const slotDt = new Date(dd); slotDt.setHours(Math.floor(sMin / 60), sMin % 60, 0, 0);
+            if (!(slotDt < curDt)) continue;
+            if (wins.length && !wins.some((w) => fits(w, sMin, sMin + durMin))) continue;
+            found = { apptId: a.id, name: a.name || "A client", providerId: prov.id, providerName: prov.name, bookedFor: slotDt.toISOString(), start: sMin }; break;
+          }
+        }
+      }
+      if (found) out.push(found);
+    });
+    return out;
+  }, [appts, providers, services, business, clients]);
+  // Fire the owner in-app alert for each earlier-time opening (deduped by appt on the notif side).
+  React.useEffect(() => {
+    if (!onWaitlistOpening) return;
+    earlierOpenings.forEach((o) => onWaitlistOpening({ apptId: o.apptId, providerId: o.providerId, bookedFor: o.bookedFor, start: o.start, count: 1, names: o.name, providerName: o.providerName, earlier: true }));
+  }, [earlierOpenings]); // eslint-disable-line react-hooks/exhaustive-deps
   const bookLink = `https://gotvero.com/book?shop=${encodeURIComponent(shopId || "avenue-phi")}`;
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   const [calMenuOpen, setCalMenuOpen] = useState(false); // ⋯ overflow on the calendar header
@@ -24205,6 +24246,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     return people.length ? { ...o, people } : null;
   }).filter(Boolean);
   const hasOpeningMatches = liveOpenings.length > 0;
+  // Combined opening signal for the calendar dot + banner: freed-slot matches (open-waitlist) PLUS
+  // earlier-time clients who now have an earlier slot (from a cancel OR the owner extending hours).
+  const anyOpening = hasOpeningMatches || earlierOpenings.length > 0;
+  const openingCount = liveOpenings.length + earlierOpenings.length;
 
   // Send ONE opening offer to ONE person — text + email, worded from the owner's editable
   // "Waitlist - Slot Opened" message. Used both by the manual "Send offer" button and by
@@ -24475,7 +24520,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
             {!sameDay(selectedDate.toISOString(), today) && <button onClick={() => setDayOffset(0)} style={{ background: "var(--panel)", color: "var(--gold)", border: "1px solid var(--border)", padding: "0 13px", height: 38, borderRadius: 12, fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY }}>Today</button>}
             <button onClick={() => setRegisterOpen(true)} aria-label="New sale" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 38, height: 38, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}><DollarSign size={17} style={{ color: "var(--text2)" }} /></button>
-            <button onClick={() => setCalMenuOpen(true)} aria-label="More actions" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 38, height: 38, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><MoreHorizontal size={18} />{(hasOpeningMatches || waitlist.length > 0) && <span style={{ position: "absolute", top: 7, right: 7, width: hasOpeningMatches ? 9 : 7, height: hasOpeningMatches ? 9 : 7, borderRadius: "50%", background: hasOpeningMatches ? "#16A34A" : "var(--text)", boxShadow: hasOpeningMatches ? "0 0 0 2px var(--panel)" : "none" }} />}</button>
+            <button onClick={() => setCalMenuOpen(true)} aria-label="More actions" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 38, height: 38, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><MoreHorizontal size={18} />{(anyOpening || waitlist.length > 0) && <span style={{ position: "absolute", top: 7, right: 7, width: anyOpening ? 9 : 7, height: anyOpening ? 9 : 7, borderRadius: "50%", background: anyOpening ? "#16A34A" : "var(--text)", boxShadow: anyOpening ? "0 0 0 2px var(--panel)" : "none" }} />}</button>
             <button onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0] || {}).id; if (!pid) { showToast("Add a staff member first."); return; } setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--text)", color: "var(--bg)", padding: "0 15px", height: 38, borderRadius: 12, fontSize: 13, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} strokeWidth={2} /> New</button>
           </div>
         </div>
@@ -24499,11 +24544,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       {/* Waitlist-opening banner: a spot opened that someone on the waitlist wants earlier. Tap → the
           waitlist panel to move them up. Driven by liveOpenings (filled slots + already-offered people
           drop off on their own). Complements the green dot on the ⋯ button. */}
-      {hasOpeningMatches && (
+      {anyOpening && (
         <button onClick={() => setShowWaitlistPanel(true)} className="lift" style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: "color-mix(in srgb, #16A34A 13%, var(--panel))", border: "1px solid color-mix(in srgb, #16A34A 42%, var(--border))", borderRadius: 13, padding: "11px 14px", marginBottom: 12, color: "var(--text)", cursor: "pointer", textAlign: "left", flexShrink: 0 }}>
           <span style={{ width: 32, height: 32, borderRadius: "50%", background: "#16A34A", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Clock size={16} /></span>
           <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: "block", fontSize: 14.5, fontWeight: 700 }}>{liveOpenings.length} waitlist opening{liveOpenings.length > 1 ? "s" : ""}</span>
+            <span style={{ display: "block", fontSize: 14.5, fontWeight: 700 }}>{openingCount} waitlist opening{openingCount > 1 ? "s" : ""}</span>
             <span style={{ display: "block", fontSize: 12.8, color: "var(--sub)", marginTop: 1 }}>A spot opened for someone waiting — tap to move them up.</span>
           </span>
           <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
