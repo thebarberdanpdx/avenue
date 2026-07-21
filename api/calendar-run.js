@@ -113,9 +113,15 @@ function reconcileFeedServer(currentAppts, events, opts) {
   }
   // [synced-appt-preserve] a WORKED appt whose outside event vanished is a real record — never delete
   // it; keep it (still tagged). Only bare, untouched mirror blocks are cancel/delete candidates.
+  // [synced-past-keep] MUST match reconcileFeed() in src/App.jsx. A synced appt whose start has already
+  // PASSED is HISTORY — never a cancellation. Staff iCal feeds export a forward-looking window, so past
+  // events fall out of the feed; deleting them there erased the whole past calendar one day at a time
+  // (Dan, 2026-07-21). Only a bare, still-UPCOMING mirror that vanished is a real cancel.
+  const _nowMs = Date.now();
+  const isPast = (a) => !!(a && a.bookedFor && new Date(a.bookedFor).getTime() < _nowMs);
   const vanished = mine.filter((a) => a.syncUid && !incomingUids.has(a.syncUid));
-  const keptWorkedOrphans = vanished.filter(worked);
-  const toCancel = vanished.filter((a) => !worked(a));
+  const keptWorkedOrphans = vanished.filter((a) => worked(a) || isPast(a));
+  const toCancel = vanished.filter((a) => !worked(a) && !isPast(a));
   const emptyFeed = incoming.length === 0 && mine.length > 0;
   const tooMany = toCancel.length > Math.max(5, Math.ceil(mine.length * 0.34));
   if (emptyFeed || tooMany) {
