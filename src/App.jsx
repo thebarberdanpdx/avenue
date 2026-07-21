@@ -10,7 +10,7 @@ import {
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
   BarChart3, TrendingUp, Palette, Globe, HelpCircle, BookOpen, Search, LifeBuoy, Scissors, Package,
   Smartphone, Link2, AlertTriangle, Pause, Play, RotateCw, UserPlus, Star, List,
-  Zap, ArrowUpRight, Download
+  Zap, ArrowUpRight, Download, Receipt
 } from "lucide-react";
 
 // ============================================================
@@ -23283,6 +23283,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     return m;
   }, [appts]);
   const [groupOpen, setGroupOpen] = useState(null); // groupId whose group detail sheet is open
+  const [saleView, setSaleView] = useState(null); // completed appt whose "View sale" receipt is open
   const [checkoutGroupResume, setCheckoutGroupResume] = useState(null); // reopen this group after a member's checkout (smooth person-to-person group checkout)
   // Group actions — write to appts through the calendar's atomic path (one setAppts + one flush).
   const setGroupPrimary = (gid, apptId) => {
@@ -23365,6 +23366,30 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     let n = 0;
     setAppts((cur) => { const next = cur.map((a) => { if (a.groupId === gid && a.status === "confirmed") { n++; return { ...a, status: "checked-in" }; } return a; }); if (flushApptsNow) queueMicrotask(() => flushApptsNow(next)); return next; });
     if (showToast) showToast(n ? "Group checked in." : "Everyone's already checked in.");
+  };
+  // --- "View sale" menu actions (SaleSheet). Reopen/Refund reuse the existing per-appt handlers via
+  // the render props below — these three are the sale-level extras. Change Date moves the appointment
+  // on the calendar only (payment/ledger date is untouched); Add Notes stamps a note on the sale;
+  // Send Receipt emails the on-file client a plain receipt (best-effort, never blocks). ---
+  const changeSaleDate = (members, dateStr) => {
+    if (!dateStr) return; const [y, mo, d] = dateStr.split("-").map(Number);
+    (members || []).forEach((m) => { const cur = m.bookedFor ? new Date(m.bookedFor) : new Date(); cur.setFullYear(y, (mo || 1) - 1, d || 1); updateAppt(m.id, { bookedFor: cur.toISOString() }); });
+  };
+  const addSaleNote = (id, text) => updateAppt(id, { saleNote: text });
+  const sendSaleReceipt = async (a, meta) => {
+    const cl = (clients || []).find((c) => c.id === a.clientId);
+    const email = ((cl && cl.email) || a.email || "").trim();
+    if (!email) { if (showToast) showToast("No email on file for this client — add one on their profile."); return; }
+    if (showToast) showToast("Sending receipt…");
+    const _m = (n) => "$" + (Math.round((Number(n) || 0) * 100) / 100).toFixed(2);
+    const ctx = { client: String((cl && cl.name) || a.name || "there").split(" ")[0], business: (business && business.name) || "your shop", amount: _m(meta && meta.total), date: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric" }) };
+    const body = "Hi {client}, thanks for coming in to {business}! Here's your receipt: {amount} on {date}. See you next time!";
+    try {
+      const r = await fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel: "email", to: { email }, subject: `${(business && business.name) || "Vero"} — your receipt (Sale #${meta && meta.saleNo})`, template: body, context: ctx }) });
+      const j = await r.json().catch(() => ({}));
+      const ok = r.ok && (!j.results || j.results.email === "sent");
+      if (showToast) showToast(ok ? `Receipt emailed to ${email}` : "Couldn't email the receipt — try again.");
+    } catch (e) { if (showToast) showToast("Couldn't email the receipt — check your connection."); }
   };
   const [dayOffset, setDayOffset] = useState(0);
   // Notification deep-link: when a tapped push hands us an appointment id, jump to its day and open its detail.
@@ -24894,6 +24919,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           showToast={showToast}
           onOpenGroup={(gid) => { setOpen(null); setGroupOpen(gid); }}
           onAddToGroup={openJoinGroup}
+          onViewSale={(a) => { setOpen(null); setSaleView(a); }}
           groupSize={open && open.groupId ? (groupCounts[open.groupId] || 0) : 0}
         />
       )}
@@ -24914,6 +24940,24 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onCheckoutGroup={startGroupCheckout}
           onCheckInGroup={checkInGroup}
           onAddToGroup={openAddToGroupForGroup}
+          onViewSale={(m) => { setGroupOpen(null); setSaleView(m); }}
+          showToast={showToast}
+        />
+      )}
+
+      {saleView && (
+        <SaleSheet
+          appt={saleView}
+          appts={appts}
+          clients={clients}
+          providers={providers}
+          business={business}
+          onClose={() => setSaleView(null)}
+          onReopen={(a) => { setSaleView(null); startCheckout(a, { reopen: true }); }}
+          onRefund={(a) => { setSaleView(null); setRefundAppt(a); }}
+          onChangeDate={changeSaleDate}
+          onAddNote={addSaleNote}
+          onSendReceipt={sendSaleReceipt}
           showToast={showToast}
         />
       )}
@@ -27018,7 +27062,7 @@ function AddToGroupSheet({ source, appts, clients, providers, onClose, onPickExi
 // groupId shown as a member card under one primary contact. Actions are lifted to
 // CalendarView (make-primary / remove / checkout / add). Styled to match
 // AppointmentSheet (panel header, gold accent) so it reads as native, not Mango.
-function GroupSheet({ groupId, appts, clients, providers, services, business, onClose, onOpenAppt, onSetPrimary, onRemoveFromGroup, onCheckoutGroup, onCheckoutMember, onAddToGroup, onCheckInGroup, showToast }) {
+function GroupSheet({ groupId, appts, clients, providers, services, business, onClose, onOpenAppt, onSetPrimary, onRemoveFromGroup, onCheckoutGroup, onCheckoutMember, onAddToGroup, onCheckInGroup, onViewSale, showToast }) {
   const [menuFor, setMenuFor] = useState(null);
   useEffect(() => {
     const y = window.scrollY;
@@ -27047,6 +27091,7 @@ function GroupSheet({ groupId, appts, clients, providers, services, business, on
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text)", padding: 4, cursor: "pointer", display: "flex" }} aria-label="Back"><ChevronLeft size={24} /></button>
           <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, color: "var(--text)", flex: 1 }}>Group Appointment</div>
           {onCheckInGroup && members.some((m) => m.status === "confirmed") && <button onClick={() => onCheckInGroup(groupId)} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 30, padding: "9px 15px", fontSize: 12.5, fontWeight: 700, letterSpacing: 0.5, cursor: "pointer", flexShrink: 0 }}>CHECK IN ALL</button>}
+          {onViewSale && allDone && <button onClick={() => onViewSale(primary)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", color: "var(--text)", border: "1px solid var(--border, var(--line))", borderRadius: 30, padding: "8px 14px", fontSize: 12.5, fontWeight: 700, letterSpacing: 0.5, cursor: "pointer", flexShrink: 0 }}><Receipt size={14} /> VIEW SALE</button>}
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 16, WebkitOverflowScrolling: "touch" }}>
           <div style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -27108,7 +27153,168 @@ function GroupSheet({ groupId, appts, clients, providers, services, business, on
   );
 }
 
-function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onCheckoutGroup, onRefund, onUpdate, onDelete, onOpenClient, onRebook, showToast, shopId, onOpenGroup, onAddToGroup, groupSize = 0 }) {
+// Sale detail — the "View Sale" receipt for a COMPLETED appointment (single or group). Read-only
+// breakdown (per-person line items, tips per barber, transactions, total) plus a ••• menu wired to
+// the SAME proven flows the appointment sheet uses: Reopen and Refund reuse the existing handlers
+// (no new money path — still guarded against double-charge); for a group they target a chosen member
+// so every charge/refund stays per-appointment. Send Receipt reuses the notify email; Change Date /
+// Add Notes patch the appointment. Kept theme-safe (CSS vars only) so every appearance still works.
+function SaleSheet({ appt, appts, clients, providers, business, onClose, onReopen, onRefund, onChangeDate, onAddNote, onSendReceipt, showToast }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [pick, setPick] = useState(null);      // { action } → choose which group member to reopen/refund
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
+  const money = (n) => "$" + (Math.round((Number(n) || 0) * 100) / 100).toFixed(2);
+  useEffect(() => {
+    const y = window.scrollY; window.scrollTo(0, 0);
+    document.body.style.position = "fixed"; document.body.style.top = "0"; document.body.style.left = "0"; document.body.style.right = "0"; document.body.style.width = "100%";
+    return () => { document.body.style.position = ""; document.body.style.top = ""; document.body.style.left = ""; document.body.style.right = ""; document.body.style.width = ""; window.scrollTo(0, y); };
+  }, []);
+  const isGroup = !!appt.groupId;
+  const members = (isGroup ? (appts || []).filter((a) => a.groupId === appt.groupId && (a.status === "done" || a.paid)) : [appt]).slice().sort((a, b) => (a.start || 0) - (b.start || 0));
+  if (!members.length) return null;
+  const primary = members.find((m) => m.groupPrimary) || members[0];
+  const primClient = (clients || []).find((c) => c.id === primary.clientId);
+  const provName = (pid) => (providers || []).find((p) => p.id === pid)?.name || "staff";
+  const recsFor = (m) => {
+    const cl = (clients || []).find((c) => c.id === m.clientId);
+    const src = [...(((cl && cl.payments) || []).filter((r) => r.apptId === m.id)), ...(((business && business.sales) || []).filter((r) => r.apptId === m.id))];
+    const seen = {}; const out = []; src.forEach((r) => { if (r && !seen[r.id]) { seen[r.id] = 1; out.push(r); } }); return out;
+  };
+  const allRecs = members.flatMap(recsFor);
+  const lines = members.map((m) => {
+    const recs = recsFor(m);
+    const svc = recs.length ? recs.reduce((s, r) => s + ((r.amount || 0) - (r.tip || 0)), 0) : Math.max(0, ((m.paid && m.paid.total) || m.price || 0) - ((m.paid && m.paid.tip) || 0));
+    return { m, name: m.serviceName || (m.title || "").replace(/\s*[(·].*$/, "") || "Service", options: Array.isArray(m.addonLabels) ? m.addonLabels.filter(Boolean) : [], svc, barber: provName(m.providerId) };
+  });
+  const subtotal = lines.reduce((s, l) => s + l.svc, 0);
+  const tipByStaff = {};
+  allRecs.forEach((r) => { if (r.tip) { const k = r.staffId || primary.providerId || "?"; tipByStaff[k] = (tipByStaff[k] || 0) + r.tip; } });
+  const tipRows = Object.entries(tipByStaff).filter(([, v]) => v > 0.0049);
+  const methodLabel = (mth) => ({ cash: "Cash", "card-on-file": "Credit Card", card: "Credit Card", terminal: "Card", reader: "Card", prepaid: "Paid at booking" })[String(mth || "").toLowerCase()] || "Card";
+  const txByMethod = {};
+  allRecs.forEach((r) => { const k = methodLabel(r.method); txByMethod[k] = (txByMethod[k] || 0) + (r.amount || 0); });
+  const txRows = Object.entries(txByMethod).filter(([, v]) => Math.abs(v) > 0.0049);
+  const refundedTotal = allRecs.reduce((s, r) => s + (r.refunded || 0), 0);
+  const total = allRecs.length ? allRecs.reduce((s, r) => s + (r.amount || 0), 0) : ((primary.paid && primary.paid.total) || 0);
+  const baseTs = allRecs.length ? Math.min(...allRecs.map((r) => r.ts || Date.now())) : (Number(primary.id) || Date.now());
+  const saleNo = 1000 + (Math.floor(baseTs) % 9000);   // stable display number (not a running counter)
+  const saleDate = new Date(baseTs);
+  const lbl = { fontSize: 11.5, letterSpacing: 0.7, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 2px 8px" };
+  const card = { background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16 };
+  const menuItems = [
+    { label: "Change Date", icon: <Calendar size={18} />, fn: () => { setMenuOpen(false); setDateOpen(true); } },
+    { label: "Add Notes", icon: <MessageSquare size={18} />, fn: () => { setMenuOpen(false); setNoteOpen(true); } },
+    { label: "Reopen", icon: <RotateCw size={18} />, fn: () => { setMenuOpen(false); (isGroup && members.length > 1) ? setPick({ action: "reopen" }) : onReopen(primary); } },
+    { label: "Refund", icon: <RefreshCw size={18} />, fn: () => { setMenuOpen(false); (isGroup && members.length > 1) ? setPick({ action: "refund" }) : onRefund(primary); } },
+    { label: "Send Receipt", icon: <Mail size={18} />, fn: () => { setMenuOpen(false); onSendReceipt(primary, { total, saleNo }); } },
+  ];
+  return (
+    <Portal>
+      <div style={{ position: "fixed", inset: 0, zIndex: 3200, background: "var(--bg)", display: "flex", flexDirection: "column" }} onClick={() => setMenuOpen(false)}>
+        <div style={{ background: "var(--panel)", borderBottom: "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 12px) 12px 12px", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, position: "relative" }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text)", padding: 4, cursor: "pointer", display: "flex" }} aria-label="Back"><ChevronLeft size={24} /></button>
+          <div style={{ flex: 1, textAlign: "center", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, color: "var(--text)" }}>Sale #{saleNo}</div>
+          <button onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }} style={{ background: "none", border: "none", color: "var(--text)", padding: 4, cursor: "pointer", display: "flex" }} aria-label="Actions"><MoreHorizontal size={22} /></button>
+          {menuOpen && (
+            <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 52px)", right: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,0.28)", zIndex: 6, overflow: "hidden", minWidth: 210 }}>
+              {menuItems.map((it, i) => (
+                <button key={it.label} onClick={it.fn} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", padding: "14px 16px", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: it.label === "Refund" ? "#B5564B" : "var(--text)", fontSize: 15.5, cursor: "pointer" }}><span style={{ color: it.label === "Refund" ? "#B5564B" : "var(--sub)", display: "flex" }}>{it.icon}</span>{it.label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: 16, WebkitOverflowScrolling: "touch" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 20, padding: "2px 2px" }}>
+            <Avatar size={52} photo={primClient?.photo} initial={(apptDisplayName(primary, clients) || "?").trim()[0] || "?"} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", fontFamily: FONT_DISPLAY }}>{apptDisplayName(primary, clients)}</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>{saleDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</div>
+            </div>
+          </div>
+          <div style={{ ...card, padding: "6px 16px", marginBottom: 16 }}>
+            {lines.map((l, i) => (
+              <div key={l.m.id} style={{ padding: "14px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                <div style={{ fontSize: 12.5, color: "var(--faint)", fontWeight: 600, marginBottom: 4 }}>for <span style={{ color: "var(--text2, var(--text))" }}>{apptDisplayName(l.m, clients)}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+                  <div style={{ fontSize: 16.5, fontWeight: 700, color: "var(--text)" }}>{l.name}</div>
+                  <div style={{ fontSize: 16.5, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>{money(l.svc)}</div>
+                </div>
+                {l.options.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>{l.options.map((o, j) => <span key={j} style={{ fontSize: 12.5, fontWeight: 600, color: "var(--sub)", background: "var(--panel2, var(--chip, var(--bg)))", border: "1px solid var(--line)", borderRadius: 8, padding: "4px 9px" }}>{cleanServiceLabel(o)}</span>)}</div>}
+                <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 8 }}>with {l.barber}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ ...card, padding: "6px 16px", marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", fontSize: 15.5, color: "var(--text)" }}><span style={{ color: "var(--sub)" }}>Subtotal</span><b>{money(subtotal)}</b></div>
+            {tipRows.map(([sid, v]) => (
+              <div key={sid} style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)", fontSize: 15.5, color: "var(--text)" }}><span style={{ color: "var(--sub)" }}>Tip{isGroup || tipRows.length > 1 ? ` (for ${provName(sid).split(" ")[0]})` : ""}</span><b>{money(v)}</b></div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "14px 0", borderTop: "2px solid var(--line)", fontSize: 19, fontWeight: 800, color: "var(--text)" }}><span>Total</span><span style={{ color: "var(--gold)" }}>{money(total)}</span></div>
+            {refundedTotal > 0.0049 && <div style={{ display: "flex", justifyContent: "space-between", padding: "0 0 12px", fontSize: 14, color: "#B5564B", fontWeight: 700 }}><span>Refunded</span><span>−{money(refundedTotal)}</span></div>}
+          </div>
+          {txRows.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={lbl}>Transactions</div>
+              <div style={{ ...card, padding: "6px 16px" }}>
+                {txRows.map(([m, v], i) => (
+                  <div key={m} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 0", borderTop: i ? "1px solid var(--line)" : "none", fontSize: 15.5, color: "var(--text)" }}><span style={{ display: "flex", alignItems: "center", gap: 9 }}><CreditCard size={16} style={{ color: "var(--faint)" }} />{m}</span><b>{money(v)}</b></div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ marginBottom: 8 }}>
+            <div style={lbl}>Sale details</div>
+            <div style={{ ...card, padding: "14px 16px", fontSize: 14.5, color: "var(--text)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}><Calendar size={15} style={{ color: "var(--faint)" }} /> {saleDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} at {saleDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>
+              {primary.saleNote ? <div style={{ display: "flex", alignItems: "flex-start", gap: 9, marginTop: 11, color: "var(--sub)" }}><MessageSquare size={15} style={{ color: "var(--faint)", flexShrink: 0, marginTop: 2 }} /> {primary.saleNote}</div> : null}
+            </div>
+          </div>
+        </div>
+
+        {pick && (
+          <div onClick={() => setPick(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 3300, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, background: "var(--panel)", borderRadius: "18px 18px 0 0", padding: "18px 16px calc(env(safe-area-inset-bottom, 0px) + 18px)" }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>{pick.action === "refund" ? "Refund whose service?" : "Reopen whose ticket?"}</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 14 }}>Each person is handled on their own ticket.</div>
+              {members.map((m) => (
+                <button key={m.id} onClick={() => { const t = m; setPick(null); pick.action === "refund" ? onRefund(t) : onReopen(t); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", textAlign: "left", padding: "14px 14px", marginBottom: 8, background: "var(--panel2, var(--bg))", border: "1px solid var(--line)", borderRadius: 12, color: "var(--text)", cursor: "pointer" }}>
+                  <span><span style={{ fontWeight: 700, fontSize: 15.5 }}>{apptDisplayName(m, clients)}</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 1 }}>{m.serviceName || "Service"} · with {provName(m.providerId).split(" ")[0]}</span></span>
+                  <ChevronLeft size={18} style={{ transform: "rotate(180deg)", color: "var(--faint)" }} />
+                </button>
+              ))}
+              <button onClick={() => setPick(null)} style={{ width: "100%", marginTop: 6, background: "none", border: "none", color: "var(--sub)", fontSize: 15.5, padding: 10, cursor: "pointer" }}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {dateOpen && (
+          <div onClick={() => setDateOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 3300, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", borderRadius: 18, padding: 22 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>Change date</div>
+              <div style={{ fontSize: 14, color: "var(--sub)", marginBottom: 16, lineHeight: 1.4 }}>Moves {isGroup ? "the group" : "this appointment"} on the calendar. The time stays the same and the payment is unchanged.</div>
+              <input type="date" defaultValue={(() => { const d = primary.bookedFor ? new Date(primary.bookedFor) : saleDate; return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })()} onChange={(e) => { if (e.target.value) { onChangeDate(members, e.target.value); setDateOpen(false); if (showToast) showToast("Date changed."); } }} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2, var(--bg))", border: "1px solid var(--line)", borderRadius: 12, padding: "13px 14px", color: "var(--text)", fontSize: 16 }} />
+              <button onClick={() => setDateOpen(false)} style={{ width: "100%", marginTop: 12, background: "none", border: "none", color: "var(--sub)", fontSize: 15.5, padding: 8, cursor: "pointer" }}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {noteOpen && (
+          <div onClick={() => setNoteOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 3300, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, background: "var(--panel)", borderRadius: 18, padding: 22 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", marginBottom: 12 }}>Sale notes</div>
+              <textarea id="sale-note-ta" defaultValue={primary.saleNote || ""} rows={4} placeholder="Add a note to this sale…" style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2, var(--bg))", border: "1px solid var(--line)", borderRadius: 12, padding: "13px 14px", color: "var(--text)", fontSize: 16, resize: "vertical", lineHeight: 1.5, outline: "none" }} />
+              <button onClick={() => { const el = document.getElementById("sale-note-ta"); onAddNote(primary.id, el ? el.value : ""); setNoteOpen(false); if (showToast) showToast("Note saved."); }} style={{ width: "100%", marginTop: 14, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>Save note</button>
+              <button onClick={() => setNoteOpen(false)} style={{ width: "100%", marginTop: 8, background: "none", border: "none", color: "var(--sub)", fontSize: 15.5, padding: 8, cursor: "pointer" }}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Portal>
+  );
+}
+
+function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onCheckoutGroup, onRefund, onUpdate, onDelete, onOpenClient, onRebook, showToast, shopId, onOpenGroup, onAddToGroup, onViewSale, groupSize = 0 }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
@@ -27638,8 +27844,9 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
             />
 
             {appt.status === "done" && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "13px 18px", background: T.chip, borderBottom: `1px solid ${T.line}`, color: T.sub, fontSize: 16, fontWeight: 600 }}>
-                <Check size={17} style={{ color: T.accent }} /> Completed & paid · ${price}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 9, padding: "12px 16px", background: T.chip, borderBottom: `1px solid ${T.line}` }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 9, color: T.sub, fontSize: 15.5, fontWeight: 600 }}><Check size={17} style={{ color: T.accent }} /> Completed &amp; paid · ${price}</span>
+                {onViewSale && <button onClick={() => onViewSale(appt)} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "none", border: `1px solid ${T.border || T.line}`, color: T.text, padding: "8px 14px", borderRadius: 30, fontSize: 13, letterSpacing: 0.4, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}><Receipt size={15} /> VIEW SALE</button>}
               </div>
             )}
             <div ref={scrollTopRef} style={{ overflowY: "auto", flex: 1 }}>
@@ -28129,6 +28336,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   <MenuItem T={T} danger icon={<Trash2 size={17} />} label="Cancel / Delete" onClick={() => { setMenuOpen(false); setDeleteAsk(true); }} />
                   {appt.paid ? (
                     <>
+                      {onViewSale && <MenuItem T={T} icon={<Receipt size={17} />} label="View sale" onClick={() => { setMenuOpen(false); onViewSale(appt); }} />}
                       <MenuItem T={T} icon={<DollarSign size={17} />} label="Reopen ticket" onClick={() => { setMenuOpen(false); onCheckout(appt, { reopen: true }); }} />
                       {onRefund && <MenuItem T={T} icon={<RefreshCw size={17} />} label="Refund…" onClick={() => { setMenuOpen(false); onRefund(appt); }} />}
                     </>
