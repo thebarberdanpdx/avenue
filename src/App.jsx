@@ -13577,16 +13577,13 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   }, [tab, activeClient, pulseDetail]);
 
   // open a conversation (creating a lightweight client if needed) with a prefilled draft
-  const textPerson = ({ name, phone, provider, draft }) => {
-    const digits = (s) => (s || "").replace(/\D/g, "");
-    let target = clients.find((c) => digits(c.phone) === digits(phone));
-    if (!target) {
-      const provId = (providers.find((p) => p.name === provider) || {}).id || "dan";
-      target = { id: "wl-" + digits(phone), name: name || "Waitlist Client", phone, provider: provId, visits: 0, customDurations: {}, notes: "Added from the waitlist.", messages: [] };
-      setClients((cur) => [...cur, target]);
-    }
-    setMsgTarget({ clientId: target.id, draft });
-    goTab("messages");
+  // Open the barber's OWN Messages app, pre-addressed with a prefilled draft — tap-to-text, like the
+  // running-late/review buttons. Replaces the old in-app "Messages tab" thread, which never actually
+  // sent anything to the client. No phone → honest toast, no broken sms: link.
+  const textPerson = ({ name, phone, draft }) => {
+    const digits = (phone || "").replace(/\D/g, "");
+    if (!digits) { showToast(`No phone number to text ${name || "them"}.`); return; }
+    if (typeof window !== "undefined") window.location.href = smsLink(digits, draft || "", IS_IOS);
   };
 
   // Gate: if a PIN is required and we're not yet authenticated, show the lock instead of the dashboard.
@@ -13633,7 +13630,6 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} onOpenAppt={(a) => { setPulseOpenApptId(a.id); navTo({ tab: "calendar", activeClient: null }); }} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} />}
-        {tab === "messages" && <MessagesView key={`messages-${tabNonce}`} clients={clients} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} appts={appts} setAppts={setAppts} clients={clients} business={business} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} flushServicesNow={flushServicesNow} />}
         {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView key={`settings-${tabNonce}`} business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} onSignOutAccount={onSignOutAccount} authEmail={authEmail} flushServicesNow={flushServicesNow} /></ErrorBoundary>}
@@ -13642,7 +13638,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
 
       {/* fixed bottom tab bar — anchors to viewport bottom. transform:translateZ(0) puts it on its own GPU layer so iOS Safari doesn't let it drift during scroll/overscroll. */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "color-mix(in srgb, var(--bg) 82%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderTop: "1px solid var(--line)", boxShadow: "0 -8px 30px -12px var(--shadow)", display: "flex", justifyContent: "space-around", alignItems: "stretch", padding: "10px 4px calc(10px + env(safe-area-inset-bottom))", zIndex: 20, transform: "translateZ(0)", WebkitTransform: "translateZ(0)", willChange: "transform" }}>
-        {[["pulse", "Pulse", TrendingUp], ["calendar", "Calendar", Calendar], ["clients", "Clients", User], ["messages", "Messages", MessageSquare], ...(isOwner ? [["settings", "Settings", Settings]] : [])].map(([id, label, Icon]) => (
+        {[["pulse", "Pulse", TrendingUp], ["calendar", "Calendar", Calendar], ["clients", "Clients", User], ...(isOwner ? [["settings", "Settings", Settings]] : [])].map(([id, label, Icon]) => (
           <button key={id} onClick={() => goTab(id)} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
             <div style={{ position: "relative", padding: "5px 16px", borderRadius: 13, background: tab === id ? "var(--wash)" : "transparent", boxShadow: tab === id ? "0 5px 16px -6px var(--wash)" : "none", transition: "background .2s var(--ease), box-shadow .2s var(--ease)" }}>
               <Icon size={21} />
