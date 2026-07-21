@@ -911,6 +911,15 @@ const THEMES = [
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.035,
     canvas: "linear-gradient(176deg,#FCFBF8,#F5F3EC)",
     t: { bg:"#FAF9F6", panel:"#FFFFFF", panel2:"#F4F2EC", line:"#EFEDE6", border:"#E6E3DB", border2:"#D3CEC2", text:"#1B1A16", text2:"#3B372F", sub:"#8A857A", faint:"#B3AEA3", gold:"#34483C", onGold:"#F6F4EE", live:"#34483C", shadow:"rgba(40,34,22,.08)", overlay:"rgba(24,22,18,0.42)" } },
+  // Minty — the Mangomint-inspired look Dan approved (2026-07-21): cool near-white canvas, crisp
+  // white cards, deep navy ink, a soft lavender accent. Clean modern-SaaS feel. Note: Mango's solid
+  // navy TOP BAR is not reproduced — Vero dashboard headers are frosted-light by design in every
+  // theme; the dark booking/checkout headers use --text, so they read navy here automatically.
+  { id: "minty", name: "Minty", tagline: "Soft lavender, navy ink", cat: "Crisp & Minimal", dark: false,
+    disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.02,
+    canvas: "linear-gradient(176deg,#FBFBFE,#EEEFF6)",
+    grad: "linear-gradient(135deg,#9A8FE0,#8477D6)",
+    t: { bg:"#F4F5F8", panel:"#FFFFFF", panel2:"#EFEFF6", line:"#ECECF3", border:"#E4E4EE", border2:"#CACADB", text:"#1E2749", text2:"#3B4168", sub:"#6C7091", faint:"#9A9EB8", gold:"#9A8FE0", onGold:"#1E2749", live:"#8477D6", shadow:"rgba(30,39,73,.08)", overlay:"rgba(20,24,44,0.42)" } },
   // ===== BOLD & SLEEK — deep, dramatic dark themes =====
   { id: "noir", name: "Noir", tagline: "Midnight, lit in platinum", cat: "Bold & Sleek", dark: true,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.08,
