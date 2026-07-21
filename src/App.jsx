@@ -2983,6 +2983,10 @@ function App() {
       }
       const keepIds = new Set(list.map((it, i) => String((it && it.id) ?? `${table}_${i}`)));
       const prevKnown = new Set((lastRemoteRef.current[table] || []).map((it) => String(it && it.id)));
+      // Only rows this device KNEW about and has since removed are deletion candidates (a new row from
+      // another device is never here). [native-appt-delete-rail] Server backstop in api/sync-pull holds an
+      // implausibly large delete batch (a corrupted/truncated local list) so a Vero-booked appointment/
+      // client can never be mass-deleted — the rows stay server-side and the next mirror pull self-heals.
       const toDelete = [...prevKnown].filter((id) => !keepIds.has(id));
       // cross-device-sync: iPad/iPhone direct Supabase writes fail RLS (42501) even when reads
       // work via api/sync-pull — route appointments + clients through the same service-role path.
