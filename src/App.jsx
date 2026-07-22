@@ -13459,6 +13459,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     return [{ id: "wlop_" + op.apptId, ts: Date.now(), kind: "opening", apptId: op.apptId, providerId: op.providerId, when: op.bookedFor, start: op.start, name: who, service: op.earlier ? "wants earlier — move them up" : "a waitlist spot opened" }, ...(cur || [])].slice(0, 50);
   });
   const apptSnapRef = useRef(null);     // id -> signature at last observation (persisted across restarts)
+  const notifSeededRef = useRef(false); // [notif-seed-once] baseline is seeded ONCE per session; never reloaded stale over a live one
   const [notifArmed, setNotifArmed] = useState(false); // flips true once the baseline is seeded → runs the first diff
   const SNAP_KEY = "vero_appt_snap_" + shopId;
   // [notif-durable-snapshot] Seed the baseline ~1.5s after data loads (covers appts arriving in
@@ -13470,6 +13471,12 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   useEffect(() => {
     if (!dataLoaded) return;
     const t = setTimeout(() => {
+      // [notif-seed-once] Seed the baseline ONLY the first time this session. dataLoaded can cycle
+      // (foreground / refetch), which re-ran this effect and RELOADED a possibly-stale persisted
+      // snapshot over the live in-memory baseline the watcher had already advanced — that reload
+      // was the "I cleared the notifications and they came right back" bug: old appts looked unseen
+      // again and re-fired. Once seeded, the watcher below is the sole owner of the baseline.
+      if (notifSeededRef.current) return;
       let persisted = null;
       try { const raw = localStorage.getItem(SNAP_KEY); if (raw) persisted = JSON.parse(raw); } catch (e) {}
       if (persisted && typeof persisted === "object") {
@@ -13480,6 +13487,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         apptSnapRef.current = snap;
         try { localStorage.setItem(SNAP_KEY, JSON.stringify(snap)); } catch (e) {}
       }
+      notifSeededRef.current = true;
       setNotifArmed(true);
     }, 1500);
     return () => clearTimeout(t);
@@ -13487,13 +13495,23 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   useEffect(() => {
     if (!notifArmed) return; // baseline not seeded yet
     const snap = apptSnapRef.current || {};
-    const nextSnap = {};
+    // [notif-snap-merge] Start from the prior baseline, not an empty object. If the appts list momentarily
+    // shrinks (a refetch clearing then repopulating), an empty-start nextSnap would DROP the remembered
+    // ids and the appts would re-fire as "new" when they came back. Retaining prior keys is harmless —
+    // a genuinely-deleted appt just stays remembered and never re-alerts.
+    const nextSnap = { ...snap };
     const fresh = [];
     for (const a of (appts || [])) {
       if (!a || a.id == null) continue;
       const key = String(a.id);
       nextSnap[key] = { start: a.start, bookedFor: a.bookedFor, status: a.status, hasNote: !!a.hasNote, photos: a.photos || 0, note: (a.note || "").trim(), extrasAt: a.clientExtrasAt || "" };
       if (a.status === "block") continue;
+      // [notif-no-past] Never surface a new/moved/cancelled/note alert for an appointment whose time has
+      // already passed (1h grace). A "new booking" bell for something days/weeks in the past is noise —
+      // this was the flood of old test appts re-appearing, each mis-stamped "just now." We still record
+      // it in nextSnap above (so it's remembered), we just don't ring the bell for it.
+      const _bfMs = a.bookedFor ? new Date(a.bookedFor).getTime() : 0;
+      if (_bfMs && _bfMs < Date.now() - 60 * 60 * 1000) continue;
       const isSynced = a.source === "sync" || a._synced;
       const prev = snap[key];
       const base = { apptId: key, name: a.name || a.title || "Client", service: a.serviceName || a.title || "", providerId: a.providerId, when: a.bookedFor, start: a.start, ts: Date.now() };
