@@ -5785,7 +5785,24 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [wlDayCustom, setWlDayCustom] = useState({}); // per-day custom text when time === "custom"
   const [wlWhen, setWlWhen] = useState("");         // legacy single pref (kept for old refs)
   const [wlFor, setWlFor] = useState("self");       // self | other | group (e.g. father/son, more than one appt)
-  const [wlPhotos, setWlPhotos] = useState(0);
+  const [wlPhotos, setWlPhotos] = useState([]); // [wl-real-selfie] REAL captured selfies (compressed dataURLs, max 3) — was a fake counter that saved nothing
+  const wlPhotoRef = useRef(null);
+  const onWlPhotoPick = (e) => {
+    const file = e.target.files && e.target.files[0]; if (e.target) e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const shrink = (maxPx, q) => { let w = img.width, h = img.height; if (w > h && w > maxPx) { h = Math.round(h * maxPx / w); w = maxPx; } else if (h > maxPx) { w = Math.round(w * maxPx / h); h = maxPx; } const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h); return c.toDataURL("image/jpeg", q); };
+        let url = shrink(900, 0.5);
+        if (url.length > 300000) url = shrink(700, 0.4);
+        setWlPhotos((cur) => cur.length >= 3 ? cur : [...cur, url]);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
   const [wlAnyProvider, setWlAnyProvider] = useState(false); // false = only their provider (the respectful default)
   const [wlService, setWlService] = useState("");
 
@@ -8251,6 +8268,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             // day + service they were looking at. Inside, they can add more days and a time for each.
             const dlbl = relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate) : `${relativeDate(selectedDate)}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
             setWlName(matched ? matched.name : (newName || ""));
+            if (matched && matched.phone && !(phone || "").trim()) setPhone(matched.phone); // returning client — don't re-ask what we know
             setWlDays([dlbl]); setWlDayTimes({ [dlbl]: "any" });
             setWlService(nextCart.map(describeEntry).join(", "));
             setShowWaitlist(true);
@@ -8907,6 +8925,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </div>
               );
             })()}
+            {/* [waitlist-clear] While the waitlist form is open it is the ONLY thing on screen — the
+                pick-a-time UI (soonest opening, calendar, times) hides so the client isn't staring at
+                two date pickers and a buried form at once. Back link restores the times. */}
+            {!showWaitlist && !waitlistDone && (<>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Pick a time</div>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>When works for you?</h2>
@@ -8943,10 +8965,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               )}
               {slot != null && <button onClick={() => setStep(7)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 24, border: "none", cursor: "pointer" }}>Continue →</button>}
             </>)}
+            </>)}
 
             {/* date is fully booked → waitlist path */}
             {(dateIsFull || showWaitlist) && !waitlistDone && (
               <div className="fade-up" style={{ marginBottom: 8 }}>
+                {showWaitlist && (
+                  <button onClick={() => setShowWaitlist(false)} style={{ background: "none", border: "none", padding: "2px 0 14px", color: "var(--sub)", fontSize: 14, cursor: "pointer", fontFamily: FONT_BODY, display: "inline-flex", alignItems: "center", gap: 6 }}>← Back to times</button>
+                )}
                 {dateIsFull && !showWaitlist && (
                 <div style={{ background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 6, padding: "16px 18px", marginBottom: 20, display: "flex", gap: 12, alignItems: "flex-start" }}>
                   <AlertCircle size={18} style={{ color: "var(--text)", flexShrink: 0, marginTop: 1 }} />
@@ -8955,10 +8981,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 )}
 
                 {!showWaitlist ? (
-                  <button className="lift" onClick={() => { setShowWaitlist(true); setWlName(matched ? matched.name : ""); setWlDays([relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate) : `${relativeDate(selectedDate)}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`]); setWlService(cart.map(describeEntry).join(", ")); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Join the waitlist →</button>
+                  <button className="lift" onClick={() => { const dlbl = relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate) : `${relativeDate(selectedDate)}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`; setShowWaitlist(true); setWlName(matched ? matched.name : ""); if (matched && matched.phone && !(phone || "").trim()) setPhone(matched.phone); setWlDays([dlbl]); setWlDayTimes({ [dlbl]: "any" }); setWlService(cart.map(describeEntry).join(", ")); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Join the waitlist →</button>
                 ) : (
                   <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8, padding: 20, textAlign: "left" }}>
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 16 }}>Join the waitlist</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>Join the waitlist</div>
+                    <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, margin: "0 0 18px" }}>Tell us which days work and we'll text you if a spot opens.</p>
 
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Your name</label>
                     <input value={wlName} onChange={(e) => setWlName(e.target.value)} placeholder="First and last name" style={{ ...inputStyle, marginBottom: 16 }} />
@@ -8980,7 +9007,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Which days work? <span style={{ color: "var(--sub)", fontWeight: 400 }}>(up to 3)</span></label>
                     <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 16 }}>
                       {dateOptions.slice(0, 14).map((d, i) => { const lbl = relativeDate(d).includes(",") ? relativeDate(d) : `${relativeDate(d)}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; const on = wlDays.includes(lbl); const atMax = !on && wlDays.length >= 3; return (
-                        <button key={i} disabled={atMax} onClick={() => setWlDays((prev) => { if (prev.includes(lbl)) { setWlDayTimes((t) => { const n = { ...t }; delete n[lbl]; return n; }); return prev.filter((x) => x !== lbl); } if (prev.length >= 3) return prev; setWlDayTimes((t) => ({ ...t, [lbl]: "any" })); return [...prev, lbl]; })} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", textAlign: "center", opacity: atMax ? 0.4 : 1 }}>
+                        <button key={i} ref={on ? ((el) => { if (el && !el._wlSeen) { el._wlSeen = 1; try { el.scrollIntoView({ block: "nearest", inline: "center" }); } catch (e) {} } }) : null} disabled={atMax} onClick={() => setWlDays((prev) => { if (prev.includes(lbl)) { setWlDayTimes((t) => { const n = { ...t }; delete n[lbl]; return n; }); return prev.filter((x) => x !== lbl); } if (prev.length >= 3) return prev; setWlDayTimes((t) => ({ ...t, [lbl]: "any" })); return [...prev, lbl]; })} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", textAlign: "center", opacity: atMax ? 0.4 : 1 }}>
                           <div style={{ fontSize: 13, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
                           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{d.getDate()}</div>
                         </button>
@@ -9009,13 +9036,17 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     )}
 
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Service</label>
+                    {cart.length > 0 ? (
+                      /* They already picked their service in the booking flow — show it, don't re-ask. */
+                      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, marginBottom: 16 }}>{cart.map(describeEntry).join(", ")}</div>
+                    ) : (
                     <div style={{ position: "relative", marginBottom: 16 }}>
                       <select value={wlService} onChange={(e) => setWlService(e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 40px 13px 15px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 15px center" }}>
-                        {cart.length > 0 && <option value={cart.map(describeEntry).join(", ")}>{cart.map(describeEntry).join(", ")}</option>}
                         {services.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
                       </select>
                       <ChevronRight size={16} style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%) rotate(90deg)", color: "var(--faint)", pointerEvents: "none" }} />
                     </div>
+                    )}
 
                     {(business?.waitlist?.askAnyProvider !== false) && provider.name !== "Anyone" && (
                       <>
@@ -9035,7 +9066,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       const photoRequired = photoMode === "required" && !hasProfilePhoto;
                       const phoneOk = phone.replace(/\D/g, "").length >= 10;
                       const daysOk = wlDays.length > 0 && wlDays.every((l) => wlDayTimes[l] && (wlDayTimes[l] !== "custom" || (wlDayCustom[l] || "").trim()));
-                      const ready = !!(wlName && phoneOk && daysOk && (!photoRequired || wlPhotos > 0));
+                      const ready = !!(wlName && phoneOk && daysOk && (!photoRequired || wlPhotos.length > 0));
                       return (
                         <>
                           {photoMode !== "off" && !hasProfilePhoto && (<>
@@ -9046,19 +9077,30 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                               <Camera size={17} style={{ color: "var(--text)", flexShrink: 0, marginTop: 2 }} />
                               <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text2)" }}>Just snap a quick selfie of your hair as it looks right now — that's all we need. It helps {provider.name === "Anyone" ? "us" : provider.name} see how much work it'll take, and there's a good chance we can squeeze you in.</div>
                             </div>
-                            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 6, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: i < wlPhotos ? "color-mix(in srgb, var(--text) 12%, transparent)" : "transparent" }}>{i < wlPhotos ? <Check size={18} style={{ color: "var(--text)" }} /> : <Camera size={16} style={{ color: "var(--faint)" }} />}</div>))}</div>
-                            <button onClick={() => setWlPhotos(Math.min(3, wlPhotos + 1))} disabled={wlPhotos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: wlPhotos >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 13, letterSpacing: 1, borderRadius: 6, marginBottom: 20 }}>{wlPhotos >= 3 ? "MAXIMUM REACHED" : `ADD SELFIE (${wlPhotos}/3)`}</button>
+                            {/* [wl-real-selfie] REAL photo capture — the old button was a stub that just counted
+                                up and showed checkmarks while saving NOTHING (staff saw "has photos" that didn't
+                                exist). This opens the camera/library, compresses, previews, and actually saves. */}
+                            <input ref={wlPhotoRef} type="file" accept="image/*" onChange={onWlPhotoPick} style={{ display: "none" }} />
+                            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>{[0, 1, 2].map((i) => (
+                              wlPhotos[i]
+                                ? <div key={i} onClick={() => setWlPhotos((cur) => cur.filter((_, j) => j !== i))} title="Tap to remove" style={{ flex: 1, aspectRatio: "1", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)", position: "relative", cursor: "pointer" }}>
+                                    <img src={wlPhotos[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                                    <span style={{ position: "absolute", top: 4, right: 4, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, lineHeight: 1 }}>×</span>
+                                  </div>
+                                : <div key={i} onClick={() => wlPhotoRef.current && wlPhotoRef.current.click()} style={{ flex: 1, aspectRatio: "1", borderRadius: 6, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", cursor: "pointer" }}><Camera size={16} style={{ color: "var(--faint)" }} /></div>
+                            ))}</div>
+                            <button onClick={() => wlPhotoRef.current && wlPhotoRef.current.click()} disabled={wlPhotos.length >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: wlPhotos.length >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 13, letterSpacing: 1, borderRadius: 6, marginBottom: 20 }}>{wlPhotos.length >= 3 ? "MAXIMUM REACHED" : `ADD SELFIE (${wlPhotos.length}/3)`}</button>
                           </>)}
 
                           <button className="lift" disabled={!ready} onClick={() => {
                             if (!ready) return;
                             const dayTimes = {}; wlDays.forEach((l) => { dayTimes[l] = wlDayTimes[l] === "custom" ? `custom:${(wlDayCustom[l] || "").trim()}` : (wlDayTimes[l] || "any"); });
-                            const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: wlName, phone, forWho: wlFor, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", dayTimes, when: dayTimes[wlDays[0]] || "any", service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() };
+                            const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: wlName, phone, forWho: wlFor, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", dayTimes, when: dayTimes[wlDays[0]] || "any", service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos.length, photoData: wlPhotos, at: new Date().toLocaleString() };
                             setWaitlist((cur) => [...cur, wlEntry]);
                             if (!isStaff) { try { supabase.rpc('join_waitlist', { p_shop: shopId, p_entry: wlEntry }); } catch (e) {} }
-                            setWaitlistDone(true); setShowWaitlist(false);
+                            setWaitlistDone(true); setShowWaitlist(false); setWlPhotos([]);
                           }} style={{ width: "100%", background: ready ? "var(--text)" : "var(--border2)", color: ready ? "var(--bg)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
-                          {photoRequired && wlPhotos === 0 && wlName && phoneOk && daysOk && <div style={{ fontSize: 13.5, color: "var(--faint)", textAlign: "center", marginTop: 8 }}>Add a selfie to join.</div>}
+                          {photoRequired && wlPhotos.length === 0 && wlName && phoneOk && daysOk && <div style={{ fontSize: 13.5, color: "var(--faint)", textAlign: "center", marginTop: 8 }}>Add a selfie to join.</div>}
                         </>
                       );
                     })()}
@@ -9067,13 +9109,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               </div>
             )}
 
-            {waitlistDone && <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8, padding: 24, textAlign: "center" }}><CheckCircle2 size={32} style={{ color: "#7A9E9F", marginBottom: 12 }} /><div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>You're on the list</div><p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5 }}>You're all set, {wlName ? wlName.split(" ")[0] : "there"}. If a spot opens that fits your days, we'll reach out.</p></div>}
+            {waitlistDone && (<>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8, padding: 24, textAlign: "center" }}><CheckCircle2 size={32} style={{ color: "#7A9E9F", marginBottom: 12 }} /><div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>You're on the list</div><p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5 }}>You're all set, {wlName ? wlName.split(" ")[0] : "there"}. If a spot opens that fits your days, we'll text you.</p></div>
+              <button onClick={() => setWaitlistDone(false)} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", padding: "16px 0 4px", color: "var(--sub)", fontSize: 14, cursor: "pointer", fontFamily: FONT_BODY, textDecoration: "underline", textUnderlineOffset: 3 }}>Want a time anyway? Browse open days</button>
+            </>)}
 
-            {!dateIsFull && !waitlistDone && (
-              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 22, textAlign: "center", marginTop: 8 }}>
-                <p style={{ color: "var(--sub)", fontSize: 14 }}>Fully booked days show a waitlist option here.</p>
-              </div>
-            )}
           </div>
         )}
 
@@ -22484,6 +22524,13 @@ function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, prov
                     {(() => { const allDays = (open.days && open.days.length > 0) ? open.days : (open.day ? [open.day] : []); if (!allDays.length) return null; const dt = open.dayTimes || {}; const winLbl = (w) => { const s = String(w || "any"); if (s.startsWith("custom:")) return s.slice(7) || "Custom"; return whenLabel[s] || "Any time"; }; return <div style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 15 }}><Clock size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} /><span style={{ color: "var(--sub)", flexShrink: 0 }}>Wants:</span> <span style={{ display: "grid", gap: 3 }}>{allDays.map((d) => <span key={d} style={{ fontWeight: 600 }}>{d} <span style={{ color: "var(--sub)", fontWeight: 400 }}>&middot; {winLbl(dt[d])}</span></span>)}</span></div>; })()}
                     <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><Sparkles size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Service:</span> <span style={{ fontWeight: 600 }}>{open.service}</span></div>
                     {open.provider && <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><User size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Prefers:</span> <span style={{ fontWeight: 600 }}>{open.provider}</span></div>}
+                    {Array.isArray(open.photoData) && open.photoData.length > 0 && (
+                      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                        {open.photoData.slice(0, 3).map((p, pi) => (
+                          <img key={pi} src={p} alt="" style={{ width: 76, height: 76, borderRadius: 10, objectFit: "cover", border: "1px solid var(--border)", display: "block" }} />
+                        ))}
+                      </div>
+                    )}
                     {open.at && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 2 }}>Added {open.at}</div>}
                   </div>
 
