@@ -9075,21 +9075,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                             </label>
                             <div style={{ background: "color-mix(in srgb, var(--text) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--text) 28%, var(--border))", borderRadius: 12, padding: "13px 15px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
                               <Camera size={17} style={{ color: "var(--text)", flexShrink: 0, marginTop: 2 }} />
-                              <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text2)" }}>Just snap a quick selfie of your hair as it looks right now — that's all we need. It helps {provider.name === "Anyone" ? "us" : provider.name} see how much work it'll take, and there's a good chance we can squeeze you in.</div>
+                              <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text2)" }}><b>Why the selfie?</b> A quick photo of your hair as it looks today lets our staff see exactly how much time you'll need — and knowing that is what makes it possible to squeeze you into a tight opening.</div>
                             </div>
                             {/* [wl-real-selfie] REAL photo capture — the old button was a stub that just counted
                                 up and showed checkmarks while saving NOTHING (staff saw "has photos" that didn't
                                 exist). This opens the camera/library, compresses, previews, and actually saves. */}
                             <input ref={wlPhotoRef} type="file" accept="image/*" onChange={onWlPhotoPick} style={{ display: "none" }} />
-                            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>{[0, 1, 2].map((i) => (
+                            {/* ONE selfie is all that's required — a single slot, with room for up to 2 extra
+                                angles only after the first is in (no wall of empty boxes implying you need 3). */}
+                            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>{Array.from({ length: Math.min(3, wlPhotos.length + 1) }).map((_, i) => (
                               wlPhotos[i]
-                                ? <div key={i} onClick={() => setWlPhotos((cur) => cur.filter((_, j) => j !== i))} title="Tap to remove" style={{ flex: 1, aspectRatio: "1", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)", position: "relative", cursor: "pointer" }}>
+                                ? <div key={i} onClick={() => setWlPhotos((cur) => cur.filter((_, j) => j !== i))} title="Tap to remove" style={{ width: 92, aspectRatio: "1", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)", position: "relative", cursor: "pointer" }}>
                                     <img src={wlPhotos[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                                     <span style={{ position: "absolute", top: 4, right: 4, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, lineHeight: 1 }}>×</span>
                                   </div>
-                                : <div key={i} onClick={() => wlPhotoRef.current && wlPhotoRef.current.click()} style={{ flex: 1, aspectRatio: "1", borderRadius: 6, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", cursor: "pointer" }}><Camera size={16} style={{ color: "var(--faint)" }} /></div>
+                                : <div key={i} onClick={() => wlPhotoRef.current && wlPhotoRef.current.click()} style={{ width: 92, aspectRatio: "1", borderRadius: 6, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", cursor: "pointer" }}><Camera size={16} style={{ color: "var(--faint)" }} /></div>
                             ))}</div>
-                            <button onClick={() => wlPhotoRef.current && wlPhotoRef.current.click()} disabled={wlPhotos.length >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: wlPhotos.length >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 13, letterSpacing: 1, borderRadius: 6, marginBottom: 20 }}>{wlPhotos.length >= 3 ? "MAXIMUM REACHED" : `ADD SELFIE (${wlPhotos.length}/3)`}</button>
+                            <button onClick={() => wlPhotoRef.current && wlPhotoRef.current.click()} disabled={wlPhotos.length >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: wlPhotos.length >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 13, letterSpacing: 1, borderRadius: 6, marginBottom: 20 }}>{wlPhotos.length === 0 ? "ADD SELFIE" : wlPhotos.length >= 3 ? "THAT'S PLENTY — THANKS" : "ADD ANOTHER ANGLE (OPTIONAL)"}</button>
                           </>)}
 
                           <button className="lift" disabled={!ready} onClick={() => {
@@ -9098,6 +9100,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                             const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: wlName, phone, forWho: wlFor, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", dayTimes, when: dayTimes[wlDays[0]] || "any", service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos.length, photoData: wlPhotos, at: new Date().toLocaleString() };
                             setWaitlist((cur) => [...cur, wlEntry]);
                             if (!isStaff) { try { supabase.rpc('join_waitlist', { p_shop: shopId, p_entry: wlEntry }); } catch (e) {} }
+                            // [wl-selfie-to-profile] Their selfie doubles as their profile photo (never
+                            // overwrites one they already have — with a photo on file this section is hidden).
+                            if (wlPhotos[0] && matched && matched.id && !matched.photo) {
+                              setMatched((m) => m ? { ...m, photo: wlPhotos[0] } : m);
+                              setClients((cur) => (cur || []).map((c) => c.id === matched.id ? { ...c, photo: c.photo || wlPhotos[0] } : c));
+                            }
                             setWaitlistDone(true); setShowWaitlist(false); setWlPhotos([]);
                           }} style={{ width: "100%", background: ready ? "var(--text)" : "var(--border2)", color: ready ? "var(--bg)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
                           {photoRequired && wlPhotos.length === 0 && wlName && phoneOk && daysOk && <div style={{ fontSize: 13.5, color: "var(--faint)", textAlign: "center", marginTop: 8 }}>Add a selfie to join.</div>}
@@ -13612,6 +13620,21 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       }));
     }
   }, [appts, notifArmed]);
+  // [wl-selfie-to-profile] A waitlist selfie doubles as the client's profile photo. When an entry
+  // carries photos and its phone matches a client who has NO profile photo yet, the first selfie
+  // becomes their photo. Never overwrites an existing photo; each applied entry is flagged
+  // (photoApplied) so it applies exactly once. Runs dashboard-side because that's where client
+  // writes persist — covering selfies from strangers-turned-clients and returning clients alike.
+  useEffect(() => {
+    if (!dataLoaded) return;
+    const n10 = (p) => { const d = String(p || "").replace(/\D/g, ""); return (d.length === 11 && d[0] === "1") ? d.slice(1) : d; };
+    const pending = (waitlist || []).filter((w) => !w.photoApplied && Array.isArray(w.photoData) && w.photoData[0] && n10(w.phone).length >= 10);
+    if (!pending.length) return;
+    const hits = pending.map((w) => { const c = (clients || []).find((x) => !x.photo && n10(x.phone) === n10(w.phone)); return c ? { w, c } : null; }).filter(Boolean);
+    if (!hits.length) return;
+    setClients((cur) => (cur || []).map((c) => { const h = hits.find((x) => x.c.id === c.id); return (h && !c.photo) ? { ...c, photo: h.w.photoData[0] } : c; }));
+    setWaitlist((cur) => (cur || []).map((w) => hits.some((x) => x.w.id === w.id) ? { ...w, photoApplied: true } : w));
+  }, [waitlist, clients, dataLoaded]);
   // Owners see the whole shop; a barber sees their own chair (mirrors the per-role
   // notification settings). Your own entries appear here too — that's intended.
   const myNotifs = notifs.filter((n) => isOwner || n.providerId === signedInAs);
