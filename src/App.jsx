@@ -9075,7 +9075,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                             </label>
                             <div style={{ background: "color-mix(in srgb, var(--text) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--text) 28%, var(--border))", borderRadius: 12, padding: "13px 15px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
                               <Camera size={17} style={{ color: "var(--text)", flexShrink: 0, marginTop: 2 }} />
-                              <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text2)" }}>Just snap a quick selfie of your hair as it looks right now — that's all we need. It helps {provider.name === "Anyone" ? "us" : provider.name} see how much work it'll take, and there's a good chance we can squeeze you in.</div>
+                              <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text2)" }}><b>Why the selfie?</b> A quick photo of your hair as it looks today lets {provider.name === "Anyone" ? "the shop" : provider.name} see exactly how much time you'll need — and knowing that is what makes it possible to squeeze you into a tight opening.</div>
                             </div>
                             {/* [wl-real-selfie] REAL photo capture — the old button was a stub that just counted
                                 up and showed checkmarks while saving NOTHING (staff saw "has photos" that didn't
