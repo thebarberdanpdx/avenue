@@ -18,6 +18,11 @@ const maskEmail = (em) => {
   return `${u}@${domain}`;
 };
 const maskPhone = (digits) => digits.length >= 4 ? `•••-•••-${digits.slice(-4)}` : digits;
+// Normalize a US phone to its 10-digit form. Records get stored inconsistently — some with a
+// leading country-code "1" (e.g. "15039356376"), some as a bare 10-digit number. Comparing raw
+// digit strings made "15039356376" !== "5039356376", so a returning client whose number is on
+// file with the "1" never matched and never got a sign-in code. Strip a leading 1 on both sides.
+const norm10 = (p) => { const d = String(p || "").replace(/\D/g, ""); return (d.length === 11 && d[0] === "1") ? d.slice(1) : d; };
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
@@ -28,7 +33,7 @@ export default async function handler(req, res) {
 
     const byPhone = !email && phone;
     const em = String(email || "").trim().toLowerCase();
-    const digits = String(phone || "").replace(/\D/g, "");
+    const digits = norm10(phone);
     if (byPhone ? digits.length < 10 : !/^\S+@\S+\.\S+$/.test(em)) return res.status(400).json({ error: "bad request" });
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -46,7 +51,7 @@ export default async function handler(req, res) {
     const { data: rows, error } = await selectAllRows(() => supabase.from("clients").select("id, data").eq("shop_id", shop).order("id"));
     if (error) return res.status(500).json({ error: "lookup failed" });
     const hit = byPhone
-      ? (rows || []).find((r) => String(r.data?.phone || "").replace(/\D/g, "") === digits && !r.data?.blocked)
+      ? (rows || []).find((r) => norm10(r.data?.phone) === digits && !r.data?.blocked)
       : (rows || []).find((r) => String(r.data?.email || "").trim().toLowerCase() === em && !r.data?.blocked);
 
     // Only generate + send a code when the client is actually on file. CRITICAL:
