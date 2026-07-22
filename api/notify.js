@@ -17,6 +17,12 @@ import { createClient } from "@supabase/supabase-js";
 import { allowRequest, clientIp } from "../lib/ratelimit.js";
 import { selectAllRows } from "../lib/paginate.js";
 
+// [phone-norm] Normalize a phone to its 10-digit form (strip a leading country-code "1"). Client
+// records are stored inconsistently — some with the "1" ("15551234567"), some without. Comparing raw
+// digit strings then treats those as different numbers, which wrongly judged a real client "not on
+// file" and could block their booking confirmation. Compare the normalized form on both sides.
+const norm10 = (p) => { const d = String(p || "").replace(/\D/g, ""); return (d.length === 11 && d[0] === "1") ? d.slice(1) : d; };
+
 // Light anti-abuse guard. Booking runs on gotvero.com (web AND the native app,
 // which loads from server.url = https://gotvero.com), so the only legitimate
 // browser origin is ours. Server-to-server callers (e.g. api/client-code.js)
@@ -178,7 +184,7 @@ async function handler(req, res) {
   if (!text) return res.status(400).json({ error: "nothing to send" });
 
   const email = String(to.email || "").trim();
-  const phone = String(to.phone || "").replace(/\D/g, "");
+  const phone = norm10(to.phone);
 
   // ── Anti-relay: this endpoint has no login (the public booking page calls it),
   // so it was an open pipe to send email/SMS "as the shop" to ANY address with ANY
@@ -196,7 +202,7 @@ async function handler(req, res) {
     const onFile = (rows) => (rows || []).some((r) => {
       const d = (r && r.data) || {};
       return (emLc && String(d.email || "").trim().toLowerCase() === emLc) ||
-             (phone && String(d.phone || "").replace(/\D/g, "") === phone);
+             (phone && norm10(d.phone) === phone);
     });
     let recognized = false, lookupOk = true;
     try {
@@ -212,7 +218,7 @@ async function handler(req, res) {
       const cmatch = (crows || []).find((r) => {
         const d = (r && r.data) || {};
         return (emLc && String(d.email || "").trim().toLowerCase() === emLc) ||
-               (phone && String(d.phone || "").replace(/\D/g, "") === phone);
+               (phone && norm10(d.phone) === phone);
       });
       if (cmatch) { recognized = true; if (((cmatch.data || {}).smsOptOut) === true) recipientOptedOut = true; }
       if (!recognized) {

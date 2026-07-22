@@ -6417,9 +6417,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         try { const { data } = await withRpcTimeout(supabase.rpc("lookup_client_by_email", { p_shop: shopId, p_email: finalEmail.trim().toLowerCase() }), PREBOOK_RPC_TIMEOUT_MS); if (data && data.id) existing = data; } catch (e) {}
       }
       if (!existing && Array.isArray(clients)) {
-        const dg = (finalPhone || "").replace(/\D/g, "");
+        // [phone-norm] normalize to 10 digits so a client on file with a leading "1" ("15551234567")
+        // still matches the 10-digit number just typed — otherwise the fallback misses them and a
+        // duplicate profile gets created.
+        const _n10 = (p) => { const d = String(p || "").replace(/\D/g, ""); return (d.length === 11 && d[0] === "1") ? d.slice(1) : d; };
+        const dg = _n10(finalPhone);
         const eg = (finalEmail || "").trim().toLowerCase();
-        existing = (dg.length >= 10 ? clients.find((c) => (c.phone || "").replace(/\D/g, "") === dg) : null)
+        existing = (dg.length >= 10 ? clients.find((c) => _n10(c.phone) === dg) : null)
                 || (eg ? clients.find((c) => (c.email || "").trim().toLowerCase() === eg) : null) || null;
       }
       if (existing && existing.id) {
