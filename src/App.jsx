@@ -4470,7 +4470,7 @@ function App() {
           ? <AccessDenied email={session?.user?.email || null} onSignOut={staffSignOut} onBooking={goBooking} />
           : masterMode
           ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={staffSignOut} />
-          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} flushServicesNow={flushServicesNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} syncHealth={syncHealth} />)
+          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} apptsLoaded={staffApptsLoadedRef.current} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} flushServicesNow={flushServicesNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} syncHealth={syncHealth} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
@@ -6164,7 +6164,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       setShowHome(true);
     }
   }, [matched, showHome, step, simpleStep, showWhoFor, showUsual, showSchedChoice, showWizardIntro, showCodeEntry, addingMember]);
-  const back = () => { setShowWaitlist(false); setTapSel(null); if (wwMerged && wwPhase === "when") { setWwPhase("provider"); setSlot(null); return; } if (cutFlow && cutFlow.phase === "addons") { setCutFlow({ phase: "cut" }); return; } if (cutFlow) { setCutFlow(null); return; } if (confirmSheet) { setConfirmSheet(null); return; } if (addonFlow) { setAddonFlow(null); if (draft && draft.cutTypes && draft.cutTypes.length) { setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "type"); setStep(2); } else { setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setStep(1); } return; } if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "finish") { setSimpleStep("what"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { if (matched) { setShowHome(true); return; } setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); if (matched) { setShowHome(true); return; } setStep(5); return; } if (step <= 0) { if (matched) { setShowHome(true); return; } return onExit(); } if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { if (matched) { setShowHome(true); return; } setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 3) { if (simpleChange !== null && draft) { const anyone = providers.find((p) => p.id === "anyone") || providers[0]; const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: anyone, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }; setCart([entry]); const hasFinish = (draft.addonGroups || []).some((g) => g.type === "addon"); setStep(0); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (draft && draft.cutTypes && draft.cutTypes.length) { setCutType(null); setBeardType(null); setCutPhase("type"); setStep(2); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setStep(6); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); setTapSel(null); if (wwMerged && wwPhase === "when") { setWwPhase("provider"); setSlot(null); return; } if (cutFlow && cutFlow.phase === "addons") { setCutFlow({ phase: "cut" }); return; } if (cutFlow) { setCutFlow(null); return; } if (confirmSheet) { setConfirmSheet(null); return; } if (addonFlow) { setAddonFlow(null); if (draft && draft.cutTypes && draft.cutTypes.length) { setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "type"); setStep(2); } else { setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setStep(1); } return; } if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "finish") { setSimpleStep("what"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { if (matched) { setShowHome(true); return; } setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); if (matched) { setShowHome(true); return; } setStep(5); return; } if (step <= 0) { if (matched) { setShowHome(true); return; } return onExit(); } if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { if (matched) { setShowHome(true); return; } setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 3) { if (simpleChange !== null && draft) { const anyone = providers.find((p) => p.id === "anyone") || providers[0]; const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: anyone, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }; setCart([entry]); const hasFinish = (draft.addonGroups || []).some((g) => g.type === "addon"); setStep(0); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (draft && draft.cutTypes && draft.cutTypes.length) { setCutType(null); setBeardType(null); setCutPhase("type"); setStep(2); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (cart.length === 0 && draft) { setCart([{ service: draft, addons: draftAddons, cutType, beardType, provider, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }]); setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); } /* [back-keeps-cart] step-7 back pops the service into draft for editing — restore it so "Your visit so far" never shows empty */ setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setStep(6); return; } setStep(step - 1); };
 
   // Simple/quick flow hand-off: instead of the old "Anyone in particular?" + time picker,
   // pop the quick-flow entry back into draft state and land on the merged Who & When.
@@ -6182,6 +6182,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setWwPhase("provider"); setWaProvId(null); // land on the barber picker first (its own screen)
     setStep(3);
   };
+
+  // [step4-never-empty] "Your visit so far" with NOTHING in it is a dead screen (no service to show,
+  // "pick a time" leads nowhere useful). If any navigation path lands on step 4 with an empty cart and
+  // no draft to restore, self-heal to the service picker instead of rendering the orphan.
+  useEffect(() => {
+    if (step === 4 && cart.length === 0 && !draft) setStep(1);
+  }, [step, cart.length]);
 
   // Add-on bottom-sheet sequence. Each type:"addon" group becomes its own sheet
   // (inviting question = group.label, price/desc from group.item). "No thanks" is a
@@ -13344,7 +13351,7 @@ function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
   );
 }
 
-function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables, flushApptsNow, flushServicesNow, flushClientsNow, flushShopsNow, syncHealth }) {
+function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, apptsLoaded = true, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables, flushApptsNow, flushServicesNow, flushClientsNow, flushShopsNow, syncHealth }) {
   // Remember where the owner/staff was so leaving the app and coming back (iOS reloads the webview
   // on resume) restores the SAME screen instead of dumping them on the Pulse home. Persisted as
   // { tab, pulseDetail, activeClientId } in localStorage; mirrors the vero_signed_in_as pattern.
@@ -13520,7 +13527,18 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       const raw = window.localStorage.getItem("vero_notif_feed_" + shopId);
       if (!raw) return [];
       const cut = Date.now() - 30 * 86400000;
-      return (JSON.parse(raw) || []).filter((n) => n && n.ts > cut).slice(0, 50);
+      // [notif-feed-selfclean] Purge alerts about long-past appointments on every load. A pre-fix
+      // burst once flooded the feed with weeks-old "new bookings" (mis-stamped "just now") and they
+      // sat there until manually cleared. Any entry whose APPOINTMENT time is >6h gone is dead
+      // weight — booking/reschedule/cancel/note alerts for it are no longer actionable — so the
+      // feed cleans itself and stray old entries can never persist. (Waitlist "opening" alerts have
+      // future times and are untouched.)
+      const pastCut = Date.now() - 6 * 3600000;
+      return (JSON.parse(raw) || []).filter((n) => {
+        if (!n || !(n.ts > cut)) return false;
+        if (n.when) { const w = new Date(n.when).getTime(); if (w && w < pastCut) return false; }
+        return true;
+      }).slice(0, 50);
     } catch (e) { return []; }
   });
   useEffect(() => {
@@ -13533,8 +13551,29 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   });
   // Owner in-app alert when a freed slot matches a waitlisted client (from CalendarView.handleFreedSlot).
   // Persisted in the same bell feed; deduped by appt so one opening never stacks. Bumps the unread count.
+  // [notif-dismiss-durable] Openings have STABLE ids ("wlop_"+apptId) and their source effect re-fires
+  // whenever calendar data changes — so after "Clear all" the very same opening re-added itself,
+  // freshly stamped, forever ("I cleared them and they come back"). A cleared opening id goes into a
+  // persisted dismissed-set and is never re-added. New openings (different appt) alert normally; the
+  // Waitlist tab still shows everything regardless.
+  const NOTIF_DISMISS_KEY = "vero_notif_dismissed_" + shopId;
+  const notifDismissedRef = useRef(null);
+  const _notifDismissed = () => {
+    if (!notifDismissedRef.current) {
+      let ids = [];
+      try { ids = JSON.parse(localStorage.getItem(NOTIF_DISMISS_KEY) || "[]"); } catch (e) {}
+      notifDismissedRef.current = new Set(Array.isArray(ids) ? ids : []);
+    }
+    return notifDismissedRef.current;
+  };
+  const dismissNotifIds = (list) => {
+    const set = _notifDismissed();
+    (list || []).forEach((n) => { if (n && n.kind === "opening" && n.id) set.add(n.id); });
+    try { localStorage.setItem(NOTIF_DISMISS_KEY, JSON.stringify([...set].slice(-200))); } catch (e) {}
+  };
   const addOpeningNotif = (op) => setNotifs((cur) => {
     if (!op || (cur || []).some((n) => n.kind === "opening" && n.apptId === op.apptId)) return cur || [];
+    if (_notifDismissed().has("wlop_" + op.apptId)) return cur || []; // [notif-dismiss-durable] cleared → stays cleared
     const first = (op.names || "A waitlist client").split(",")[0].trim() || "A waitlist client";
     const who = op.count > 1 ? `${first} +${op.count - 1} more` : first;
     return [{ id: "wlop_" + op.apptId, ts: Date.now(), kind: "opening", apptId: op.apptId, providerId: op.providerId, when: op.bookedFor, start: op.start, name: who, service: op.earlier ? "wants earlier — move them up" : "a waitlist spot opened" }, ...(cur || [])].slice(0, 50);
@@ -13550,13 +13589,17 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   // live. First-ever run (no saved snapshot) seeds silently from the current list → no backlog flood.
   // The snapshot is re-saved after every diff below so it always reflects "what we've already shown."
   useEffect(() => {
-    if (!dataLoaded) return;
+    // [notif-seed-once] Seed the baseline ONLY the first time this session; afterwards the watcher
+    // below is the sole owner (a dataLoaded cycle once reloaded a stale snapshot over the live
+    // baseline — the "cleared notifications came right back" bug).
+    // [notif-seed-after-load] Gate on the appointment book ACTUALLY being loaded (apptsLoaded), not
+    // just dataLoaded — the shops/services load can finish before appointments arrive, and seeding
+    // then captured an EMPTY baseline; when the real book landed moments later, every future
+    // non-synced appt fired as a brand-new booking (the flood). Depending on [appts] also re-arms
+    // the 1.5s timer on every staged arrival, so we seed 1.5s after the book goes QUIET — the old
+    // frozen-closure version claimed to cover staged arrival but never re-read appts.
+    if (!dataLoaded || !apptsLoaded || notifSeededRef.current) return;
     const t = setTimeout(() => {
-      // [notif-seed-once] Seed the baseline ONLY the first time this session. dataLoaded can cycle
-      // (foreground / refetch), which re-ran this effect and RELOADED a possibly-stale persisted
-      // snapshot over the live in-memory baseline the watcher had already advanced — that reload
-      // was the "I cleared the notifications and they came right back" bug: old appts looked unseen
-      // again and re-fired. Once seeded, the watcher below is the sole owner of the baseline.
       if (notifSeededRef.current) return;
       let persisted = null;
       try { const raw = localStorage.getItem(SNAP_KEY); if (raw) persisted = JSON.parse(raw); } catch (e) {}
@@ -13572,7 +13615,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       setNotifArmed(true);
     }, 1500);
     return () => clearTimeout(t);
-  }, [dataLoaded]);
+  }, [dataLoaded, apptsLoaded, appts]);
   useEffect(() => {
     if (!notifArmed) return; // baseline not seeded yet
     const snap = apptSnapRef.current || {};
@@ -13619,7 +13662,16 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       }
     }
     apptSnapRef.current = nextSnap;
-    try { localStorage.setItem(SNAP_KEY, JSON.stringify(nextSnap)); } catch (e) {} // [notif-durable-snapshot] persist so closed-app changes are caught next open
+    // [notif-durable-snapshot] persist so closed-app changes are caught next open.
+    // [notif-snap-prune] Persist a PRUNED copy: entries whose appointment ended >30 days ago can never
+    // alert again ([notif-no-past]) — dropping them keeps this, the biggest localStorage write, from
+    // growing forever and hitting quota (a failed snapshot write here = re-fired alerts next launch).
+    try {
+      const _cut30 = Date.now() - 30 * 86400000;
+      const slim = {};
+      for (const k in nextSnap) { const v = nextSnap[k]; const w = v && v.bookedFor ? new Date(v.bookedFor).getTime() : 0; if (!w || w > _cut30) slim[k] = v; }
+      localStorage.setItem(SNAP_KEY, JSON.stringify(slim));
+    } catch (e) {}
     if (fresh.length) setNotifs((cur) => {
       // Collapse repeat note/photo updates for the same appointment into one latest entry (a client
       // adding a photo, then a note, then another photo shouldn't stack up multiple alerts).
@@ -13771,7 +13823,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
             `tab` so moving to another tab remounts a fresh boundary. Crashes still report to Sentry. */}
         <ErrorBoundary key={tab} label={({ pulse: "Pulse", calendar: "Calendar", clients: "Clients", messages: "Messages", waitlist: "Waitlist", menu: "Menu", settings: "Settings" })[tab] || "this screen"}>
         {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => goTab(t)} onOpenRevenue={() => navTo({ pulseDetail: "revenue" })} onOpenPayments={() => navTo({ pulseDetail: "payments" })} onOpenAppointments={() => navTo({ pulseDetail: "appointments" })} onOpenClients={() => navTo({ pulseDetail: "clients" })} onOpenServices={() => navTo({ pulseDetail: "services" })} onOpenBarbers={() => navTo({ pulseDetail: "barbers" })} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c, pulseDetail: null })} onOpenAppt={(id) => { setPulseOpenApptId(id); navTo({ tab: "calendar", pulseDetail: null, activeClient: null }); }} showToast={showToast} notifCount={unseenCount} onOpenNotifications={() => navTo({ pulseDetail: "notifications" })} />}
-        {tab === "pulse" && pulseDetail === "notifications" && <NotificationsView notifs={myNotifs} notifSeenAt={notifSeenAt} markSeen={markNotifsSeen} onClear={() => setNotifs([])} clients={clients} providers={providers} isOwner={isOwner} me={me} onBack={navBack} onOpenCalendar={(n) => { if (n && n.apptId != null) setPulseOpenApptId(n.apptId); goTab("calendar"); }} onOpenNudge={() => goTab("clients")} onOpenWaitlist={() => goTab("waitlist")} />}
+        {tab === "pulse" && pulseDetail === "notifications" && <NotificationsView notifs={myNotifs} notifSeenAt={notifSeenAt} markSeen={markNotifsSeen} onClear={() => { dismissNotifIds(notifs); setNotifs([]); try { window.localStorage.setItem("vero_notif_feed_" + shopId, "[]"); } catch (e) {} /* [notif-clear-writethrough] persist the clear IMMEDIATELY — iOS can drop a lazy write on quick app-close, resurrecting the feed */ }} clients={clients} providers={providers} isOwner={isOwner} me={me} onBack={navBack} onOpenCalendar={(n) => { if (n && n.apptId != null) setPulseOpenApptId(n.apptId); goTab("calendar"); }} onOpenNudge={() => goTab("clients")} onOpenWaitlist={() => goTab("waitlist")} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} business={business} onBack={navBack} />}
         {tab === "pulse" && pulseDetail === "payments" && <PaymentsView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={navBack} showToast={showToast} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={navBack} />}
