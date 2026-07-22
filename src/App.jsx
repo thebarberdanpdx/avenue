@@ -13520,7 +13520,18 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       const raw = window.localStorage.getItem("vero_notif_feed_" + shopId);
       if (!raw) return [];
       const cut = Date.now() - 30 * 86400000;
-      return (JSON.parse(raw) || []).filter((n) => n && n.ts > cut).slice(0, 50);
+      // [notif-feed-selfclean] Purge alerts about long-past appointments on every load. A pre-fix
+      // burst once flooded the feed with weeks-old "new bookings" (mis-stamped "just now") and they
+      // sat there until manually cleared. Any entry whose APPOINTMENT time is >6h gone is dead
+      // weight — booking/reschedule/cancel/note alerts for it are no longer actionable — so the
+      // feed cleans itself and stray old entries can never persist. (Waitlist "opening" alerts have
+      // future times and are untouched.)
+      const pastCut = Date.now() - 6 * 3600000;
+      return (JSON.parse(raw) || []).filter((n) => {
+        if (!n || !(n.ts > cut)) return false;
+        if (n.when) { const w = new Date(n.when).getTime(); if (w && w < pastCut) return false; }
+        return true;
+      }).slice(0, 50);
     } catch (e) { return []; }
   });
   useEffect(() => {
