@@ -13447,21 +13447,34 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     const who = op.count > 1 ? `${first} +${op.count - 1} more` : first;
     return [{ id: "wlop_" + op.apptId, ts: Date.now(), kind: "opening", apptId: op.apptId, providerId: op.providerId, when: op.bookedFor, start: op.start, name: who, service: op.earlier ? "wants earlier — move them up" : "a waitlist spot opened" }, ...(cur || [])].slice(0, 50);
   });
-  const apptSnapRef = useRef(null);     // id -> { start, bookedFor } at last observation
-  const notifReadyRef = useRef(false);  // gate so the initial backlog never floods the bell
-  // Seed the baseline ~1.5s after data loads (covers appts arriving in stages), then watch.
+  const apptSnapRef = useRef(null);     // id -> signature at last observation (persisted across restarts)
+  const [notifArmed, setNotifArmed] = useState(false); // flips true once the baseline is seeded → runs the first diff
+  const SNAP_KEY = "vero_appt_snap_" + shopId;
+  // [notif-durable-snapshot] Seed the baseline ~1.5s after data loads (covers appts arriving in
+  // stages), then watch. The baseline is LOADED FROM localStorage, not just re-seeded from the current
+  // list — so appointment changes made while the app was CLOSED (new bookings, reschedules, cancels,
+  // note/photo updates) are detected on the next open and land in the bell, not only ones observed
+  // live. First-ever run (no saved snapshot) seeds silently from the current list → no backlog flood.
+  // The snapshot is re-saved after every diff below so it always reflects "what we've already shown."
   useEffect(() => {
     if (!dataLoaded) return;
     const t = setTimeout(() => {
-      const snap = {};
-      for (const a of (appts || [])) { if (a && a.id != null) snap[String(a.id)] = { start: a.start, bookedFor: a.bookedFor, status: a.status, hasNote: !!a.hasNote, photos: a.photos || 0 }; }
-      apptSnapRef.current = snap;
-      notifReadyRef.current = true;
+      let persisted = null;
+      try { const raw = localStorage.getItem(SNAP_KEY); if (raw) persisted = JSON.parse(raw); } catch (e) {}
+      if (persisted && typeof persisted === "object") {
+        apptSnapRef.current = persisted;
+      } else {
+        const snap = {};
+        for (const a of (appts || [])) { if (a && a.id != null) snap[String(a.id)] = { start: a.start, bookedFor: a.bookedFor, status: a.status, hasNote: !!a.hasNote, photos: a.photos || 0, note: (a.note || "").trim(), extrasAt: a.clientExtrasAt || "" }; }
+        apptSnapRef.current = snap;
+        try { localStorage.setItem(SNAP_KEY, JSON.stringify(snap)); } catch (e) {}
+      }
+      setNotifArmed(true);
     }, 1500);
     return () => clearTimeout(t);
   }, [dataLoaded]);
   useEffect(() => {
-    if (!notifReadyRef.current) return; // baseline not seeded yet
+    if (!notifArmed) return; // baseline not seeded yet
     const snap = apptSnapRef.current || {};
     const nextSnap = {};
     const fresh = [];
@@ -13496,6 +13509,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       }
     }
     apptSnapRef.current = nextSnap;
+    try { localStorage.setItem(SNAP_KEY, JSON.stringify(nextSnap)); } catch (e) {} // [notif-durable-snapshot] persist so closed-app changes are caught next open
     if (fresh.length) setNotifs((cur) => {
       // Collapse repeat note/photo updates for the same appointment into one latest entry (a client
       // adding a photo, then a note, then another photo shouldn't stack up multiple alerts).
@@ -13528,7 +13542,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         return add.length ? { ...c, timeline: [...add, ...(c.timeline || [])] } : c;
       }));
     }
-  }, [appts]);
+  }, [appts, notifArmed]);
   // Owners see the whole shop; a barber sees their own chair (mirrors the per-role
   // notification settings). Your own entries appear here too — that's intended.
   const myNotifs = notifs.filter((n) => isOwner || n.providerId === signedInAs);
