@@ -6927,14 +6927,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <div style={{ marginTop: 16, paddingTop: 15, borderTop: "1px solid var(--line)", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--sub)", lineHeight: 1.5 }}>
                       Less than {manageWindowHrs} hours away, so it can't be changed or cancelled online. {shopPh ? <>Need to? <a href={`tel:${String(shopPh).replace(/[^0-9+]/g, "")}`} style={{ color: "var(--text)", fontWeight: 600 }}>Call {shopPh}</a>.</> : "Please call us and we'll help."}
                     </div>
-                    <div style={{ marginTop: 14 }}><button onClick={() => openExtras(v)} style={actLink}>Add notes &amp; photos</button></div>
+                    <button onClick={() => openExtras(v)} style={{ marginTop: 14, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--text)", cursor: "pointer" }}><Camera size={16} /> {(v.hasPhotos || (v.photos || 0) > 0 || v.hasNote || (v.note || "").trim()) ? "Edit photos & notes" : "Add photos & notes"}</button>
                   </>
                 ) : (
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
-                    <button onClick={() => { if (insideManageWindow(v)) { setHomeAction({ type: "locked", appt: v }); return; } if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "reschedule", appt: v }); }} style={actLink}>Reschedule</button>
-                    <button onClick={() => openExtras(v)} style={actLink}>Notes &amp; photos</button>
-                    <button onClick={() => { if (insideManageWindow(v)) { setHomeAction({ type: "locked", appt: v }); return; } if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "cancel", appt: v }); }} style={{ ...actLink, color: "var(--faint)", fontWeight: 500 }}>Cancel</button>
-                  </div>
+                  <>
+                    {/* [client-photos-discoverable] photos/notes was a tiny text link a client missed — make it an obvious iconed button */}
+                    <button onClick={() => openExtras(v)} style={{ marginTop: 16, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--text)", cursor: "pointer" }}>
+                      <Camera size={16} /> {(v.hasPhotos || (v.photos || 0) > 0 || v.hasNote || (v.note || "").trim()) ? "Edit photos & notes" : "Add photos & notes"}
+                    </button>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+                      <button onClick={() => { if (insideManageWindow(v)) { setHomeAction({ type: "locked", appt: v }); return; } if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "reschedule", appt: v }); }} style={actLink}>Reschedule</button>
+                      <button onClick={() => { if (insideManageWindow(v)) { setHomeAction({ type: "locked", appt: v }); return; } if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "cancel", appt: v }); }} style={{ ...actLink, color: "var(--faint)", fontWeight: 500 }}>Cancel</button>
+                    </div>
+                  </>
                 )}
               </div>
             ); }) : (
