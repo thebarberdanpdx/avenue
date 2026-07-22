@@ -6118,7 +6118,20 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const waCt = cutType && draft?.cutTypes ? draft.cutTypes.find((c) => c.id === cutType) : null;
   const waBt = beardType && draft?.beardTypes ? draft.beardTypes.find((b) => b.id === beardType) : null;
   const waExtra = (waCt?.min || 0) + (waBt?.min || 0);
-  const waDurFor = (pid) => (draft ? getDuration(waWho, draft, pid) + waExtra + (simpleChange === "fresh" ? 10 : 0) : 30);
+  // [offer-equals-booked] The duration used to OFFER times must be the exact duration that will be
+  // BOOKED — anything less and the page offers starts the server then rightly rejects ("that time
+  // was just taken" on a slot that was never actually free). The old math here used base service
+  // + flat cut/beard minutes only: it ignored add-on minutes (hot towel, facial), answer/style
+  // durations, per-barber cut lengths, the overdue buffer, and — worst — everything ALREADY IN THE
+  // CART (a second service measured alone). lineTotal() is the same resolver the committed
+  // appointment uses (people[].durMin), so offer and booking can never disagree again.
+  const waDurFor = (pid) => {
+    if (!draft) return 30;
+    const provObj = providers.find((x) => x.id === pid) || { id: pid };
+    const draftMin = lineTotal({ service: draft, addons: draftAddons || {}, cutType, beardType, provider: provObj, forMemberId: activeMember?.id || null }).min;
+    const cartSame = cart.reduce((s, e) => s + lineTotal(e).min, 0); // services already chosen for this same visit
+    return draftMin + cartSame + overdueExtra + (simpleChange === "fresh" ? 10 : 0);
+  };
   const waReal = providers.filter((p) => p.id !== "anyone");
   // Time-rule blocks come from the DRAFT service here (it isn't in the cart yet).
   const waBlocked = (provId, d, t) => {

@@ -121,6 +121,7 @@ try {
 //    this check FAILS and blocks the deploy, so a "done" fix can't silently un-ship. Add to this list
 //    whenever you fix a painful regression you never want to come back.
 const GUARDS = [
+  { needle: "offer-equals-booked", label: "offered booking times are computed with the EXACT duration that gets booked (add-ons, cart items, per-barber cut lengths, overdue buffer) — never a shorter one that the server then rejects" },
   { needle: "wl-real-selfie", label: "waitlist selfie is a REAL photo capture (never a fake counter that saves nothing)" },
   { needle: "appt-name-live-resolve", label: "appointment name resolves to live client/member name (renames reflect on calendar)" },
   { needle: "table === 'providers' && rows.length", label: "staff email/phone save-backstop (never blank on save)" },
