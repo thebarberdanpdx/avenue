@@ -22062,6 +22062,10 @@ function NativeDiagnostics() {
   const isNative = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
   const [info, setInfo] = useState({ uid: "checking…", push: "", err: "", claims: "" });
   const [pushBusy, setPushBusy] = useState(false);
+  // Hidden by default (Dan): the diagnostics blob is technical noise at the bottom of Settings. Kept
+  // one discreet tap away so the recovery buttons (Update now / Register push) are still reachable if
+  // auto-update or phone alerts ever break.
+  const [open, setOpen] = useState(false);
   const run = async () => {
     let push = "";
     try { push = window.localStorage.getItem("vero_push_status") || "(none captured yet)"; } catch (e) {}
@@ -22101,10 +22105,17 @@ function NativeDiagnostics() {
       setTimeout(() => { if (!got) { setStatus("Phone alerts: Apple returned no token in 6s — force-quit the app and reopen, then tap Register push again."); run(); setPushBusy(false); } }, 6000);
     } catch (e) { setStatus("Phone alerts: setup failed — " + (e && e.message ? e.message : String(e))); run(); setPushBusy(false); }
   };
-  useEffect(() => { run(); }, []);
+  useEffect(() => { if (open) run(); }, [open]);
+  if (!open) {
+    return (
+      <div style={{ marginTop: 18, textAlign: "center" }}>
+        <button onClick={() => setOpen(true)} style={{ background: "none", border: "none", color: "var(--faint)", fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer", fontFamily: FONT_BODY, padding: 8 }}>Diagnostics</button>
+      </div>
+    );
+  }
   return (
     <div style={{ marginTop: 18, padding: "14px 16px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--panel2)" }}>
-      <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-8</div>
+      <button onClick={() => setOpen(false)} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, marginBottom: 9, cursor: "pointer", fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, fontFamily: FONT_BODY }}>Diagnostics · {isNative ? "app" : "web"} · build diag-8 · hide</button>
       <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, color: "var(--text2)", lineHeight: 1.75, wordBreak: "break-all" }}>
         <div>app code: <b style={{ color: "var(--gold)" }}>{(typeof __BUILD_VERSION__ !== "undefined" ? String(__BUILD_VERSION__) : "dev").slice(0, 7)}</b> <span style={{ color: "var(--faint)" }}>(if this changes without a force-quit, auto-update works)</span></div>
         {(() => { let u = null; try { u = JSON.parse(localStorage.getItem("vero_update_status") || "null"); } catch (e) {} return u
