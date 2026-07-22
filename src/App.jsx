@@ -8255,7 +8255,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {wwMerged && (() => {
           const pid = waProvId || waReal[0]?.id;
           const prov = waReal.find((p) => p.id === pid) || null; // null = First Available
-          const daySlots = selectedDate ? waSlotsFor(pid, selectedDate) : [];
+          // [nc-cap-visible] A day at this barber's new-client limit shows NO times to a new booker —
+          // it reads as a normal full day (cap never revealed), with a sign-in nudge for returning
+          // clients browsing signed-out (they see full times once signed in — the cap never applies to them).
+          const capFullDay = !!selectedDate && newClientDayFull(prov || { id: "anyone" }, selectedDate);
+          const daySlots = selectedDate && !capFullDay ? waSlotsFor(pid, selectedDate) : [];
           const dayFull = !!selectedDate && daySlots.length === 0;
           const today = new Date(); today.setHours(0, 0, 0, 0);
           const dayDiff = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return Math.round((x - today) / 86400000); };
@@ -8388,7 +8392,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               )}
 
               {wwPhase === "when" && (
-                <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => waSlotsFor(pid, d).length > 0 && !newClientDayFull(prov || { id: "anyone" }, d)} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
+                <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => waSlotsFor(pid, d).length > 0} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
               )}
 
               {wwPhase === "when" && selectedDate && !dayFull && (<>
@@ -8399,6 +8403,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               {wwPhase === "when" && dayFull && (
                 <div style={{ margin: "6px 0 24px" }}>
                   <div style={{ fontSize: 15.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Fully booked that day — try another day, or someone else.</div>
+                  {/* [nc-cap-visible] cap-full day + signed-out browser: a returning client just needs to
+                      sign in to see their times (the cap never applies to them). Cap itself stays unmentioned. */}
+                  {capFullDay && !matched && (
+                    <button onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ display: "block", background: "none", border: "none", padding: "0 0 12px", color: "var(--text)", fontSize: 13.5, fontWeight: 500, letterSpacing: 0.5, textDecoration: "underline", textUnderlineOffset: 4, cursor: "pointer" }}>Been here before? Sign in to see your times</button>
+                  )}
                   <button onClick={toWaitlist} style={{ background: "none", border: "none", padding: 0, color: "var(--text)", fontSize: 13.5, fontWeight: 500, letterSpacing: 0.5, textDecoration: "underline", textUnderlineOffset: 4, cursor: "pointer" }}>Join the waitlist</button>
                 </div>
               )}
@@ -8970,7 +8979,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             })()}
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 12 }}>Or pick another day</div>
             {(() => { const calProv = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]); return (
-              <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); setNcCapFull(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0 && !newClientDayFull(calProv, d)} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
+              <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); setNcCapFull(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
             ); })()}
             {selectedDate && !dateIsFull && (<>
               <div style={{ height: 26 }} />
@@ -8994,7 +9003,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 {dateIsFull && !showWaitlist && (
                 <div style={{ background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 6, padding: "16px 18px", marginBottom: 20, display: "flex", gap: 12, alignItems: "flex-start" }}>
                   <AlertCircle size={18} style={{ color: "var(--text)", flexShrink: 0, marginTop: 1 }} />
-                  <div style={{ fontSize: 14, lineHeight: 1.5 }}><strong>{relativeDate(selectedDate)}</strong> is fully booked. Join the waitlist and we'll reach out if a spot opens that fits.</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.5 }}>
+                    <strong>{relativeDate(selectedDate)}</strong> is fully booked. Join the waitlist and we'll reach out if a spot opens that fits.
+                    {/* [nc-cap-visible] cap-caused fullness + signed-out: returning clients see their times after sign-in. */}
+                    {!matched && newClientDayFull(provider, selectedDate) && (
+                      <button onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ display: "block", background: "none", border: "none", padding: "8px 0 0", color: "var(--text)", fontSize: 13.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 4, cursor: "pointer" }}>Been here before? Sign in to see your times</button>
+                    )}
+                  </div>
                 </div>
                 )}
 
