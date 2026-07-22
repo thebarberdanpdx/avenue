@@ -3297,7 +3297,12 @@ function App() {
     try {
       if (table === 'appointments' && !session) {
         const { data } = await supabase.rpc('get_availability', { p_shop: SHOP_ID });
-        const list = Array.isArray(data) ? data : [];
+        let list = Array.isArray(data) ? data : [];
+        // [nc-cap-visible] refresh the new-client load alongside availability (see mount load)
+        try {
+          const { data: nc } = await supabase.rpc('get_newclient_load', { p_shop: SHOP_ID });
+          if (Array.isArray(nc) && nc.length) list = [...list, ...nc];
+        } catch (e) {}
         lastRemoteRef.current.appointments = list;
         setAppts(list);
         return;
@@ -3759,7 +3764,17 @@ function App() {
       try {
         const { data } = await supabase.rpc('get_availability', { p_shop: SHOP_ID });
         if (!alive) return;
-        const list = Array.isArray(data) ? data : [];
+        let list = Array.isArray(data) ? data : [];
+        // [nc-cap-visible] Pull the per-barber new-client load (zero-length marker rows, no client
+        // info) so the booking page KNOWS which days are already at a barber's new-client limit and
+        // never offers them to a new booker — instead of letting them fill the whole form and get
+        // rejected by the server at the end. Best-effort: if the RPC isn't deployed yet, availability
+        // works exactly as before (the server cap guard remains the wall).
+        try {
+          const { data: nc } = await supabase.rpc('get_newclient_load', { p_shop: SHOP_ID });
+          if (Array.isArray(nc) && nc.length) list = [...list, ...nc];
+        } catch (e) {}
+        if (!alive) return;
         lastRemoteRef.current.appointments = list;
         setAppts(list);
       } catch (e) { console.error('[vero] availability load failed:', e); }
@@ -4967,13 +4982,13 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
   const h = hoursForDate(prov, date);
   if (!h || !h.on) return [];
   const dayKey = (d) => d.toDateString();
-  const realCount = (filterFn) => (appts || []).filter((a) => a.status !== "cancelled" && a.status !== "block" && a.bookedFor && dayKey(new Date(a.bookedFor)) === dayKey(date) && filterFn(a)).length;
+  const realCount = (filterFn) => (appts || []).filter((a) => !a.ncMarker && a.status !== "cancelled" && a.status !== "block" && a.bookedFor && dayKey(new Date(a.bookedFor)) === dayKey(date) && filterFn(a)).length; // [nc-cap-visible] ncMarker rows are zero-length new-client-load markers — never real occupancy
   const provCap = Math.max(0, Number(prov.maxPerDay) || 0);
   const shopCap = Math.max(0, Number(business?.booking?.dailyCap) || 0);
   if (provCap > 0 && realCount((a) => a.providerId === prov.id) >= provCap) return [];
   if (shopCap > 0 && realCount((a) => a.bookedOnline) >= shopCap) return []; // #24: the shop cap limits ONLINE bookings only — manual/phone appts must not count toward it
   const busy = (appts || [])
-    .filter((a) => apptHoldsSlot(a) && a.providerId === prov.id && a.bookedFor && dayKey(new Date(a.bookedFor)) === dayKey(date))
+    .filter((a) => !a.ncMarker && apptHoldsSlot(a) && a.providerId === prov.id && a.bookedFor && dayKey(new Date(a.bookedFor)) === dayKey(date))
     .map((a) => { const s = a.start; const d = (a.end != null ? a.end - a.start : 30); return [s, s + (d > 0 ? d : 30)]; })
     .sort((a, b) => a[0] - b[0]);
   const isToday = date.toDateString() === new Date().toDateString();

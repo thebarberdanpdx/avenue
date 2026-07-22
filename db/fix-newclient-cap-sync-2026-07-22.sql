@@ -152,3 +152,51 @@ begin
   end if;
 end;
 $function$;
+
+-- ============================================================================
+-- PART 2 — get_newclient_load: let the booking page SEE the new-client load
+-- ----------------------------------------------------------------------------
+-- Dan's rule (2026-07-22): a day a new client can't book must NEVER show times
+-- to a new client — no filling the whole form only to be rejected at the end.
+-- The public availability feed strips client info, so the page can't tell which
+-- bookings are "new clients." This read-only feed returns one ZERO-LENGTH
+-- marker per genuine upcoming new-client booking (providerId + time only — no
+-- names, no contact info). The page counts these against each barber's cap and
+-- hides capped days from new bookers up front. The book_public guard above
+-- remains the real wall.
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.get_newclient_load(p_shop text)
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id',         'ncload_' || a.id,
+    'providerId', a.data->>'providerId',
+    'bookedFor',  a.data->>'bookedFor',
+    'start',      -1,
+    'end',        -1,
+    'status',     'confirmed',
+    'newClient',  true,
+    'ncMarker',   true
+  )), '[]'::jsonb)
+  from appointments a
+  where a.shop_id = p_shop
+    and coalesce(a.data->>'status','') not in ('cancelled','block')
+    and coalesce(a.data->>'source','') <> 'sync'
+    and nullif(a.data->>'clientId','') is not null
+    and a.data->>'clientId' <> 'guest'
+    and (a.data->>'bookedFor')::timestamptz > now() - interval '1 day'
+    and not exists (
+      select 1 from appointments b
+      where b.shop_id = p_shop
+        and b.data->>'clientId' = a.data->>'clientId'
+        and coalesce(b.data->>'status','') not in ('cancelled','block')
+        and (b.data->>'bookedFor')::timestamptz < (a.data->>'bookedFor')::timestamptz
+    );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_newclient_load(text) TO anon, authenticated;
