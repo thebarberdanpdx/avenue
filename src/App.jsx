@@ -4446,7 +4446,7 @@ function App() {
       {view === "privacy" && <PrivacyPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "client" && ((!session && acctLocs.length > 1 && !locParam)
         ? <LocationChooser shopId={SHOP_ID} locations={acctLocs} business={business} />
-        : <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} dataLoaded={dataLoaded} servicesTrusted={servicesTrusted} providersTrusted={providersTrusted} onExit={goBooking} onManage={() => setView("manage")} onHoldReload={(v) => { holdReloadRef.current = !!v; }} />)}
+        : <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} dataLoaded={dataLoaded} servicesTrusted={servicesTrusted} providersTrusted={providersTrusted} onExit={goBooking} onManage={() => setView("manage")} onHoldReload={(v) => { holdReloadRef.current = !!v; }} onRefreshAvail={() => refetchTable('appointments', { force: true })} />)}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={goBooking} />}
       {view === "managetoken" && <ManageByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} providers={providers} services={services} onExit={goBooking} />}
       {view === "reviewtoken" && <ReviewByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} onExit={goBooking} />}
@@ -5398,7 +5398,7 @@ function GroupedTimes({ slots, selected, onPick, bestSet, cell }) {
   );
 }
 
-function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, dataLoaded = true, servicesTrusted = true, providersTrusted = true, onExit, onManage, onHoldReload }) {
+function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, dataLoaded = true, servicesTrusted = true, providersTrusted = true, onExit, onManage, onHoldReload, onRefreshAvail }) {
   const [step, setStep] = useState(0);
   const [bookingFor, setBookingFor] = useState(null); // null until chosen: "self" or "other"
   const [showWhoFor, setShowWhoFor] = useState(false); // who's-it-for screen for a matched returning client
@@ -5658,6 +5658,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [keepPhone, setKeepPhone] = useState("new"); // "file" | "new"
   const [keepEmail, setKeepEmail] = useState("new"); // "file" | "new"
   const [selectedDate, setSelectedDate] = useState(null);
+  // [avail-fresh] Public booking loads availability ONCE on mount (get_availability). If the shop's
+  // calendar syncs new appointments after that, the page would keep offering slots that are now taken
+  // and book_public rejects them ("that time was just taken" on a slot that's genuinely gone). Re-pull
+  // availability whenever the booker changes the date they're viewing, so the times shown are always
+  // fresh against the server. (Also refreshed on a slot_taken rejection, so "pick another" is fresh.)
+  useEffect(() => { if (!isStaff && selectedDate && onRefreshAvail) { try { onRefreshAvail(); } catch (e) {} } }, [selectedDate]);
   const [slot, setSlot] = useState(null);
   const [slotsReady, setSlotsReady] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -6398,7 +6404,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         const pid = person.prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, sMin, person.durMin, business) : person.prov.id;
         return appts.some((a) => occupies(a) && a.providerId === pid && a.bookedFor && sameDay(a.bookedFor) && typeof a.start === "number" && typeof a.end === "number" && sMin < a.end && eMin > a.start);
       });
-      if (clash) { setSlot(null); setStep(6); setSlotConflict(true); return; }
+      if (clash) { if (!isStaff && onRefreshAvail) { try { onRefreshAvail(); } catch (e) {} } setSlot(null); setStep(6); setSlotConflict(true); return; }
     }
     const baseId = Date.now();
     let clientId = matched?.id || null;
@@ -6598,7 +6604,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           if (emsg.includes("newclient_cap")) { setSlot(null); setStep(6); return; }
           // Genuine race — someone grabbed the slot between showing times and this write. Show the
           // friendly "pick another opening" banner (same as the pre-check) rather than a generic error.
-          if (emsg.includes("slot_taken")) { setSlot(null); setStep(6); setSlotConflict(true); return; }
+          if (emsg.includes("slot_taken")) { if (!isStaff && onRefreshAvail) { try { onRefreshAvail(); } catch (e) {} } setSlot(null); setStep(6); setSlotConflict(true); return; }
           // blocked-online-guard: the shop blocked this person from booking online — show the discreet
           // "online booking unavailable" notice. Nothing was written (the guard raises before any insert).
           if (emsg.includes("client_blocked")) { setBlockedNotice(true); return; }
