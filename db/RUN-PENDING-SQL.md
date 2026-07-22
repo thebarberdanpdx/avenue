@@ -6,6 +6,16 @@ Order does not matter. If a line says `already exists`, that’s fine — stop a
 
 ---
 
+## 0. ⚠️ URGENT — new clients can't book on synced days (go-live blocker)
+
+**File:** `fix-newclient-cap-sync-2026-07-22.sql`
+
+**What it does:** Your "new clients per day" limit was counting every appointment synced from your old calendar as a "new client," so any day with synced appointments looked over the limit — and every brand-new client got rejected when they tried to book (this is the error Heather hit on July 31). This fix makes the limit count only real online bookings.
+
+**After:** A brand-new client can book a Thursday/Friday again (your cap of 2 then works as intended).
+
+---
+
 ## 1. Client notes/photos → staff in-app alert
 
 **File:** `visit-extras-2026-07-08.sql`

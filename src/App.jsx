@@ -6421,7 +6421,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         const pid = person.prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, sMin, person.durMin, business) : person.prov.id;
         return appts.some((a) => occupies(a) && a.providerId === pid && a.bookedFor && sameDay(a.bookedFor) && typeof a.start === "number" && typeof a.end === "number" && sMin < a.end && eMin > a.start);
       });
-      if (clash) { if (!isStaff && onRefreshAvail) { try { onRefreshAvail(); } catch (e) {} } setSlot(null); setStep(6); setSlotConflict(true); return; }
+      if (clash) { if (!isStaff && onRefreshAvail) { try { onRefreshAvail(); } catch (e) {} } setSlot(null); setNcCapFull(false); setWaitlistDone(false); setShowWaitlist(false); setStep(6); setSlotConflict(true); return; } // [honest-bounce]
     }
     const baseId = Date.now();
     let clientId = matched?.id || null;
@@ -6470,7 +6470,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     const bookingIsNew = !!newClientRow;
     if (bookingIsNew && people[0] && people[0].prov) {
       const pid0 = people[0].prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, people[0].durMin, business) : people[0].prov.id;
-      if (pid0 && newClientCapReached(pid0, selectedDate)) { setSlot(null); setStep(6); setNcCapFull(true); return; }
+      if (pid0 && newClientCapReached(pid0, selectedDate)) { setSlot(null); setSlotConflict(false); setWaitlistDone(false); setShowWaitlist(false); setStep(6); setNcCapFull(true); return; } // [honest-bounce]
     }
     const newAppts = [];
     const isSame = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
@@ -6618,10 +6618,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           // on, and capped days are filtered out of the picker — so this should not be reachable. If it
           // ever is (e.g. the SQL migration hasn't been applied yet), route to the day picker quietly
           // rather than surfacing any "fully booked for new clients" wall to the client.
-          if (emsg.includes("newclient_cap")) { setSlot(null); setStep(6); return; }
+          // [honest-bounce] Any bounce back to the day picker must land on a COHERENT screen: show the
+          // right banner for THIS rejection and clear every leftover state (a stale "just taken" banner
+          // + a stale "You're on the list" card once stacked on one screen — pure confusion).
+          if (emsg.includes("newclient_cap")) { setSlot(null); setSlotConflict(false); setNcCapFull(true); setWaitlistDone(false); setShowWaitlist(false); setStep(6); return; }
           // Genuine race — someone grabbed the slot between showing times and this write. Show the
           // friendly "pick another opening" banner (same as the pre-check) rather than a generic error.
-          if (emsg.includes("slot_taken")) { if (!isStaff && onRefreshAvail) { try { onRefreshAvail(); } catch (e) {} } setSlot(null); setStep(6); setSlotConflict(true); return; }
+          if (emsg.includes("slot_taken")) { if (!isStaff && onRefreshAvail) { try { onRefreshAvail(); } catch (e) {} } setSlot(null); setNcCapFull(false); setWaitlistDone(false); setShowWaitlist(false); setStep(6); setSlotConflict(true); return; }
           // blocked-online-guard: the shop blocked this person from booking online — show the discreet
           // "online booking unavailable" notice. Nothing was written (the guard raises before any insert).
           if (emsg.includes("client_blocked")) { setBlockedNotice(true); return; }
