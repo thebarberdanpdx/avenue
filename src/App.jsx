@@ -5555,13 +5555,27 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     } catch (e) {}
     return () => { alive = false; };
   }, []);
+  // [client-session-slim] Keep the signed-in client's session persisted so they stay logged in across
+  // reloads/remounts. ROOT-CAUSE FIX: a selfie + reference photos are base64 blobs; once they made this
+  // record too big, localStorage.setItem threw QuotaExceeded, the old code swallowed it, and NOTHING
+  // was stored — so a brand-new booker who added a selfie got booted to the "Welcome / I've been here
+  // before" screen on the next remount. We now try the full write, then fall back to a photo-stripped
+  // copy so the login ALWAYS persists (the photos already live on the server and reload from there).
+  const stripSessionBlobs = (c) => {
+    if (!c || typeof c !== "object") return c;
+    const noData = (v) => (typeof v === "string" && v.slice(0, 5) === "data:") ? undefined : v;
+    const slimGal = (g) => Array.isArray(g) ? g.map((x) => (x && typeof x === "object") ? { ...x, photo: noData(x.photo) } : x) : g;
+    const out = { ...c, photo: noData(c.photo), gallery: slimGal(c.gallery) };
+    if (Array.isArray(c.family)) out.family = c.family.map((f) => (f && typeof f === "object") ? { ...f, photo: noData(f.photo), gallery: slimGal(f.gallery) } : f);
+    if (Array.isArray(c._localAppts)) out._localAppts = c._localAppts.map((a) => (a && typeof a === "object") ? { ...a, photoData: undefined, photos: undefined, selfie: noData(a.selfie) } : a);
+    return out;
+  };
   useEffect(() => {
     if (isStaff) return;
     if (!_didInitClient.current) { _didInitClient.current = true; return; } // first pass is the restore above
-    try {
-      if (matched && matched.id) localStorage.setItem(_clientKey, JSON.stringify(matched));
-      else localStorage.removeItem(_clientKey);
-    } catch (e) {}
+    if (!(matched && matched.id)) { try { localStorage.removeItem(_clientKey); } catch (e) {} return; }
+    try { localStorage.setItem(_clientKey, JSON.stringify(matched)); }
+    catch (e) { try { localStorage.setItem(_clientKey, JSON.stringify(stripSessionBlobs(matched))); } catch (e2) {} }
   }, [matched]);
   // Hold the App's version auto-reload while the client is on the confirmation screen (step 8) so a
   // background version bump can't hard-reload the "You're confirmed" page out from under them.
