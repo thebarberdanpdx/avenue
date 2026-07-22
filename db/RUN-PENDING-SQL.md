@@ -10,9 +10,9 @@ Order does not matter. If a line says `already exists`, that’s fine — stop a
 
 **File:** `fix-newclient-cap-sync-2026-07-22.sql`
 
-**What it does:** Your "new clients per day" limit was counting every appointment synced from your old calendar as a "new client," so any day with synced appointments looked over the limit — and every brand-new client got rejected when they tried to book (this is the error Heather hit on July 31). This fix makes the limit count only real online bookings.
+**What it does:** Two fixes in one paste. (1) Your "new clients per day" limit was counting every appointment synced from your old calendar as a "new client," so any day with synced appointments looked over the limit — and every brand-new client got rejected when they tried to book (this is the error Heather hit on July 31). This makes the limit count only real online bookings. (2) It also lets the booking page see each barber's new-client load (times only, no client info), so a day that's already at the limit is hidden from new clients up front — they never fill out the form just to be rejected at the end.
 
-**After:** A brand-new client can book a Thursday/Friday again (your cap of 2 then works as intended).
+**After:** A brand-new client can book a Thursday/Friday again (your cap of 2 works as intended), and days at the limit simply don't show times to new clients.
 
 ---
 
