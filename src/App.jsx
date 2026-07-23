@@ -9922,9 +9922,8 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, mins, pr
             <div onClick={!selfie ? openCam : undefined} style={{ ...card, border: `1px solid ${goldLine}`, padding: 16, marginBottom: 14, cursor: !selfie ? "pointer" : "default" }}>
               <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
               <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-                {selfie
-                  ? <img src={selfie} alt="" style={{ width: 46, height: 46, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: `1px solid ${goldLine}` }} />
-                  : <div style={{ width: 46, height: 46, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: `1px solid ${goldLine}`, color: "var(--gold)" }}><Camera size={20} /></div>}
+                {/* no icon in the empty state — the prompt uses the full width; the real selfie shows once uploaded */}
+                {selfie && <img src={selfie} alt="" style={{ width: 46, height: 46, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: `1px solid ${goldLine}` }} />}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ ...rowTitle, fontSize: selfie ? 14.5 : 16.5, fontWeight: selfie ? 600 : 700, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{title}{selfie && <span style={chip}>$5 OFF</span>}</div>
                   <div style={{ ...rowSub, fontSize: 13.5, marginTop: 3 }}>{sub}</div>
