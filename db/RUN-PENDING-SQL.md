@@ -6,6 +6,16 @@ Order does not matter. If a line says `already exists`, that’s fine — stop a
 
 ---
 
+## 000. 🚨 RUN THIS NOW — blocked clients can currently book online
+
+**File:** `restore-blocked-guard-2026-07-23.sql`
+
+**What it does:** An earlier SQL update accidentally removed the rule that stops blocked clients from booking online — so right now a client you blocked can still book. This puts the block back (and keeps the new-client-limit fix). Verified live that the block was off.
+
+**After:** A blocked client's online booking is refused — they see the neutral "online booking unavailable" message, never anything about being blocked.
+
+---
+
 ## 00. Client can re-load their photos on a new phone (optional but recommended)
 
 **File:** `booking-extras-read-2026-07-23.sql`
