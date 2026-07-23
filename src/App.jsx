@@ -5607,7 +5607,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     // login screen" failure can't happen as long as this survives. Includes the per-appointment manage
     // tokens so a local (no-server-token) session can rebuild its visit list from the server.
     try {
-      const tiny = { id: matched.id, name: matched.name, firstName: matched.firstName, lastName: matched.lastName, email: matched.email, phone: matched.phone, sessionToken: matched.sessionToken, _localSession: matched._localSession, _tok: (Array.isArray(matched._localAppts) ? matched._localAppts : []).filter((a) => a && a.manageToken).map((a) => ({ id: a.id, manageToken: a.manageToken })) };
+      const tiny = { id: matched.id, name: matched.name, firstName: matched.firstName, lastName: matched.lastName, email: matched.email, phone: matched.phone, sessionToken: matched.sessionToken, _localSession: matched._localSession, _tok: (Array.isArray(matched._localAppts) ? matched._localAppts : []).filter((a) => a && a.manageToken).map((a) => ({ id: a.id, manageToken: a.manageToken, serviceId: a.serviceId, providerId: a.providerId, bookedFor: a.bookedFor, start: a.start, end: a.end, status: a.status, title: a.title, serviceName: a.serviceName, price: a.price })) };
       localStorage.setItem(_clientKey + "_id", JSON.stringify(tiny));
     } catch (e) {}
     try { localStorage.setItem(_clientKey, JSON.stringify(matched)); }
@@ -9573,6 +9573,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             if (t && t.id) {
               const restored = { ...t, _localAppts: (t._localSession && Array.isArray(t._tok)) ? t._tok : (Array.isArray(t._localAppts) ? t._localAppts : undefined) };
               setMatched(restored);
+              // Seed the visit list IMMEDIATELY (the tiny record carries the display fields) so the
+              // home never shows "No visit booked yet" while the server re-pull is in flight.
+              if (Array.isArray(restored._localAppts) && restored._localAppts.length) setMyAppts(restored._localAppts);
               setShowHome(true);
               if (restored.sessionToken) { try { supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: restored.id, p_session: restored.sessionToken }).then(({ data }) => { if (Array.isArray(data)) setMyAppts(data); }).catch(() => {}); } catch (e) {} }
               else if (Array.isArray(restored._localAppts) && restored._localAppts.length) refreshLocalAppts(restored);
@@ -9581,7 +9584,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             onExit();
           }} />}
 
-        {step === 9 && <ManageByToken token={(appts.find((a) => a.id === bookedId) || {}).manageToken} shopId={shopId} business={business} providers={providers} services={services} onExit={onExit} />}
+        {step === 9 && <ManageByToken token={bookedToken || (appts.find((a) => a.id === bookedId) || {}).manageToken} shopId={shopId} business={business} providers={providers} services={services} onExit={onExit} />} {/* bookedToken first — the appts feed is wholesale-replaced by availability refreshes and would drop the token */}
         </div>
 
         {/* Legal footer — pinned to the bottom of the booking page on every step (#terms / #privacy
