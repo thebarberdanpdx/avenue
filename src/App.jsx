@@ -10092,6 +10092,7 @@ function ReviewByToken({ token, shopId, business, onExit }) {
 function ManageByToken({ token, shopId, business, providers, services, onExit, onChanged }) {
   const [appt, setAppt] = useState(null);
   const [avail, setAvail] = useState([]);
+  const [availLoaded, setAvailLoaded] = useState(false); // true once get_availability has resolved (so we don't auto-pick a day before real availability is known)
   const [phase, setPhase] = useState("loading"); // loading | error | view | resched | cancel | cancelled | rescheduled
   const [newDate, setNewDate] = useState(null);
   const [newSlot, setNewSlot] = useState(null);
@@ -10118,6 +10119,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
         setPhase(String(data.status || "").toLowerCase() === "cancelled" ? "cancelled" : (arriveFlag ? "arrive" : "view"));
       } catch (e) { if (alive) setPhase("error"); return; }
       try { const av = await supabase.rpc("get_availability", { p_shop: shopId }); if (alive && av && av.data) setAvail(av.data); } catch (e) {}
+      finally { if (alive) setAvailLoaded(true); }
     })();
     return () => { alive = false; };
   }, [token, shopId]);
@@ -10145,6 +10147,24 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
     if (!blocks.length) return reSlotsRaw;
     return reSlotsRaw.filter((s) => { const st = s.start, en = s.start + dur; return !blocks.some((r) => st < r.end && en > r.start); });
   })();
+
+  // [resched-open-next-open] When the reschedule picker opens, land on the NEXT day that actually has
+  // openings — not the first day on the strip (which is often the client's own fully-booked day, showing
+  // "No open times that day"). Waits for real availability to load, honors time-rule blocks (same filter
+  // as reSlots), and only auto-selects while the client hasn't picked a day yet. Falls back to the first
+  // strip day if nothing in the horizon is open, so the picker is never left blank.
+  useEffect(() => {
+    if (phase !== "resched" || newDate != null || !prov || !availLoaded) return;
+    const svc = appt ? services.find((s) => s.id === appt.serviceId) : null;
+    const dayHasOpen = (d) => {
+      let slots = computeFreeSlots({ prov, date: d, durMin: dur, providers, appts: avail, business, services });
+      const blocks = ((svc && svc.timeRules) || []).filter((r) => r && r.block && (!r.scope || r.scope === "all" || r.scope === prov.id) && (!r.days || !r.days.length || r.days.includes(d.getDay())));
+      if (blocks.length) slots = slots.filter((s) => { const st = s.start, en = s.start + dur; return !blocks.some((r) => st < r.end && en > r.start); });
+      return slots.length > 0;
+    };
+    const firstOpen = dateOptions.find(dayHasOpen) || dateOptions[0] || null;
+    if (firstOpen) setNewDate(firstOpen);
+  }, [phase, availLoaded, prov, appt, dateOptions]);
 
   const fmtWhenObj = (iso) => { const d = new Date(iso); const day = relativeDate(d); const lbl = day.includes(",") ? day : `${day}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; return { date: lbl, time: fmtTime(d.getHours() * 60 + d.getMinutes()) }; };
   const hoursUntil = (iso) => (new Date(iso) - new Date()) / 36e5;
