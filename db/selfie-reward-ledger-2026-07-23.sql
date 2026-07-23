@@ -77,19 +77,7 @@ $function$;
 -- (auth is possession of the private token, checked inside the function).
 grant execute on function public.set_selfie_discount_by_token(text, boolean) to anon, authenticated;
 
--- ── Backfill: mark clients who ALREADY received the selfie $5 as rewarded ─────────────────────────
--- Verified against live prod (2026-07-23): 4 appointments carry the selfie credit across 4 clients,
--- but only 1 of those clients has a saved profile photo — so under the old photo-only gate the other
--- 3 are still "eligible" and could claim the $5 a second time. Stamp the ledger flag on everyone who
--- has ever gotten it so the one-time rule is retroactive. Adds only `selfieRewarded`; touches nothing
--- else on the record.
-update clients c
-   set data = c.data || jsonb_build_object('selfieRewarded', true)
- where c.shop_id = 'sanctuary'
-   and coalesce((c.data->>'selfieRewarded')::boolean, false) = false
-   and exists (
-     select 1 from appointments a
-      where a.shop_id = c.shop_id
-        and a.data->>'clientId' = c.id
-        and a.data->'discount'->>'id' = 'selfie'
-   );
+-- NOTE: no retroactive backfill. The app isn't live to real clients yet — the handful of existing
+-- selfie-credit records are test bookings, and marking them "rewarded" would only stop those test
+-- accounts from re-testing the $5. The one-time rule takes effect for every credit granted from here
+-- on. If you ever want to stamp a specific already-rewarded real client later, it's a one-liner.
