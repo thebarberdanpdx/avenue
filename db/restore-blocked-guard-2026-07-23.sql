@@ -1,20 +1,21 @@
 -- ============================================================================
--- FIX: new-client cap counted SYNCED calendar appointments as "new clients"
+-- ⚠️ URGENT — RESTORE the blocked-client guard to book_public
 -- ----------------------------------------------------------------------------
--- BUG (found 2026-07-22, live): appointments imported from the calendar sync
--- carry NO clientId. The cap's "is this client new?" test (NOT EXISTS earlier
--- booking by the same clientId) treats every null-clientId row as brand new,
--- so a fully synced day (e.g. 8 imported appointments) instantly exceeds any
--- cap. Result: EVERY genuinely new client was rejected ('newclient_cap') on
--- every synced day where a cap was set — the go-live blocker Heather hit
--- booking Fri Jul 31 (cap 2, but 8 synced appts counted as 8 "new clients").
+-- REGRESSION (found live 2026-07-23): the new-client-cap replacement of
+-- book_public (fix-newclient-cap-sync-2026-07-22.sql) was rebuilt without the
+-- "blocked client" guard that block-online-appts-guard-2026-07-16.sql had
+-- added — so running it silently DROPPED that protection. Verified on prod:
+-- book_public accepted a booking for a blocked client. Blocked clients could
+-- book online.
 --
--- THE FIX (count block only — everything else byte-identical):
---   • Only count rows with a REAL clientId (synced/imported rows have none).
---   • Never count rows whose source is the calendar sync.
---   • Respect the master `enabled` switch (off = unlimited).
+-- This file is the COMPLETE, correct book_public: the blocked-client guard
+-- (GUARD 1 + 1b) AND the new-client-cap fix (synced rows / real clientId only,
+-- respects `enabled`) AND the double-booking guard — all together. It's a
+-- CREATE OR REPLACE, safe to run once now (and idempotent).
 --
--- Run this WHOLE file once in Supabase → SQL Editor → Run.
+-- Run this WHOLE file once in Supabase -> SQL Editor -> Run.
+-- After: a blocked client's online booking is refused (the app shows the
+-- neutral "online booking unavailable" notice — never "you're blocked").
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.book_public(p_shop text, p_client jsonb, p_appts jsonb)
@@ -38,8 +39,8 @@ begin
     raise exception 'shop required';
   end if;
 
-  -- GUARD 1 + 1b: a blocked client cannot book (restored 2026-07-23 — an earlier version of THIS file
-  -- shipped without these and silently dropped the block protection). Tested against the STORED record.
+  -- GUARD 1: a blocked client cannot book, tested against the STORED record
+  -- (never the caller-supplied p_client, which can't be trusted).
   if p_client is not null then
     if exists (
       select 1 from clients
@@ -57,6 +58,10 @@ begin
       raise exception 'client_blocked' using errcode = 'P0001';
     end if;
   end if;
+
+  -- GUARD 1b: also reject when ANY appointment's clientId belongs to a blocked stored client.
+  -- Closes the hole where a blocked client already on file books as "new" (the app can't sign
+  -- them in) and the lookup hands back their existing id with p_client=null.
   if p_appts is not null and jsonb_typeof(p_appts) = 'array' then
     if exists (
       select 1
@@ -94,7 +99,7 @@ begin
   end if;
 
   -- ========================================================================
-  -- NEW-CLIENT DAILY CAP GUARD (fixed 2026-07-22 — see header)
+  -- NEW-CLIENT DAILY CAP GUARD (synced rows / real clientId only; respects enabled)
   -- ========================================================================
   if p_appts is not null and jsonb_typeof(p_appts) = 'array' then
     for e in select value from jsonb_array_elements(p_appts) loop
@@ -104,7 +109,6 @@ begin
         v_client := e->>'clientId';
         v_when   := (e->>'bookedFor')::timestamptz;
 
-        -- Is this booker NEW? (no earlier non-cancelled booking at this shop)
         if not exists (
           select 1 from appointments a
           where a.shop_id = p_shop
@@ -112,8 +116,6 @@ begin
             and coalesce(a.data->>'status', '') not in ('cancelled', 'block')
             and (a.data->>'bookedFor')::timestamptz < v_when
         ) then
-          -- Resolve this provider's cap for the local weekday of this booking.
-          -- FIX: a disabled cap (enabled=false / missing) means NO limit.
           v_cap := (
             select case
               when pd->'newClients' is null then null
@@ -130,13 +132,7 @@ begin
                    where shop_id = p_shop and data->>'id' = v_prov limit 1) s
           );
 
-          -- null cap = unlimited; only enforce a real number (0 included).
           if v_cap is not null then
-            -- Count OTHER new clients already booked with this provider on the
-            -- same local day.
-            -- FIX: only real client bookings count. Synced/imported calendar rows
-            -- have no clientId (and source='sync') — they must NEVER count as
-            -- "new clients," or a synced day trips the cap for everyone.
             v_count := (
               select count(*)
               from appointments a
@@ -166,7 +162,6 @@ begin
       end if;
     end loop;
   end if;
-  -- ===================== end new-client cap guard ==========================
 
   if p_client is not null and (p_client ? 'id') then
     delete from clients where id = p_client->>'id' and shop_id = p_shop;
@@ -182,51 +177,3 @@ begin
   end if;
 end;
 $function$;
-
--- ============================================================================
--- PART 2 — get_newclient_load: let the booking page SEE the new-client load
--- ----------------------------------------------------------------------------
--- Dan's rule (2026-07-22): a day a new client can't book must NEVER show times
--- to a new client — no filling the whole form only to be rejected at the end.
--- The public availability feed strips client info, so the page can't tell which
--- bookings are "new clients." This read-only feed returns one ZERO-LENGTH
--- marker per genuine upcoming new-client booking (providerId + time only — no
--- names, no contact info). The page counts these against each barber's cap and
--- hides capped days from new bookers up front. The book_public guard above
--- remains the real wall.
--- ============================================================================
-
-CREATE OR REPLACE FUNCTION public.get_newclient_load(p_shop text)
-RETURNS jsonb
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-  select coalesce(jsonb_agg(jsonb_build_object(
-    'id',         'ncload_' || a.id,
-    'providerId', a.data->>'providerId',
-    'bookedFor',  a.data->>'bookedFor',
-    'start',      -1,
-    'end',        -1,
-    'status',     'confirmed',
-    'newClient',  true,
-    'ncMarker',   true
-  )), '[]'::jsonb)
-  from appointments a
-  where a.shop_id = p_shop
-    and coalesce(a.data->>'status','') not in ('cancelled','block')
-    and coalesce(a.data->>'source','') <> 'sync'
-    and nullif(a.data->>'clientId','') is not null
-    and a.data->>'clientId' <> 'guest'
-    and (a.data->>'bookedFor')::timestamptz > now() - interval '1 day'
-    and not exists (
-      select 1 from appointments b
-      where b.shop_id = p_shop
-        and b.data->>'clientId' = a.data->>'clientId'
-        and coalesce(b.data->>'status','') not in ('cancelled','block')
-        and (b.data->>'bookedFor')::timestamptz < (a.data->>'bookedFor')::timestamptz
-    );
-$$;
-
-GRANT EXECUTE ON FUNCTION public.get_newclient_load(text) TO anon, authenticated;

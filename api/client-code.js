@@ -50,6 +50,16 @@ export default async function handler(req, res) {
     // (their "I've been here before" login code would never send).
     const { data: rows, error } = await selectAllRows(() => supabase.from("clients").select("id, data").eq("shop_id", shop).order("id"));
     if (error) return res.status(500).json({ error: "lookup failed" });
+    // A BLOCKED client on file (matched by phone OR email) is turned away immediately with a neutral
+    // signal — the app shows the "online booking unavailable" notice instead of a code screen that
+    // never resolves. The wire field is deliberately named `unavailable`, NOT "blocked", so even the
+    // raw network response never carries the word (client must never see they're blocked — hard rule).
+    // (Owner-approved tradeoff: this makes a turned-away identity distinguishable from a normal one to
+    // someone probing — the prior silent dead-end leaked nothing, but left the blocked client stuck.)
+    const blockedHit = byPhone
+      ? (rows || []).find((r) => norm10(r.data?.phone) === digits && r.data?.blocked)
+      : (rows || []).find((r) => String(r.data?.email || "").trim().toLowerCase() === em && r.data?.blocked);
+    if (blockedHit) return res.status(200).json({ ok: true, unavailable: true, masked: byPhone ? maskPhone(digits) : maskEmail(em) });
     const hit = byPhone
       ? (rows || []).find((r) => norm10(r.data?.phone) === digits && !r.data?.blocked)
       : (rows || []).find((r) => String(r.data?.email || "").trim().toLowerCase() === em && !r.data?.blocked);
