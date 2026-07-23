@@ -2460,9 +2460,23 @@ function App() {
     // its HTTP cache. window.location.replace to a NEW query key, not the same href.
     const hardReload = (version) => {
       try { if (window.caches && caches.keys) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {}); } catch (e) {}
-      const origin = (window.location && window.location.origin) ? window.location.origin : "https://gotvero.com";
-      const path = (window.location && window.location.pathname) ? window.location.pathname : "/";
-      window.location.replace(origin + path + "?u=" + Date.now() + (version ? "&v=" + String(version).slice(0, 8) : ""));
+      // [session-shop-stable] KEEP every existing query param across the cache-bust reload — above all
+      // ?shop=. resolveShopId reads ?shop= FIRST, so dropping it fell back to the default shop, which
+      // changed the per-shop client-session key (vero_client_<shop>) and dumped a just-booked client to
+      // the login/welcome screen (and reloaded the WRONG shop). Only the cache-bust key `u` changes.
+      let target;
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.set("u", String(Date.now()));
+        if (version) u.searchParams.set("v", String(version).slice(0, 8));
+        u.hash = ""; // match the prior behavior (no hash) — resolveShopId never reads the hash
+        target = u.toString();
+      } catch (e) {
+        const origin = (window.location && window.location.origin) ? window.location.origin : "https://gotvero.com";
+        const path = (window.location && window.location.pathname) ? window.location.pathname : "/";
+        target = origin + path + "?u=" + Date.now() + (version ? "&v=" + String(version).slice(0, 8) : "");
+      }
+      window.location.replace(target);
     };
     const doReload = (version) => {
       // Bounded auto-retry: try a few times, then STOP (surface the manual "Update now" button) — never
@@ -5536,6 +5550,41 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // [session-crumbs] Tiny on-device event trail (last 40) for the recurring "bounced to login"
   // hunt — records which session path fired so a report becomes a read, not a guess.
   const _crumb = (ev) => { try { const k = "vero_crumbs_" + shopId; const list = JSON.parse(localStorage.getItem(k) || "[]"); list.push({ t: new Date().toISOString().slice(5, 19), ev }); localStorage.setItem(k, JSON.stringify(list.slice(-40))); } catch (e) {} };
+  // [session-cookie-fallback] THE surviving root of the recurring "booked, added a selfie/photos, got
+  // dumped to the login/welcome screen": the signed-in client state (matched) was ONLY ever backed up
+  // to localStorage. On the browsers real clients actually use — iOS Private Mode, the in-app webviews
+  // an SMS/Instagram booking link opens in, and a WKWebView that memory-purges + RELOADS the page the
+  // instant the camera closes (taking a selfie/photo) — localStorage.setItem silently THROWS or is
+  // wiped on that reload, so nothing durable was stored and the next restore found no session → login.
+  // Commits #503/#517/#518 each only shrank the localStorage payload; none removed the sole-dependency
+  // on it. A first-party COOKIE is the one store that keeps working in exactly those environments and
+  // survives an in-session reload, so we mirror the tiny identity record to a cookie and read it as a
+  // fallback at every restore site. localStorage stays primary; the cookie is the lifeline when it's dead.
+  const _clientCookie = "vero_c_" + shopId;
+  const _cookieSecure = () => { try { return (typeof location !== "undefined" && location.protocol === "https:") ? "; Secure" : ""; } catch (e) { return ""; } };
+  const _writeClientCookie = (obj) => {
+    try {
+      const v = encodeURIComponent(JSON.stringify(obj));
+      if (v.length > 3800) return; // stay under the ~4KB cookie cap — localStorage still holds the full record
+      document.cookie = _clientCookie + "=" + v + "; path=/; max-age=31536000; SameSite=Lax" + _cookieSecure();
+    } catch (e) {}
+  };
+  const _readClientCookie = () => {
+    try {
+      const pre = _clientCookie + "=";
+      const parts = (document.cookie || "").split(";");
+      for (let i = 0; i < parts.length; i++) { const c = parts[i].trim(); if (c.indexOf(pre) === 0) return decodeURIComponent(c.slice(pre.length)); }
+    } catch (e) {}
+    return null;
+  };
+  const _clearClientCookie = () => { try { document.cookie = _clientCookie + "=; path=/; max-age=0; SameSite=Lax" + _cookieSecure(); } catch (e) {} };
+  // Best available DURABLE identity record — localStorage tiny first, then the cookie lifeline. Returns
+  // the parsed tiny object (or null). Used by every "restore the signed-in client" path below.
+  const _readTinyIdentity = () => {
+    try { const a = localStorage.getItem(_clientKey + "_id"); if (a) return JSON.parse(a); } catch (e) {}
+    try { const b = _readClientCookie(); if (b) return JSON.parse(b); } catch (e) {}
+    return null;
+  };
   const _didInitClient = useRef(false);
   useEffect(() => {
     if (isStaff) return;
@@ -5547,7 +5596,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       // per-appointment manage tokens). They must NEVER land back on the login screen while this exists.
       if (!raw) {
         try {
-          const t = JSON.parse(localStorage.getItem(_clientKey + "_id") || "null");
+          const t = _readTinyIdentity(); // localStorage tiny → cookie lifeline
           if (t && t.id) raw = JSON.stringify({ ...t, _localAppts: (t._localSession && Array.isArray(t._tok)) ? t._tok : undefined });
         } catch (e2) {}
       }
@@ -5591,7 +5640,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   useEffect(() => {
     if (isStaff || matched || showHome || step !== 0 || simpleStep || showCodeEntry) return;
     let t = null;
-    try { t = JSON.parse(localStorage.getItem(_clientKey) || localStorage.getItem(_clientKey + "_id") || "null"); } catch (e) {}
+    try { const full = localStorage.getItem(_clientKey); t = full ? JSON.parse(full) : _readTinyIdentity(); } catch (e) {} // full localStorage → tiny → cookie lifeline
     if (!(t && t.id)) return;
     _crumb("welcome-guard:restored:" + t.id);
     const restored = { ...t, _localAppts: Array.isArray(t._localAppts) ? t._localAppts : ((t._localSession && Array.isArray(t._tok)) ? t._tok : undefined) };
@@ -5630,10 +5679,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     // on the next load, this alone keeps them SIGNED IN — the "saved my photos and got dumped to the
     // login screen" failure can't happen as long as this survives. Includes the per-appointment manage
     // tokens so a local (no-server-token) session can rebuild its visit list from the server.
-    try {
-      const tiny = { id: matched.id, name: matched.name, firstName: matched.firstName, lastName: matched.lastName, email: matched.email, phone: matched.phone, sessionToken: matched.sessionToken, _localSession: matched._localSession, _tok: (Array.isArray(matched._localAppts) ? matched._localAppts : []).filter((a) => a && a.manageToken).map((a) => ({ id: a.id, manageToken: a.manageToken, serviceId: a.serviceId, providerId: a.providerId, bookedFor: a.bookedFor, start: a.start, end: a.end, status: a.status, title: a.title, serviceName: a.serviceName, price: a.price })) };
-      localStorage.setItem(_clientKey + "_id", JSON.stringify(tiny));
-    } catch (e) {}
+    const tiny = { id: matched.id, name: matched.name, firstName: matched.firstName, lastName: matched.lastName, email: matched.email, phone: matched.phone, sessionToken: matched.sessionToken, _localSession: matched._localSession, _tok: (Array.isArray(matched._localAppts) ? matched._localAppts : []).filter((a) => a && a.manageToken).map((a) => ({ id: a.id, manageToken: a.manageToken, serviceId: a.serviceId, providerId: a.providerId, bookedFor: a.bookedFor, start: a.start, end: a.end, status: a.status, title: a.title, serviceName: a.serviceName, price: a.price })) };
+    try { localStorage.setItem(_clientKey + "_id", JSON.stringify(tiny)); } catch (e) {}
+    // [session-cookie-fallback] Mirror the SAME tiny record to the cookie lifeline (slice _tok so a
+    // returning client with many visits still fits the 4KB cap). This is what keeps them signed in when
+    // the localStorage writes just threw (iOS private mode / in-app webview / camera-purge reload).
+    _writeClientCookie((Array.isArray(tiny._tok) && tiny._tok.length > 6) ? { ...tiny, _tok: tiny._tok.slice(-6) } : tiny);
     try { localStorage.setItem(_clientKey, JSON.stringify(matched)); }
     catch (e) { try { localStorage.setItem(_clientKey, JSON.stringify(stripSessionBlobs(matched))); } catch (e2) {} }
   }, [matched]);
@@ -6948,7 +6999,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     else bookForPerson({ id: null });
   };
   const signOutClient = () => {
-    try { localStorage.removeItem(_clientKey); localStorage.removeItem(_clientKey + "_id"); } catch (e) {} // [session-clear-explicit] the ONLY sanctioned session wipe (plus "It's my first time")
+    try { localStorage.removeItem(_clientKey); localStorage.removeItem(_clientKey + "_id"); } catch (e) {} _clearClientCookie(); // [session-clear-explicit] the ONLY sanctioned session wipe (plus "It's my first time")
     _crumb("signout:explicit");
     setShowHome(false); setMatched(null); setMyAppts([]); setShowAllVisits(false); setShowAllPast(false); setHomeAction(null); setReschedPrev(null);
     setBookingFor(null); setActiveMember(null); setCart([]); setShowWhoFor(false); setShowUsual(false);
@@ -7241,7 +7292,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </span>
                 <span className="wel-ar">&#8594;</span>
               </button>
-              <button onClick={() => { if ((business?.booking?.clientType) === "returning") { setClientTypeBlock("returning_only"); return; } try { localStorage.removeItem(_clientKey); localStorage.removeItem(_clientKey + "_id"); } catch (e) {} _crumb("signout:first-time-tap"); setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} className="wel-card wel-sec">
+              <button onClick={() => { if ((business?.booking?.clientType) === "returning") { setClientTypeBlock("returning_only"); return; } try { localStorage.removeItem(_clientKey); localStorage.removeItem(_clientKey + "_id"); } catch (e) {} _clearClientCookie(); _crumb("signout:first-time-tap"); setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} className="wel-card wel-sec">
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="wel-h" style={{ display: "block" }}>It's my first time</span>
                   <span className="wel-s" style={{ display: "block" }}>Welcome — let's take a look</span>
@@ -9594,7 +9645,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             // home anyway. Only a person with NO session anywhere exits to the storefront.
             if (matched && matched.id) { _crumb("exit8:matched:" + matched.id); goClientHome(); return; }
             let t = null;
-            try { t = JSON.parse(localStorage.getItem(_clientKey + "_id") || localStorage.getItem(_clientKey) || "null"); } catch (e) {}
+            try { const full = localStorage.getItem(_clientKey); t = _readTinyIdentity() || (full ? JSON.parse(full) : null); } catch (e) {} // tiny → cookie lifeline → full localStorage
             _crumb("exit8:" + (t && t.id ? "tiny-restore:" + t.id : "NO-SESSION"));
             if (t && t.id) {
               const restored = { ...t, _localAppts: (t._localSession && Array.isArray(t._tok)) ? t._tok : (Array.isArray(t._localAppts) ? t._localAppts : undefined) };
