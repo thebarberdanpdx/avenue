@@ -24648,7 +24648,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const focusedId = pulseView === "shop" ? null : (pulseView === "me" ? (me && me.id) : pulseView);
   const isOffDay = (p) => { const h = hoursForDate(p, selectedDate); return !h || !h.on; };
   // Display-only: open stretches between a barber's bookings during their shift, big enough to be worth filling.
-  const GAP_MIN = 20;
+  const GAP_MIN = 15; // show any open gap 15 min and up (owner request) — also drives the header "gaps to fill" count
   const gapsForProvider = (p) => {
     const h = p && p.hours && p.hours[selectedDate.getDay()];
     if (!h || !h.on) return [];
@@ -25028,7 +25028,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               {/* open-gap markers — display only, sit behind the tap layer so tapping a gap still opens a new appointment */}
               {gapsForProvider(p).map((g) => (
                 <div key={`gap-${g.start}`} style={{ position: "absolute", top: (g.start - DAY_START) * PPM + 1, left: 0, right: 0, height: (g.end - g.start) * PPM - 2, borderRadius: 3, background: "color-mix(in srgb, var(--text) 3.5%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12.5, fontWeight: 500, letterSpacing: 0.2, color: "var(--faint)", pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
-                  {(g.end - g.start) >= 30 ? `${g.end - g.start} min open` : ""}
+                  {(g.end - g.start) >= 15 ? `${g.end - g.start} min open` : ""}
                 </div>
               ))}
               {/* live "now" line — only on today, only within the visible grid window */}
