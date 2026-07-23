@@ -8828,7 +8828,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* CODE VERIFICATION — confirms the texted code (accepts any 6 digits until Twilio is live) */}
         <Sheet open={blockedNotice} onClose={() => setBlockedNotice(false)} align="top">
           <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
-          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Online booking unavailable</h2>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8, color: "var(--text)" }}>Online booking unavailable</h2>
           <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>We're not able to accept new appointments online at this time. Please check back later.</p>
           <button onClick={() => setBlockedNotice(false)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>OK</button>
         </Sheet>
