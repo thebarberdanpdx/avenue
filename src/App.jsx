@@ -5589,10 +5589,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // refuses to strand a signed-in device: if it renders while a stored session exists, restore and go
   // home. Explicit sign-outs delete the stored session first, so they still land here normally.
   useEffect(() => {
-    if (isStaff || matched || showHome || step !== 0 || simpleStep || showCodeEntry) return;
+    // Covers BOTH login-type screens: the step-0 welcome AND the step-5 phone/email login (until a
+    // code entry is actually in progress). Explicit sign-outs deleted the keys first, so they pass.
+    if (isStaff || matched || showHome || simpleStep || showCodeEntry || (step !== 0 && step !== 5)) return;
     let t = null;
     try { t = JSON.parse(localStorage.getItem(_clientKey) || localStorage.getItem(_clientKey + "_id") || "null"); } catch (e) {}
-    if (!(t && t.id)) return;
+    if (!(t && t.id)) { _crumb("login-shown:no-stored-session:step" + step); return; }
     _crumb("welcome-guard:restored:" + t.id);
     const restored = { ...t, _localAppts: Array.isArray(t._localAppts) ? t._localAppts : ((t._localSession && Array.isArray(t._tok)) ? t._tok : undefined) };
     setMatched(restored);
@@ -7249,6 +7251,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <span className="wel-ar">&#8594;</span>
               </button>
             </div>
+            {/* [session-crumbs] Debug readout — ONLY with ?debug=1 in the URL. Shows the running bundle,
+                whether a stored session exists, and the last few session events, so a "bounced to login"
+                report can be diagnosed from one screenshot instead of guesswork. */}
+            {typeof location !== "undefined" && /[?&]debug=1/.test(location.search) && (() => {
+              let c = []; try { c = (JSON.parse(localStorage.getItem("vero_crumbs_" + shopId) || "[]") || []).slice(-8); } catch (e) {}
+              let sess = "err"; try { sess = localStorage.getItem(_clientKey) ? "full" : (localStorage.getItem(_clientKey + "_id") ? "tiny" : "none"); } catch (e) {}
+              return (
+                <div style={{ marginTop: 18, fontSize: 10.5, color: "var(--faint)", fontFamily: "monospace", lineHeight: 1.65, wordBreak: "break-all", textAlign: "left" }}>
+                  <div>v:{(typeof __BUILD_VERSION__ !== "undefined" ? String(__BUILD_VERSION__) : "dev").slice(0, 7)} · stored-session:{sess}</div>
+                  {c.map((x, i) => <div key={i}>{x.t} {x.ev}</div>)}
+                </div>
+              );
+            })()}
             {pubReviews.length > 0 && (() => {
               const feat = pubReviews.filter((r) => r.featured);
               const picks = (feat.length ? feat : pubReviews).slice(0, 3);
