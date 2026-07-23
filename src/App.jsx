@@ -24650,17 +24650,24 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   // Display-only: open stretches between a barber's bookings during their shift, big enough to be worth filling.
   const GAP_MIN = 15; // show any open gap 15 min and up (owner request) — also drives the header "gaps to fill" count
   const gapsForProvider = (p) => {
-    const h = p && p.hours && p.hours[selectedDate.getDay()];
+    // Use the SAME shift hours the off-shift shading uses, so a gap can never land in the greyed area.
+    const h = hoursForDate(p, selectedDate);
     if (!h || !h.on) return [];
     const isTodayView = sameDay(selectedDate.toISOString(), today);
     const nowM = today.getHours() * 60 + today.getMinutes();
     const items = (appts || []).filter((a) => a.providerId === p.id && sameDay(a.bookedFor, selectedDate) && a.status !== "cancelled" && typeof a.start === "number" && typeof a.end === "number").sort((a, b) => a.start - b.start);
-    if (items.length < 1) return [];
     const out = [];
-    for (let i = 0; i < items.length - 1; i++) {
-      const gs = items[i].end, ge = items[i + 1].start;
+    // Every open window of GAP_MIN+ inside the shift is a gap: before the first client, BETWEEN
+    // clients, AND after the last client (the whole shift when the day is empty). `cursor` walks the
+    // shift; each stretch from cursor to the next appt's start (clamped to the shift) is an opening.
+    let cursor = h.start;
+    for (const a of items) {
+      const gs = Math.max(cursor, h.start), ge = Math.min(a.start, h.end);
       if (ge - gs >= GAP_MIN && !(isTodayView && ge <= nowM)) out.push({ start: gs, end: ge });
+      cursor = Math.max(cursor, a.end);
     }
+    const gs = Math.max(cursor, h.start);
+    if (h.end - gs >= GAP_MIN && !(isTodayView && h.end <= nowM)) out.push({ start: gs, end: h.end });
     return out;
   };
   const orderedStaff = [...staff].sort((a, b) => {
