@@ -23925,7 +23925,12 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     const primary = members.find((m) => m.groupPrimary) || members[0];
     const enriched = members.map((m) => ({ ...m, __barberName: (providers.find((p) => p.id === m.providerId) || {}).name || "", __clientName: apptDisplayName(m, clients) }));
     const ordered = [enriched.find((m) => m.id === primary.id), ...enriched.filter((m) => m.id !== primary.id)].filter(Boolean);
-    setGroupOpen(null);
+    // [group-checkout-closes-appt-sheet] close BOTH the group sheet AND the appointment detail sheet.
+    // startGroupCheckout was written for the GroupSheet entry point (only closed groupOpen); the
+    // appointment sheet's CHECKOUT button now calls it too, so without closing `open` the checkout
+    // opened UNDERNEATH the still-open appointment sheet and looked like "nothing happened". Mirrors
+    // startCheckout, which already setOpen(null) for the single-appt path.
+    setGroupOpen(null); setOpen(null);
     delete committedRef.current[primary.id];
     setCheckout({ ...primary, __groupAppts: ordered });
   };
