@@ -6512,15 +6512,28 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // Selfie taken on the CONFIRMATION screen → the client's PROFILE photo + gallery (persisted by the
   // extras RPC, passing the fresh dataURL since state isn't updated yet) and $5 off THIS visit.
   const SELFIE_DISCOUNT = { id: "selfie", name: "Profile photo", type: "amount", value: 5 };
+  // [selfie-reward-ledger] The $5 selfie credit is a ONE-TIME-per-client reward. It used to be gated
+  // only by "does this client already have a profile photo?" — mutable state (a photo can be removed
+  // or fail to persist), so the $5 could be farmed on repeat bookings. Now a durable per-client
+  // `selfieRewarded` flag is the ledger: set the moment it's granted, checked before every offer and
+  // every write. The photo also locks on add (no in-session Remove — see ConfirmationScreen). Server
+  // backstop (un-bypassable even via a direct RPC call) is in db/selfie-reward-ledger-2026-07-23.sql.
+  const selfieAlreadyRewarded = () => !!(
+    (matched && matched.id === bookedClientId && matched.selfieRewarded) ||
+    (clients.find((c) => c.id === bookedClientId) || {}).selfieRewarded
+  );
   const applySelfie = (dataUrl) => {
     setSelfie(dataUrl);
     if (!bookedClientId) return;
-    setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, photo: dataUrl } : c));
-    setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a));
-    setMyAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a));
-    if (matched && matched.id === bookedClientId) setMatched((m) => m ? { ...m, photo: dataUrl, _localAppts: Array.isArray(m._localAppts) ? m._localAppts.map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a) : m._localAppts } : m);
+    const rewarded = selfieAlreadyRewarded(); // already claimed once → keep the photo but grant no new $5
+    setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, photo: dataUrl, selfieRewarded: true } : c));
+    if (!rewarded) {
+      setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a));
+      setMyAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a));
+    }
+    if (matched && matched.id === bookedClientId) setMatched((m) => m ? { ...m, photo: dataUrl, selfieRewarded: true, _localAppts: Array.isArray(m._localAppts) ? m._localAppts.map((a) => a.id === bookedId ? { ...a, discount: rewarded ? a.discount : SELFIE_DISCOUNT } : a) : m._localAppts } : m);
     saveConfirmationExtras({ selfie: dataUrl });
-    if (bookedToken) { try { supabase.rpc("set_selfie_discount_by_token", { p_token: bookedToken, p_on: true }).catch(() => {}); } catch (e) {} }
+    if (bookedToken && !rewarded) { try { supabase.rpc("set_selfie_discount_by_token", { p_token: bookedToken, p_on: true }).catch(() => {}); } catch (e) {} }
   };
   const clearSelfie = () => {
     setSelfie(null);
@@ -6714,7 +6727,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         earlierAnyProvider: wantEarlier ? !!earlierPref.anyProvider : undefined,
         newClient: (pi === 0 && bookingIsNew) ? true : undefined, // audit #29: counts toward the barber's new-client-per-day cap
         address: (pi === 0 && newAddress.trim()) ? newAddress.trim() : undefined, // #11: home address for mobile/in-home services
-        discount: (pi === 0 && selfie) ? { id: "selfie", name: "Profile photo", type: "amount", value: 5 } : undefined, // $5 off for adding a profile selfie
+        discount: (pi === 0 && selfie && !(matched && matched.selfieRewarded)) ? { id: "selfie", name: "Profile photo", type: "amount", value: 5 } : undefined, // $5 off for adding a profile selfie — one-time per client (selfie-reward-ledger)
       });
       if (!isSame) cursor += person.durMin;
     });
@@ -9711,7 +9724,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} mins={effMin} provider={provider} selectedDate={selectedDate} slot={slot}
           noteOn={business?.booking?.askNote !== false} photoOn={business?.bookingPhotos?.mode !== "off"}
           clientNote={clientNote} setClientNote={setClientNote} photoList={photos} setPhotos={setPhotos} clientPhotoRef={clientPhotoRef} onPhotoPick={onPhotoPick}
-          selfie={selfie} selfieRef={selfieRef} onSelfiePick={onSelfiePick} onClearSelfie={clearSelfie} selfieEligible={!((clients.find((c) => c.id === bookedClientId) || {}).photo)}
+          selfie={selfie} selfieRef={selfieRef} onSelfiePick={onSelfiePick} onClearSelfie={clearSelfie} selfieEligible={(() => { const r = (clients.find((c) => c.id === bookedClientId)) || (matched && matched.id === bookedClientId ? matched : null) || {}; return !r.photo && !r.selfieRewarded; })()}
           saveState={extrasSave}
           onManage={async () => { const ok = await flushBookingDetails(); captureBookingGallery(); if (ok) setStep(9); }} onExit={async () => {
             const ok = await flushBookingDetails(); captureBookingGallery(); if (!ok) return;
@@ -9896,7 +9909,7 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, mins, pr
                 <div style={{ ...rowSub, fontSize: 13, marginTop: 3 }}>{selfie ? "Now your profile photo." : "So we see how you look today."}</div>
               </div>
               {selfie
-                ? <button onClick={onClearSelfie} style={{ flexShrink: 0, background: "none", border: "1px solid var(--border)", color: "var(--sub)", borderRadius: 10, padding: "9px 12px", fontFamily: F, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Remove</button>
+                ? <div style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 5, color: "var(--gold)", fontFamily: F, fontSize: 13, fontWeight: 700 }} title="Saved to your profile"><Check size={16} strokeWidth={2.6} /> Saved</div>
                 : <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "9px 14px", fontFamily: F, fontSize: 13.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Selfie</button>}
             </div>
           )}

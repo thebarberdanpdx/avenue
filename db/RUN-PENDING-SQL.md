@@ -16,6 +16,16 @@ Order does not matter. If a line says `already exists`, that’s fine — stop a
 
 ---
 
+## 00b. $5 selfie credit becomes one-time-per-client (recommended)
+
+**File:** `selfie-reward-ledger-2026-07-23.sql`
+
+**What it does:** The $5 "add a selfie" credit is meant to be a one-time perk. Until now it was only blocked from repeating by "do we already have their photo?" — which a client could get around (skip or remove the photo) to grab the $5 again on a later booking. This makes it a real one-time-per-client rule on the server: once someone's gotten the $5, they never get it again, even if the photo changes. The app now also locks the selfie once added (no "Remove" button on the confirmation screen).
+
+**After:** A returning client who already got the selfie $5 is not offered it again and can't re-claim it. No change for a first-time selfie.
+
+---
+
 ## 00. Client can re-load their photos on a new phone (optional but recommended)
 
 **File:** `booking-extras-read-2026-07-23.sql`
