@@ -167,6 +167,11 @@ async function handler(req, res) {
     // badge:0 shows the alert but leaves no lingering dot on the app icon, and clears any
     // currently-stuck badge (the app has no unread-count model, so a persistent badge was noise).
     aps: { alert: { title, body: finalBody }, sound: "default", badge: 0 },
+    // [push-deeplink-shape] Deep-link fields (t/id) go BOTH at the top level AND nested under `data`
+    // so the app's tap handler finds them no matter how iOS/Capacitor delivers the custom payload
+    // (flat keys, a nested object, or a JSON string). Nesting alone was unreliable — a tapped
+    // "rescheduled" notification then failed to open the appointment's day.
+    ...(data && typeof data === "object" ? data : {}),
     ...(data ? { data } : {}),
   };
 

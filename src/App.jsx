@@ -2841,9 +2841,17 @@ function App() {
         });
         await PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
           try {
-            const raw = (action && action.notification && action.notification.data) || {};
-            const info = raw.data && typeof raw.data === "object" ? raw.data : raw;
-            if (info && info.t === "appt" && info.id) { setPendingApptId(String(info.id)); setView("shop"); }
+            // [push-deeplink-shape] iOS/Capacitor can hand the tapped notification's custom data back
+            // FLAT ({t,id}), NESTED ({data:{t,id}}), or as a JSON STRING — the old handler only read the
+            // first two, so a tapped notification whose data arrived stringified never deep-linked and the
+            // app just resumed on today. Parse every shape; server now also sends t/id at the top level.
+            const asObj = (v) => { if (typeof v === "string") { try { return JSON.parse(v) || {}; } catch (e) { return {}; } } return (v && typeof v === "object") ? v : {}; };
+            const raw = asObj((action && action.notification && action.notification.data) || {});
+            const nested = asObj(raw.data);
+            const t = nested.t || raw.t;
+            const id = nested.id || raw.id;
+            try { window.localStorage.setItem("vero_last_push_tap", JSON.stringify({ t, id, raw, at: Date.now() }).slice(0, 600)); } catch (e) {}
+            if (t === "appt" && id) { setPendingApptId(String(id)); setView("shop"); }
           } catch (e) {}
         });
         await PushNotifications.register();
@@ -22621,6 +22629,8 @@ function NativeDiagnostics() {
   const run = async () => {
     let push = "";
     try { push = window.localStorage.getItem("vero_push_status") || "(none captured yet)"; } catch (e) {}
+    let lastTap = "";
+    try { lastTap = window.localStorage.getItem("vero_last_push_tap") || ""; } catch (e) {}
     let uid = "—", claims = "", err = "";
     try {
       await ensureFreshSession();
@@ -22628,7 +22638,7 @@ function NativeDiagnostics() {
       if (error) { err = error.message || String(error); }
       else if (data) { uid = data.uid || "NULL (not authenticated)"; claims = data.claims || ""; }
     } catch (e) { err = (e && e.message) ? e.message : String(e); }
-    setInfo({ uid, push, err, claims });
+    setInfo({ uid, push, err, claims, lastTap });
   };
   // Force a fresh push registration and report exactly what happens at each step.
   const forcePush = async () => {
@@ -22675,6 +22685,7 @@ function NativeDiagnostics() {
           : <div>auto-update: <span style={{ color: "var(--faint)" }}>no check recorded yet</span></div>; })()}
         <div>auth.uid(): <b style={{ color: "var(--text)" }}>{info.uid}</b></div>
         {info.push ? <div>push: {info.push}</div> : null}
+        {info.lastTap ? <div style={{ color: "var(--sub)", fontSize: 12 }}>last notification tap: {info.lastTap}</div> : null}
         {info.err ? <div style={{ color: "var(--text)" }}>error: {info.err}</div> : null}
         {info.claims ? <div style={{ color: "var(--sub)", fontSize: 12.5 }}>claims: {info.claims}</div> : null}
       </div>
