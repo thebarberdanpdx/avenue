@@ -3700,6 +3700,18 @@ function App() {
       return;
     }
     let alive = true;
+    // [clients-cache-coldstart] Render the last-synced clients + appointments INSTANTLY from the offline
+    // cache while the authoritative mirror loads in the background. A cold open of a 2,900+ client shop
+    // used to sit on an empty "0 people / No clients yet" list for the whole multi-MB pull (full client
+    // records + all appointment history in one response). This only FILLS an empty list (never overwrites
+    // live data) and deliberately does NOT flip staffClients/ApptsLoadedRef — so the clients/appts SAVE
+    // effects stay gated (they require those refs) and the slim, photo-stripped cache can NEVER be written
+    // back over the server. The mirror then replaces it with full data (photos, galleries) seconds later.
+    // Set the mirror BASELINE (lastRemoteRef) to exactly what we display, so tableHasUnsavedWork sees no
+    // phantom "unsaved work" and the authoritative mirror below proceeds (and then replaces this) instead
+    // of bailing and stranding the app on the slim cache.
+    if (!(clientsRef.current || []).length) { const cc = readCache("clients"); if (cc && cc.length) { lastRemoteRef.current.clients = cc; setClients(cc); } }
+    if (!(apptsRef.current || []).length) { const ca = readCache("appointments"); if (ca && ca.length) { const rc = reconcileDoneOutbox(reconcileCheckinOutbox(ca)); lastRemoteRef.current.appointments = rc; setAppts(rc); } }
     (async () => { if (alive) await mirrorFromServer(); })();
     return () => { alive = false; };
   }, [sessionUid]);
@@ -4484,7 +4496,7 @@ function App() {
           ? <AccessDenied email={session?.user?.email || null} onSignOut={staffSignOut} onBooking={goBooking} />
           : masterMode
           ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={staffSignOut} />
-          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} apptsLoaded={staffApptsLoadedRef.current} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} flushServicesNow={flushServicesNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} syncHealth={syncHealth} />)
+          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} apptsLoaded={staffApptsLoadedRef.current} clientsLoaded={staffClientsLoadedRef.current} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} flushServicesNow={flushServicesNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} syncHealth={syncHealth} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
@@ -13492,7 +13504,7 @@ function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
   );
 }
 
-function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, apptsLoaded = true, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables, flushApptsNow, flushServicesNow, flushClientsNow, flushShopsNow, syncHealth }) {
+function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, apptsLoaded = true, clientsLoaded = true, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables, flushApptsNow, flushServicesNow, flushClientsNow, flushShopsNow, syncHealth }) {
   // Remember where the owner/staff was so leaving the app and coming back (iOS reloads the webview
   // on resume) restores the SAME screen instead of dumping them on the Pulse home. Persisted as
   // { tab, pulseDetail, activeClientId } in localStorage; mirrors the vero_signed_in_as pattern.
@@ -13972,7 +13984,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={navBack} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={navBack} />}
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} onWaitlistOpening={addOpeningNotif} />}
-        {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
+        {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} clientsLoaded={clientsLoaded} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} onOpenAppt={(a) => { setPulseOpenApptId(a.id); navTo({ tab: "calendar", activeClient: null }); }} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} appts={appts} setAppts={setAppts} clients={clients} business={business} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} flushServicesNow={flushServicesNow} />}
@@ -29567,7 +29579,7 @@ function clientListComparator(mode, paidByClient) {
   };
   return S[mode] || S.recent;
 }
-function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner, shopId, appts, setAppts, waitlist, setWaitlist }) {
+function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner, shopId, appts, setAppts, waitlist, setWaitlist, clientsLoaded = true }) {
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState("recent"); // recent | first | last | lastvisit | spend | newest | due | blocked
   const [adding, setAdding] = useState(false);
@@ -29708,7 +29720,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
           <div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, color: "var(--text)" }}>Clients</h2>
-            <div style={{ fontSize: 12.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{clients.length} {clients.length === 1 ? "person" : "people"}</div>
+            <div style={{ fontSize: 12.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{(clients.length === 0 && !clientsLoaded) ? "Loading…" : `${clients.length} ${clients.length === 1 ? "person" : "people"}`}</div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "stretch" }}>
             <button onClick={() => setShowNudgeFolder(true)} aria-label="Rebooking nudges" style={{ position: "relative", background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", height: 42, width: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
@@ -29742,7 +29754,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column" }}>{shown.slice(0, visLimit).map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1] || providers[0] || {}; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>{subFor(c, provider)}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}{shown.length > visLimit && <div ref={listSentinelRef} style={{ height: 1 }} />}</div>
-      {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : "No clients yet — tap + to add your first one."}</p>}
+      {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : (!clientsLoaded ? "Loading your clients…" : "No clients yet — tap + to add your first one.")}</p>}
     </div>
 
     {adding && (
