@@ -8,6 +8,51 @@
 
 ---
 
+## 🆕 CURRENT HANDOFF — 2026-07-23 (live bug-fix + feature session). Branch `claude/live-testing-setup-w0hfet`
+
+> **This is the authoritative handoff. Kickoff line for a fresh app session:**
+> *"Read SESSION-HANDOFF.md (top section) and continue the app work."*
+> The **website** is a SEPARATE effort — see `WEBSITE-HANDOFF.md`, don't mix the two.
+
+App is LIVE at **gotvero.com**. Shop id **`sanctuary`**. Owner **Dan** (not an engineer — honor the ⭐ WORKING STANDARD in `CLAUDE.md`: lead with the answer, 1–3 lines, root-cause never patch, verify PROD before any status, protect data).
+
+### ⚡ CAPABILITIES — what a new session can do, and how to enable each (Dan asked this directly)
+A fresh session on this repo can do **almost everything this session did** — with ONE setup step for live data access.
+
+| Capability | Out of the box? | How |
+|---|---|---|
+| Edit code, `npm run build`, `npm run ship-check` | ✅ yes | just run them |
+| **Deploy / ship** | ✅ yes | commit → push branch → PR to `main` → **squash-merge** → Vercel auto-deploys → poll `https://gotvero.com/api/version` for the merge sha → reset branch. Uses the GitHub tools; no Vercel token needed (GitHub-integration auto-deploy). |
+| **Live PROD data access** (query/verify real Supabase data — the thing that makes "verify live" possible) | ⚠️ **NO — needs a secret** | See below. |
+
+**Live prod access = the Supabase SERVICE-ROLE key.** It is a FULL read/write DB key — a SECRET. It is **NOT in the repo and must NEVER be committed.** This session had it only in an ephemeral scratchpad file, which a new session will **not** have. To give a new session this power **securely**:
+- Set two **environment variables in the Claude Code web environment settings** (Environments → your env → env vars): `SUPABASE_URL=https://iufgznminbujcabqeesk.supabase.co` and `SUPABASE_SERVICE_ROLE_KEY=<the service_role key from Supabase → Project Settings → API>`. Every session in that environment then inherits it. **Prefer this over pasting the key in chat** (chat is logged). **Also: rotate the key** — it has been pasted in chat before.
+- Public/anon key `sb_publishable_aGX3akW7VfHO6Lm-FsZmEA_sf95Nu2i` is safe/public and already in the app.
+- Query pattern: `node` + `@supabase/supabase-js` with the service key; **paginate with `.range(from, from+999)`** — PostgREST silently caps at 1000 rows. Tables: `clients`, `appointments`, `services`, `providers`, `client_login_codes`. RPCs incl. `book_public`, `set_selfie_discount_by_token`. SQL DDL can't run from the JS client — Dan pastes migrations into Supabase SQL Editor (see `db/RUN-PENDING-SQL.md`).
+- **Native only on Dan's device:** Tap to Pay, card reader, push notifications, haptics — a cloud session can NEVER verify these.
+
+### 🚢 Deploy/verify rituals (do these every time)
+- Fast parse check: `npx esbuild --loader=jsx < src/App.jsx > /dev/null`.
+- Full gate before deploy: `npm run ship-check` (build + unit tests + **consent phrase ×4** + regression GUARDS + no-undef; ~2–5 min → run in background, it often exceeds a 300s foreground timeout).
+- After merging a PR: **reset the branch from main** (`git fetch origin main && git checkout -B claude/live-testing-setup-w0hfet origin/main && git push --force-with-lease`). A merged PR is FINISHED — new work is a fresh change off main, never stacked on merged history.
+- Commit footer: `Co-Authored-By: Claude Opus 4.8 …` + the `Claude-Session:` line. PR body ends with the Claude Code line. **Never** put the model id in commits/PRs/code.
+
+### ✅ Shipped + live this session (all verified in the deployed bundle / on prod)
+- **Blocked clients**: (1) restored the `book_public` server guard (an earlier cap-fix SQL had dropped it — Dan re-ran `db/restore-blocked-guard-2026-07-23.sql`; verified GUARD 1 + 1b reject live); (2) blocked client hitting the login flow now gets the neutral "online booking unavailable" sheet the instant they enter phone OR email — never a dead code screen (`api/client-code.js` returns `{unavailable:true}`; both login handlers show `blockedNotice`).
+- **Group CHECKOUT** from the appointment sheet now opens the group checkout (was opening hidden behind the sheet — `startGroupCheckout` now `setOpen(null)`).
+- **"Their usual"** on the client card (pricing tab): pin a client's regular combo (service + cut style + add-ons) via `UsualEditor`/`usualLineCalc` (mirrors `staffItemCalc`, can't drift from checkout); stored as `client.usual`; the online "your usual" prefers it over last-visit.
+- **Durations as hr + min** via reusable `HrMinField`: the usual editor + Settings→Services **default duration** and **per-barber duration** (service editor tab + staff page). Cut-style times were already hr+min. **Left as minutes on purpose (Dan confirmed "leave them"):** the "+extra min" add-on boxes, the client-card `CardBookingRow` "Time for {name}" row, and the two wrap-up "learned time" steppers.
+- Fixed an invisible heading on the "online booking unavailable" sheet (missing `color:var(--text)`).
+
+### ⏳ Pending / not started
+- **#46 — Staff one-tap "Book their usual"** from the client card. Prefill `NewAppointmentForm` (~23232) with the combo: add `initialOpts`/`initialExtraIds` props seeded past the `[service]` reset effect (~23252, use a first-run ref), extend the rebook seam (`onRebook`→`rebookSeed`→`openRebookForm`) to carry `addons`; seeding `opts` makes `commitAppt` (~24651) compute price/duration correctly on its own. Optionally thread a flat price/time override. MONEY PATH — verify the booked price matches the card.
+- **#47 — Harden the selfie $5** (Dan approved the plan): today it's blocked from repeating only by the "already has a photo" offer guard; there's NO per-client ledger. Add `client.selfieRewarded` set when granted (at `applySelfie` ~6518 + booking ~6717), gate BOTH the offer (`selfieEligible` ~9714 / waitlist ~9300) and the discount write on `!selfieRewarded`, and remove the client's in-session "Remove selfie" button (~9899) so the pic locks on add. Also: Dan's manually-created $5 discount preset is redundant with the hardcoded selfie one — suggest deleting it.
+
+### Prior context
+The live-testing RIG (`tests/live/`), timezone fix, money-math unit tests, and readiness findings are in the 2026-07-12 section below — still valid. `db/RUN-PENDING-SQL.md` tracks any owner-run SQL.
+
+---
+
 ## 🆕 LATEST SESSION — 2026-07-12 (live-testing rig + readiness push). Branch `claude/live-testing-setup-w0hfet`
 
 **Headline: built a cloud LIVE-TESTING RIG so changes are verified WITHOUT Dan's phone, then used it to harden the money/booking paths. Dan reframed Phase 2 → "get it READY for real clients" (the finish line, on me) — NOT running real clients before it's safe.**
