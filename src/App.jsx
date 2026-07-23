@@ -8762,6 +8762,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               try {
                 const res = await fetch(API_BASE + "/api/client-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, email: em }) });
                 const out = await res.json().catch(() => ({}));
+                if (out && out.unavailable) { setLoginBusy(false); setBlockedNotice(true); return; } // [blocked-login-notice] blocked client → neutral sheet, never a code screen (field is 'unavailable', not 'blocked', so the wire never says it)
                 if (res.ok && out && out.ok) {
                   // Uniform: always advance to the code screen. If the email isn't on file
                   // no code is sent — but we never reveal that here (anti-enumeration).
@@ -8803,6 +8804,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               try {
                 const res = await fetch(API_BASE + "/api/client-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, phone }) });
                 const out = await res.json().catch(() => ({}));
+                if (out && out.unavailable) { setLoginBusy(false); setBlockedNotice(true); return; } // [blocked-login-notice] blocked client → neutral sheet, never a code screen (field is 'unavailable', not 'blocked', so the wire never says it)
                 if (res.ok && out && out.ok) {
                   // Uniform: always advance to the code screen (anti-enumeration — we never
                   // reveal here whether the number is on file).
