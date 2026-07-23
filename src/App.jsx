@@ -5538,7 +5538,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (isStaff) return;
     let alive = true;
     try {
-      const raw = localStorage.getItem(_clientKey);
+      let raw = localStorage.getItem(_clientKey);
+      // [session-id-durable] Full record gone/unreadable (quota, eviction, partial write)? The tiny
+      // identity record keeps them signed in; their visits re-pull from the server (session token or
+      // per-appointment manage tokens). They must NEVER land back on the login screen while this exists.
+      if (!raw) {
+        try {
+          const t = JSON.parse(localStorage.getItem(_clientKey + "_id") || "null");
+          if (t && t.id) raw = JSON.stringify({ ...t, _localAppts: (t._localSession && Array.isArray(t._tok)) ? t._tok : undefined });
+        } catch (e2) {}
+      }
       if (raw) {
         const c = JSON.parse(raw);
         if (c && c.id) {
@@ -5588,7 +5597,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   useEffect(() => {
     if (isStaff) return;
     if (!_didInitClient.current) { _didInitClient.current = true; return; } // first pass is the restore above
-    if (!(matched && matched.id)) { try { localStorage.removeItem(_clientKey); } catch (e) {} return; }
+    if (!(matched && matched.id)) { try { localStorage.removeItem(_clientKey); localStorage.removeItem(_clientKey + "_id"); } catch (e) {} return; }
+    // [session-id-durable] ALWAYS also write a tiny identity record (a few hundred bytes — immune to
+    // quota, photo bloat, or a partial write). If the full session record is ever missing or unreadable
+    // on the next load, this alone keeps them SIGNED IN — the "saved my photos and got dumped to the
+    // login screen" failure can't happen as long as this survives. Includes the per-appointment manage
+    // tokens so a local (no-server-token) session can rebuild its visit list from the server.
+    try {
+      const tiny = { id: matched.id, name: matched.name, firstName: matched.firstName, lastName: matched.lastName, email: matched.email, phone: matched.phone, sessionToken: matched.sessionToken, _localSession: matched._localSession, _tok: (Array.isArray(matched._localAppts) ? matched._localAppts : []).filter((a) => a && a.manageToken).map((a) => ({ id: a.id, manageToken: a.manageToken })) };
+      localStorage.setItem(_clientKey + "_id", JSON.stringify(tiny));
+    } catch (e) {}
     try { localStorage.setItem(_clientKey, JSON.stringify(matched)); }
     catch (e) { try { localStorage.setItem(_clientKey, JSON.stringify(stripSessionBlobs(matched))); } catch (e2) {} }
   }, [matched]);
@@ -6415,7 +6433,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
   // Commits the booking with the resolved phone and email. Called either directly from LOCK IT IN
   // (no conflict) or from the conflict-confirmation sheet (after the user picks which to keep).
-  const commitBooking = (finalPhone, finalEmail) => {
+  const commitBooking = (finalPhoneRaw, finalEmail) => {
+    // [phone-norm-store] Normalize the phone ONCE at the entry point: "+1 (503) 935-6376" (iOS
+    // autofill) and "5039356376" are the same number. Everything downstream — the stored client
+    // row, the lookup RPC, the appointment payload, notifications, and LOGIN-CODE VERIFY — then
+    // agrees. Heather's client row was stored as "15039356376" while her login codes were keyed
+    // "5039356376": the code always sent, and never matched ("the codes don't work").
+    const finalPhone = formatPhone(finalPhoneRaw) || String(finalPhoneRaw || "").trim();
     // Heads-up guard: if this returning client already has ANY upcoming appointment, alert them
     // before booking a second one and let them choose to keep both or cancel the existing one.
     if (matched) {
@@ -8697,7 +8721,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ marginBottom: 16 }} />
             <input autoFocus inputMode="numeric" value={codeEntry} onChange={(e) => { setCodeEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(false); }} placeholder="• • • • • •" style={{ ...inputStyle, textAlign: "center", fontSize: 28, letterSpacing: 8, marginBottom: codeError ? 8 : 18 }} />
             {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>{codeEntry.length < 6 ? "Enter all 6 digits." : `That code didn't match — check the ${usePhone ? "text" : "email"} and try again.`}</p>}
-            <button className="lift" disabled={loginBusy} onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } let found = null; setLoginBusy(true); try { const { data, error } = usePhone ? await supabase.rpc("verify_client_code_phone", { p_shop: shopId, p_phone: phone, p_code: codeEntry }) : await supabase.rpc("verify_client_code", { p_shop: shopId, p_email: clientEmail.trim().toLowerCase(), p_code: codeEntry }); setLoginBusy(false); if (error || !data) { setCodeError(true); return; } found = data; } catch (e) { setLoginBusy(false); setCodeError(true); return; } const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id, p_session: found.sessionToken }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); setShowAllVisits(false); const _now = Date.now(); const _hasUpcoming = list.some((a) => { if (!a.serviceId || a.status === "block" || a.status === "cancelled" || a.status === "no-show" || a.status === "done") return false; const d = a.bookedFor ? new Date(a.bookedFor) : null; return d && d.getTime() >= _now - 2 * 3600 * 1000; }); const _hasPast = list.some((a) => a.serviceId && a.status !== "block" && a.status !== "cancelled"); const _hasFamily = ((found.family) || []).length > 0; if (business?.bookUsual?.enabled !== false && !_hasFamily && !_hasUpcoming && _hasPast) { setActiveMember(null); setBookingFor("self"); setShowUsual(true); } else { setShowHome(true); } } else { if (cart.length === 0) { setStep(0); setSimpleStep("what"); } else { setStep(6); } } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
+            <button className="lift" disabled={loginBusy} onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } let found = null; setLoginBusy(true); try { const { data, error } = usePhone ? await supabase.rpc("verify_client_code_phone", { p_shop: shopId, p_phone: formatPhone(phone) || phone, p_code: codeEntry }) : await supabase.rpc("verify_client_code", { p_shop: shopId, p_email: clientEmail.trim().toLowerCase(), p_code: codeEntry }); /* [phone-norm-store] verify with the 10-digit form — a "+1"-autofilled number never digit-matched the stored code row (codes "didn't work") */ setLoginBusy(false); if (error || !data) { setCodeError(true); return; } found = data; } catch (e) { setLoginBusy(false); setCodeError(true); return; } const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id, p_session: found.sessionToken }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); setShowAllVisits(false); const _now = Date.now(); const _hasUpcoming = list.some((a) => { if (!a.serviceId || a.status === "block" || a.status === "cancelled" || a.status === "no-show" || a.status === "done") return false; const d = a.bookedFor ? new Date(a.bookedFor) : null; return d && d.getTime() >= _now - 2 * 3600 * 1000; }); const _hasPast = list.some((a) => a.serviceId && a.status !== "block" && a.status !== "cancelled"); const _hasFamily = ((found.family) || []).length > 0; if (business?.bookUsual?.enabled !== false && !_hasFamily && !_hasUpcoming && _hasPast) { setActiveMember(null); setBookingFor("self"); setShowUsual(true); } else { setShowHome(true); } } else { if (cart.length === 0) { setStep(0); setSimpleStep("what"); } else { setStep(6); } } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
             <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); setCodeError(false); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6, cursor: "pointer" }}>{usePhone ? "Use a different number" : "Use a different email"}</button>
             {usePhone && <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); setCodeError(false); setUsePhone(false); setLoginNoMatch(null); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 6, cursor: "pointer" }}>Didn't get the text? Use my email instead</button>}
           </div>
