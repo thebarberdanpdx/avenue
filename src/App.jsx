@@ -9928,6 +9928,7 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, mins, pr
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ ...rowTitle, fontSize: selfie ? 14.5 : 16.5, fontWeight: selfie ? 600 : 700, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{title}{selfie && <span style={chip}>$5 OFF</span>}</div>
                   <div style={{ ...rowSub, fontSize: 13.5, marginTop: 3 }}>{sub}</div>
+                  {!selfie && <div style={{ fontFamily: F, fontSize: 11.5, color: "var(--faint)", marginTop: 5 }}>One-time offer — one $5 discount per client.</div>}
                 </div>
                 {!selfie && <button onClick={openCam} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "11px 17px", fontFamily: F, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Upload</button>}
                 {locked && <div style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 5, color: "var(--gold)", fontFamily: F, fontSize: 13, fontWeight: 700 }} title="Saved & locked"><Check size={16} strokeWidth={2.6} /> Saved</div>}
