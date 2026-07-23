@@ -10177,6 +10177,20 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
     const firstOpen = dateOptions.find(dayHasOpen) || dateOptions[0] || null;
     if (firstOpen) setNewDate(firstOpen);
   }, [phase, availLoaded, prov, appt, dateOptions]);
+  // [resched-jump] The next OPEN day strictly after the current selection (null if none further out).
+  const nextOpenDay = (() => {
+    if (!openDaySet) return null;
+    const cur = newDate ? newDate.toDateString() : null;
+    const idx = cur ? dateOptions.findIndex((d) => d.toDateString() === cur) : -1;
+    for (let i = idx + 1; i < dateOptions.length; i++) if (openDaySet.has(dateOptions[i].toDateString())) return dateOptions[i];
+    return null;
+  })();
+  // Keep the selected day visible: scroll the chosen chip into view (horizontal only) — so the
+  // auto-opened / jumped-to open day isn't left off-screen on the strip.
+  const selChipRef = useRef(null);
+  useEffect(() => {
+    if (phase === "resched" && newDate && selChipRef.current) { try { selChipRef.current.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" }); } catch (e) {} }
+  }, [newDate, phase]);
 
   const fmtWhenObj = (iso) => { const d = new Date(iso); const day = relativeDate(d); const lbl = day.includes(",") ? day : `${day}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; return { date: lbl, time: fmtTime(d.getHours() * 60 + d.getMinutes()) }; };
   const hoursUntil = (iso) => (new Date(iso) - new Date()) / 36e5;
@@ -10319,12 +10333,17 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
           <div style={{ fontSize: 12, letterSpacing: 2.5, color: A, fontWeight: 600, textTransform: "uppercase", marginBottom: 14 }}>Pick a new time</div>
           <div style={{ display: "flex", gap: 9, overflowX: "auto", paddingBottom: 6, marginBottom: 18 }}>
             {dateOptions.map((d, i) => { const on = newDate && d.toDateString() === newDate.toDateString(); const full = openDaySet ? !openDaySet.has(d.toDateString()) : false; return (
-              <button key={i} disabled={full} onClick={() => { if (full) return; setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, width: 54, padding: "10px 0", borderRadius: 13, border: `1px solid ${on ? A : "var(--border)"}`, background: on ? A : "var(--panel)", color: on ? ON : "var(--text)", textAlign: "center", cursor: full ? "default" : "pointer", opacity: full ? 0.38 : 1, boxShadow: on ? "0 8px 18px -10px var(--shadow)" : "none" }}>
+              <button key={i} ref={on ? selChipRef : null} disabled={full} onClick={() => { if (full) return; setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, width: 54, padding: "10px 0", borderRadius: 13, border: `1px solid ${on ? A : "var(--border)"}`, background: on ? A : "var(--panel)", color: on ? ON : "var(--text)", textAlign: "center", cursor: full ? "default" : "pointer", opacity: full ? 0.38 : 1, boxShadow: on ? "0 8px 18px -10px var(--shadow)" : "none" }}>
                 <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.72 }}>{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][d.getDay()]}</div>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, marginTop: 1 }}>{d.getDate()}</div>
               </button>
             ); })}
           </div>
+          {/* [resched-jump] Skip straight to the next day with openings — for a fully-booked stretch the
+              client shouldn't have to tap through greyed days one by one. */}
+          {nextOpenDay && (
+            <button onClick={() => { setNewDate(nextOpenDay); setNewSlot(null); }} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: "0 0 14px", color: A, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Jump to next available day →</button>
+          )}
           {newDate && (reSlots.length === 0
             ? <div style={{ fontSize: 14, color: "var(--sub)" }}>No open times that day — try another.</div>
             : <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
