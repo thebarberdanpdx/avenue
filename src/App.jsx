@@ -5536,6 +5536,31 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // [session-crumbs] Tiny on-device event trail (last 40) for the recurring "bounced to login"
   // hunt — records which session path fired so a report becomes a read, not a guess.
   const _crumb = (ev) => { try { const k = "vero_crumbs_" + shopId; const list = JSON.parse(localStorage.getItem(k) || "[]"); list.push({ t: new Date().toISOString().slice(5, 19), ev }); localStorage.setItem(k, JSON.stringify(list.slice(-40))); } catch (e) {} };
+  // [storage-self-heal] Proven live: the flow worked in PRIVATE mode (clean storage) and bounced in
+  // normal Safari — the device's stored data for this site was full/wedged, so every session write
+  // silently died. On start: canary-write; if it throws, evict this app's bulkiest non-essential
+  // entries (old caches, oversized leftovers — NEVER the session keys) and retry, so a wedged device
+  // fixes itself on the next visit.
+  useEffect(() => {
+    if (isStaff || typeof window === "undefined") return;
+    const canary = () => { localStorage.setItem("vero_canary", "1"); localStorage.removeItem("vero_canary"); };
+    try { canary(); return; } catch (e) {}
+    try {
+      const keep = new Set([_clientKey, _clientKey + "_id", "vero_crumbs_" + shopId]);
+      const victims = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || keep.has(k)) continue;
+        const v = localStorage.getItem(k) || "";
+        victims.push([k, v.length]);
+      }
+      victims.sort((a, b) => b[1] - a[1]); // biggest first
+      for (const [k] of victims) {
+        try { localStorage.removeItem(k); canary(); _crumb("selfheal:freed:" + k.slice(0, 28)); return; } catch (e) { /* keep evicting */ }
+      }
+      _crumb("selfheal:STILL-WEDGED");
+    } catch (e) {}
+  }, []);
   const _didInitClient = useRef(false);
   useEffect(() => {
     if (isStaff) return;
@@ -5589,10 +5614,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // refuses to strand a signed-in device: if it renders while a stored session exists, restore and go
   // home. Explicit sign-outs delete the stored session first, so they still land here normally.
   useEffect(() => {
-    if (isStaff || matched || showHome || step !== 0 || simpleStep || showCodeEntry) return;
+    // Covers BOTH login-type screens: the step-0 welcome AND the step-5 phone/email login (until a
+    // code entry is actually in progress). Explicit sign-outs deleted the keys first, so they pass.
+    if (isStaff || matched || showHome || simpleStep || showCodeEntry || (step !== 0 && step !== 5)) return;
     let t = null;
     try { t = JSON.parse(localStorage.getItem(_clientKey) || localStorage.getItem(_clientKey + "_id") || "null"); } catch (e) {}
-    if (!(t && t.id)) return;
+    if (!(t && t.id)) { _crumb("login-shown:no-stored-session:step" + step); return; }
     _crumb("welcome-guard:restored:" + t.id);
     const restored = { ...t, _localAppts: Array.isArray(t._localAppts) ? t._localAppts : ((t._localSession && Array.isArray(t._tok)) ? t._tok : undefined) };
     setMatched(restored);
@@ -5634,8 +5661,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       const tiny = { id: matched.id, name: matched.name, firstName: matched.firstName, lastName: matched.lastName, email: matched.email, phone: matched.phone, sessionToken: matched.sessionToken, _localSession: matched._localSession, _tok: (Array.isArray(matched._localAppts) ? matched._localAppts : []).filter((a) => a && a.manageToken).map((a) => ({ id: a.id, manageToken: a.manageToken, serviceId: a.serviceId, providerId: a.providerId, bookedFor: a.bookedFor, start: a.start, end: a.end, status: a.status, title: a.title, serviceName: a.serviceName, price: a.price })) };
       localStorage.setItem(_clientKey + "_id", JSON.stringify(tiny));
     } catch (e) {}
-    try { localStorage.setItem(_clientKey, JSON.stringify(matched)); }
-    catch (e) { try { localStorage.setItem(_clientKey, JSON.stringify(stripSessionBlobs(matched))); } catch (e2) {} }
+    // [session-always-slim] NEVER persist photo blobs on the device. The old "full first, slim on
+    // failure" dance meant a device with bloated/wedged storage (proven live: private mode worked,
+    // normal Safari bounced) could fail BOTH writes. Photos live on the server and re-pull on load;
+    // the stored record stays small enough to write on any device, always.
+    try { localStorage.setItem(_clientKey, JSON.stringify(stripSessionBlobs(matched))); }
+    catch (e) { _crumb("persist:FAILED:" + String((e && e.name) || e).slice(0, 24)); }
   }, [matched]);
   // Hold the App's version auto-reload while the client is on the confirmation screen (step 8) so a
   // background version bump can't hard-reload the "You're confirmed" page out from under them.
@@ -7249,6 +7280,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <span className="wel-ar">&#8594;</span>
               </button>
             </div>
+            {/* [session-crumbs] Debug readout — ONLY with ?debug=1 in the URL. Shows the running bundle,
+                whether a stored session exists, and the last few session events, so a "bounced to login"
+                report can be diagnosed from one screenshot instead of guesswork. */}
+            {typeof location !== "undefined" && /[?&]debug=1/.test(location.search) && (() => {
+              let c = []; try { c = (JSON.parse(localStorage.getItem("vero_crumbs_" + shopId) || "[]") || []).slice(-8); } catch (e) {}
+              let sess = "err"; try { sess = localStorage.getItem(_clientKey) ? "full" : (localStorage.getItem(_clientKey + "_id") ? "tiny" : "none"); } catch (e) {}
+              return (
+                <div style={{ marginTop: 18, fontSize: 10.5, color: "var(--faint)", fontFamily: "monospace", lineHeight: 1.65, wordBreak: "break-all", textAlign: "left" }}>
+                  <div>v:{(typeof __BUILD_VERSION__ !== "undefined" ? String(__BUILD_VERSION__) : "dev").slice(0, 7)} · stored-session:{sess}</div>
+                  {c.map((x, i) => <div key={i}>{x.t} {x.ev}</div>)}
+                </div>
+              );
+            })()}
             {pubReviews.length > 0 && (() => {
               const feat = pubReviews.filter((r) => r.featured);
               const picks = (feat.length ? feat : pubReviews).slice(0, 3);
