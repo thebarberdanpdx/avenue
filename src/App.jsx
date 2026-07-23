@@ -10148,20 +10148,32 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
     return reSlotsRaw.filter((s) => { const st = s.start, en = s.start + dur; return !blocks.some((r) => st < r.end && en > r.start); });
   })();
 
+  // Does a given day have any bookable opening for this appointment? (real computeFreeSlots, minus
+  // any time-rule blocks — the SAME filter reSlots uses, so what's clickable matches what's shown.)
+  const dayHasOpen = (d) => {
+    if (!prov) return false;
+    let slots = computeFreeSlots({ prov, date: d, durMin: dur, providers, appts: avail, business, services });
+    const svc = appt ? services.find((s) => s.id === appt.serviceId) : null;
+    const blocks = ((svc && svc.timeRules) || []).filter((r) => r && r.block && (!r.scope || r.scope === "all" || r.scope === prov.id) && (!r.days || !r.days.length || r.days.includes(d.getDay())));
+    if (blocks.length) slots = slots.filter((s) => { const st = s.start, en = s.start + dur; return !blocks.some((r) => st < r.end && en > r.start); });
+    return slots.length > 0;
+  };
+  // [resched-grey-full-days] Set of strip days that HAVE openings. Days not in it are greyed + unclickable,
+  // so a client can't land on a "No open times that day." Null until real availability loads (don't grey
+  // on a guess). Computed once per availability change, not per render/frame.
+  const openDaySet = useMemo(() => {
+    if (!prov || !availLoaded) return null;
+    const s = new Set();
+    for (const d of dateOptions) if (dayHasOpen(d)) s.add(d.toDateString());
+    return s;
+  }, [prov, availLoaded, dateOptions, avail, dur, appt]);
+
   // [resched-open-next-open] When the reschedule picker opens, land on the NEXT day that actually has
-  // openings — not the first day on the strip (which is often the client's own fully-booked day, showing
-  // "No open times that day"). Waits for real availability to load, honors time-rule blocks (same filter
-  // as reSlots), and only auto-selects while the client hasn't picked a day yet. Falls back to the first
+  // openings — not the first day on the strip (which is often the client's own fully-booked day). Waits
+  // for real availability, only auto-selects while the client hasn't picked a day. Falls back to the first
   // strip day if nothing in the horizon is open, so the picker is never left blank.
   useEffect(() => {
     if (phase !== "resched" || newDate != null || !prov || !availLoaded) return;
-    const svc = appt ? services.find((s) => s.id === appt.serviceId) : null;
-    const dayHasOpen = (d) => {
-      let slots = computeFreeSlots({ prov, date: d, durMin: dur, providers, appts: avail, business, services });
-      const blocks = ((svc && svc.timeRules) || []).filter((r) => r && r.block && (!r.scope || r.scope === "all" || r.scope === prov.id) && (!r.days || !r.days.length || r.days.includes(d.getDay())));
-      if (blocks.length) slots = slots.filter((s) => { const st = s.start, en = s.start + dur; return !blocks.some((r) => st < r.end && en > r.start); });
-      return slots.length > 0;
-    };
     const firstOpen = dateOptions.find(dayHasOpen) || dateOptions[0] || null;
     if (firstOpen) setNewDate(firstOpen);
   }, [phase, availLoaded, prov, appt, dateOptions]);
@@ -10306,8 +10318,8 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
         <div style={{ padding: "22px 22px 24px" }}>
           <div style={{ fontSize: 12, letterSpacing: 2.5, color: A, fontWeight: 600, textTransform: "uppercase", marginBottom: 14 }}>Pick a new time</div>
           <div style={{ display: "flex", gap: 9, overflowX: "auto", paddingBottom: 6, marginBottom: 18 }}>
-            {dateOptions.map((d, i) => { const on = newDate && d.toDateString() === newDate.toDateString(); return (
-              <button key={i} onClick={() => { setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, width: 54, padding: "10px 0", borderRadius: 13, border: `1px solid ${on ? A : "var(--border)"}`, background: on ? A : "var(--panel)", color: on ? ON : "var(--text)", textAlign: "center", cursor: "pointer", boxShadow: on ? "0 8px 18px -10px var(--shadow)" : "none" }}>
+            {dateOptions.map((d, i) => { const on = newDate && d.toDateString() === newDate.toDateString(); const full = openDaySet ? !openDaySet.has(d.toDateString()) : false; return (
+              <button key={i} disabled={full} onClick={() => { if (full) return; setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, width: 54, padding: "10px 0", borderRadius: 13, border: `1px solid ${on ? A : "var(--border)"}`, background: on ? A : "var(--panel)", color: on ? ON : "var(--text)", textAlign: "center", cursor: full ? "default" : "pointer", opacity: full ? 0.38 : 1, boxShadow: on ? "0 8px 18px -10px var(--shadow)" : "none" }}>
                 <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.72 }}>{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][d.getDay()]}</div>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, marginTop: 1 }}>{d.getDate()}</div>
               </button>
