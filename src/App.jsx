@@ -10092,6 +10092,7 @@ function ReviewByToken({ token, shopId, business, onExit }) {
 function ManageByToken({ token, shopId, business, providers, services, onExit, onChanged }) {
   const [appt, setAppt] = useState(null);
   const [avail, setAvail] = useState([]);
+  const [availLoaded, setAvailLoaded] = useState(false); // true once get_availability has resolved (so we don't auto-pick a day before real availability is known)
   const [phase, setPhase] = useState("loading"); // loading | error | view | resched | cancel | cancelled | rescheduled
   const [newDate, setNewDate] = useState(null);
   const [newSlot, setNewSlot] = useState(null);
@@ -10116,8 +10117,34 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
         if (error || !data || !data.id) { setPhase("error"); return; }
         setAppt(data);
         setPhase(String(data.status || "").toLowerCase() === "cancelled" ? "cancelled" : (arriveFlag ? "arrive" : "view"));
+        // [manage-keeps-signed-in] Opening a manage link signs the client into a lightweight LOCAL session
+        // (built from THIS appointment + its possession token) WHEN they aren't already signed in — so
+        // after any manage action (reschedule / cancel / notes) the exit lands on their own home, never
+        // the login screen ("keep the client logged in after any update to the appt"). Written to the same
+        // key ClientFlow restores from. Never clobbers a richer existing session.
+        try {
+          const ck = "vero_client_" + shopId;
+          const cookieKey = "vero_c_" + shopId;
+          let existing = null;
+          try { existing = JSON.parse(localStorage.getItem(ck) || localStorage.getItem(ck + "_id") || "null"); } catch (e2) {}
+          if (!(existing && existing.id)) { // also honor a cookie-only session (wedged/cleared localStorage) so we never clobber a real login
+            try { const pre = cookieKey + "="; for (const c of (document.cookie || "").split(";")) { const cc = c.trim(); if (cc.indexOf(pre) === 0) { existing = JSON.parse(decodeURIComponent(cc.slice(pre.length))); break; } } } catch (e2) {}
+          }
+          if (!(existing && existing.id) && (data.phone || data.email)) {
+            const digits = String(data.phone || "").replace(/\D/g, "");
+            const cid = "mt_" + (digits || String(data.email || "").toLowerCase());
+            const ap = { id: data.id, manageToken: token, serviceId: data.serviceId, providerId: data.providerId, bookedFor: data.bookedFor, start: data.start, end: data.end, status: data.status, title: data.title, serviceName: data.serviceName, name: data.name };
+            const sess = { id: cid, name: data.name || "", firstName: "", lastName: "", email: data.email || "", phone: data.phone || "", family: [], gallery: [], _localSession: true, _localAppts: [ap] };
+            const tiny = { id: cid, name: sess.name, email: sess.email, phone: sess.phone, _localSession: true, _tok: [{ id: ap.id, manageToken: ap.manageToken, serviceId: ap.serviceId, providerId: ap.providerId, bookedFor: ap.bookedFor, start: ap.start, end: ap.end, status: ap.status, title: ap.title, serviceName: ap.serviceName }] };
+            try { localStorage.setItem(ck, JSON.stringify(sess)); } catch (e2) {}
+            try { localStorage.setItem(ck + "_id", JSON.stringify(tiny)); } catch (e2) {}
+            // Cookie lifeline too — survives wedged/full localStorage (the exact failure behind the recurring bounce).
+            try { const v = encodeURIComponent(JSON.stringify(tiny)); if (v.length <= 3800) { const sec = (typeof location !== "undefined" && location.protocol === "https:") ? "; Secure" : ""; document.cookie = cookieKey + "=" + v + "; path=/; max-age=31536000; SameSite=Lax" + sec; } } catch (e2) {}
+          }
+        } catch (e2) {}
       } catch (e) { if (alive) setPhase("error"); return; }
       try { const av = await supabase.rpc("get_availability", { p_shop: shopId }); if (alive && av && av.data) setAvail(av.data); } catch (e) {}
+      finally { if (alive) setAvailLoaded(true); }
     })();
     return () => { alive = false; };
   }, [token, shopId]);
@@ -10145,6 +10172,50 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
     if (!blocks.length) return reSlotsRaw;
     return reSlotsRaw.filter((s) => { const st = s.start, en = s.start + dur; return !blocks.some((r) => st < r.end && en > r.start); });
   })();
+
+  // Does a given day have any bookable opening for this appointment? (real computeFreeSlots, minus
+  // any time-rule blocks — the SAME filter reSlots uses, so what's clickable matches what's shown.)
+  const dayHasOpen = (d) => {
+    if (!prov) return false;
+    let slots = computeFreeSlots({ prov, date: d, durMin: dur, providers, appts: avail, business, services });
+    const svc = appt ? services.find((s) => s.id === appt.serviceId) : null;
+    const blocks = ((svc && svc.timeRules) || []).filter((r) => r && r.block && (!r.scope || r.scope === "all" || r.scope === prov.id) && (!r.days || !r.days.length || r.days.includes(d.getDay())));
+    if (blocks.length) slots = slots.filter((s) => { const st = s.start, en = s.start + dur; return !blocks.some((r) => st < r.end && en > r.start); });
+    return slots.length > 0;
+  };
+  // [resched-grey-full-days] Set of strip days that HAVE openings. Days not in it are greyed + unclickable,
+  // so a client can't land on a "No open times that day." Null until real availability loads (don't grey
+  // on a guess). Computed once per availability change, not per render/frame.
+  const openDaySet = useMemo(() => {
+    if (!prov || !availLoaded) return null;
+    const s = new Set();
+    for (const d of dateOptions) if (dayHasOpen(d)) s.add(d.toDateString());
+    return s;
+  }, [prov, availLoaded, dateOptions, avail, dur, appt]);
+
+  // [resched-open-next-open] When the reschedule picker opens, land on the NEXT day that actually has
+  // openings — not the first day on the strip (which is often the client's own fully-booked day). Waits
+  // for real availability, only auto-selects while the client hasn't picked a day. Falls back to the first
+  // strip day if nothing in the horizon is open, so the picker is never left blank.
+  useEffect(() => {
+    if (phase !== "resched" || newDate != null || !prov || !availLoaded) return;
+    const firstOpen = dateOptions.find(dayHasOpen) || dateOptions[0] || null;
+    if (firstOpen) setNewDate(firstOpen);
+  }, [phase, availLoaded, prov, appt, dateOptions]);
+  // [resched-jump] The next OPEN day strictly after the current selection (null if none further out).
+  const nextOpenDay = (() => {
+    if (!openDaySet) return null;
+    const cur = newDate ? newDate.toDateString() : null;
+    const idx = cur ? dateOptions.findIndex((d) => d.toDateString() === cur) : -1;
+    for (let i = idx + 1; i < dateOptions.length; i++) if (openDaySet.has(dateOptions[i].toDateString())) return dateOptions[i];
+    return null;
+  })();
+  // Keep the selected day visible: scroll the chosen chip into view (horizontal only) — so the
+  // auto-opened / jumped-to open day isn't left off-screen on the strip.
+  const selChipRef = useRef(null);
+  useEffect(() => {
+    if (phase === "resched" && newDate && selChipRef.current) { try { selChipRef.current.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" }); } catch (e) {} }
+  }, [newDate, phase]);
 
   const fmtWhenObj = (iso) => { const d = new Date(iso); const day = relativeDate(d); const lbl = day.includes(",") ? day : `${day}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; return { date: lbl, time: fmtTime(d.getHours() * 60 + d.getMinutes()) }; };
   const hoursUntil = (iso) => (new Date(iso) - new Date()) / 36e5;
@@ -10286,13 +10357,18 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
         <div style={{ padding: "22px 22px 24px" }}>
           <div style={{ fontSize: 12, letterSpacing: 2.5, color: A, fontWeight: 600, textTransform: "uppercase", marginBottom: 14 }}>Pick a new time</div>
           <div style={{ display: "flex", gap: 9, overflowX: "auto", paddingBottom: 6, marginBottom: 18 }}>
-            {dateOptions.map((d, i) => { const on = newDate && d.toDateString() === newDate.toDateString(); return (
-              <button key={i} onClick={() => { setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, width: 54, padding: "10px 0", borderRadius: 13, border: `1px solid ${on ? A : "var(--border)"}`, background: on ? A : "var(--panel)", color: on ? ON : "var(--text)", textAlign: "center", cursor: "pointer", boxShadow: on ? "0 8px 18px -10px var(--shadow)" : "none" }}>
+            {dateOptions.map((d, i) => { const on = newDate && d.toDateString() === newDate.toDateString(); const full = openDaySet ? !openDaySet.has(d.toDateString()) : false; return (
+              <button key={i} ref={on ? selChipRef : null} disabled={full} onClick={() => { if (full) return; setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, width: 54, padding: "10px 0", borderRadius: 13, border: `1px solid ${on ? A : "var(--border)"}`, background: on ? A : "var(--panel)", color: on ? ON : "var(--text)", textAlign: "center", cursor: full ? "default" : "pointer", opacity: full ? 0.38 : 1, boxShadow: on ? "0 8px 18px -10px var(--shadow)" : "none" }}>
                 <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.72 }}>{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][d.getDay()]}</div>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, marginTop: 1 }}>{d.getDate()}</div>
               </button>
             ); })}
           </div>
+          {/* [resched-jump] Skip straight to the next day with openings — for a fully-booked stretch the
+              client shouldn't have to tap through greyed days one by one. */}
+          {nextOpenDay && (
+            <button onClick={() => { setNewDate(nextOpenDay); setNewSlot(null); }} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: "0 0 14px", color: A, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Jump to next available day →</button>
+          )}
           {newDate && (reSlots.length === 0
             ? <div style={{ fontSize: 14, color: "var(--sub)" }}>No open times that day — try another.</div>
             : <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
