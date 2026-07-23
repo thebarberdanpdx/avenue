@@ -30137,7 +30137,9 @@ function UsualEditor({ client, services, providers, onSave, onClear }) {
   const saved = client.usual && client.usual.serviceId ? client.usual : null;
   const [svcId, setSvcId] = useState(saved ? saved.serviceId : "");
   const [addons, setAddons] = useState(() => ({ ...((saved && saved.addons) || {}) }));
-  const [durOverride, setDurOverride] = useState(saved && saved.duration != null ? String(saved.duration) : "");
+  // [usual-hr-min] time is entered as HOURS + MINUTES (Dan doesn't want to think in raw minutes); stored as total minutes.
+  const [hrStr, setHrStr] = useState(saved && saved.duration != null ? String(Math.floor(saved.duration / 60)) : "");
+  const [minStr, setMinStr] = useState(saved && saved.duration != null ? String(saved.duration % 60) : "");
   const [priceOverride, setPriceOverride] = useState(saved && saved.price != null ? String(saved.price) : "");
   const [flash, setFlash] = useState(false);
   useEffect(() => { if (!flash) return; const id = setTimeout(() => setFlash(false), 2600); return () => clearTimeout(id); }, [flash]);
@@ -30162,18 +30164,20 @@ function UsualEditor({ client, services, providers, onSave, onClear }) {
   const otherChoice = svc ? (svc.addonGroups || []).filter((g) => g.type === "choice" && g.id !== "cutchoice") : [];
   const addonGroups = svc ? (svc.addonGroups || []).filter((g) => g.type === "addon") : [];
   const calc = usualLineCalc(client, { serviceId: svcId, addons, providerId: client.provider }, services, providers);
-  const effMin = durOverride.trim() !== "" ? Math.max(0, parseInt(durOverride, 10) || 0) : calc.min;
+  const durTyped = hrStr.trim() !== "" || minStr.trim() !== "";
+  const durOverrideMin = durTyped ? Math.max(0, (parseInt(hrStr, 10) || 0) * 60 + (parseInt(minStr, 10) || 0)) : null;
+  const effMin = durOverrideMin != null ? durOverrideMin : calc.min;
   const effPrice = priceOverride.trim() !== "" ? Math.max(0, Math.round((parseFloat(priceOverride) || 0) * 100) / 100) : calc.price;
   const setChoice = (gid, val) => setAddons((p) => { const n = { ...p }; if (val) n[gid] = val; else delete n[gid]; return n; });
   const toggleAddon = (gid) => setAddons((p) => { const n = { ...p }; if (n[gid]) delete n[gid]; else n[gid] = true; return n; });
   const save = () => {
     if (!svcId) return;
     onSave({ serviceId: svcId, addons: { ...addons }, cutType: null, beardType: null, providerId: client.provider || null,
-      duration: durOverride.trim() === "" ? null : Math.max(0, parseInt(durOverride, 10) || 0),
+      duration: durTyped ? durOverrideMin : null,
       price: priceOverride.trim() === "" ? null : Math.max(0, Math.round((parseFloat(priceOverride) || 0) * 100) / 100) });
     setFlash(true);
   };
-  const clear = () => { setSvcId(""); setAddons({}); setDurOverride(""); setPriceOverride(""); onClear(); };
+  const clear = () => { setSvcId(""); setAddons({}); setHrStr(""); setMinStr(""); setPriceOverride(""); onClear(); };
   const fl = { fontSize: 13, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, marginBottom: 6 };
   const selStyle = { width: "100%", boxSizing: "border-box", border: "1px solid var(--border2)", borderRadius: 11, background: "var(--bg)", padding: "11px 12px", fontFamily: FONT_BODY, fontSize: 15, color: "var(--text)", appearance: "none", WebkitAppearance: "none" };
   const ipt = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--bg)" };
@@ -30224,18 +30228,17 @@ function UsualEditor({ client, services, providers, onSave, onClear }) {
         </div>
       )}
       {svcId && (
-        <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-          <div style={{ flex: 1 }}>
-            <div style={fl}>Time</div>
-            <div style={ipt}><input value={durOverride} onChange={(e) => setDurOverride(e.target.value.replace(/[^0-9]/g, ""))} placeholder={String(calc.min)} inputMode="numeric" style={inp} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13.5 }}>min</span></div>
+        <div style={{ marginTop: 4 }}>
+          <div style={fl}>Time</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 13 }}>
+            <div style={{ ...ipt, flex: 1 }}><input value={hrStr} onChange={(e) => setHrStr(e.target.value.replace(/[^0-9]/g, ""))} placeholder={String(Math.floor(calc.min / 60))} inputMode="numeric" style={inp} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13.5 }}>hr</span></div>
+            <div style={{ ...ipt, flex: 1 }}><input value={minStr} onChange={(e) => setMinStr(e.target.value.replace(/[^0-9]/g, ""))} placeholder={String(calc.min % 60)} inputMode="numeric" style={inp} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13.5 }}>min</span></div>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={fl}>Price</div>
-            <div style={ipt}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input value={priceOverride} onChange={(e) => setPriceOverride(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={String(calc.price)} inputMode="decimal" style={inp} /></div>
-          </div>
+          <div style={fl}>Price</div>
+          <div style={ipt}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input value={priceOverride} onChange={(e) => setPriceOverride(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={String(calc.price)} inputMode="decimal" style={inp} /></div>
         </div>
       )}
-      {svcId && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 11, lineHeight: 1.5 }}>{svc ? svc.name : ""}{calc.labels.length ? " · " + calc.labels.join(" · ") : ""} — books at <strong style={{ color: "var(--text)" }}>{fmtDur(effMin)} · ${effPrice}</strong>{(durOverride.trim() !== "" || priceOverride.trim() !== "") ? " (your set rate)" : " (from your menu)"}</div>}
+      {svcId && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 11, lineHeight: 1.5 }}>{svc ? svc.name : ""}{calc.labels.length ? " · " + calc.labels.join(" · ") : ""} — books at <strong style={{ color: "var(--text)" }}>{fmtDur(effMin)} · ${effPrice}</strong>{(durTyped || priceOverride.trim() !== "") ? " (your set rate)" : " (from your menu)"}</div>}
       <div style={{ display: "flex", gap: 12, marginTop: 15, alignItems: "center" }}>
         <button className="lift" onClick={save} disabled={!svcId} style={{ background: svcId ? "var(--gold)" : "var(--panel2)", color: svcId ? "var(--on-gold)" : "var(--faint)", border: "none", borderRadius: 10, padding: "11px 20px", fontSize: 14.5, fontWeight: 700, cursor: svcId ? "pointer" : "default" }}>Save usual</button>
         {saved && <button onClick={clear} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>Clear</button>}
