@@ -2460,9 +2460,23 @@ function App() {
     // its HTTP cache. window.location.replace to a NEW query key, not the same href.
     const hardReload = (version) => {
       try { if (window.caches && caches.keys) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {}); } catch (e) {}
-      const origin = (window.location && window.location.origin) ? window.location.origin : "https://gotvero.com";
-      const path = (window.location && window.location.pathname) ? window.location.pathname : "/";
-      window.location.replace(origin + path + "?u=" + Date.now() + (version ? "&v=" + String(version).slice(0, 8) : ""));
+      // [session-shop-stable] KEEP every existing query param across the cache-bust reload — above all
+      // ?shop=. resolveShopId reads ?shop= FIRST, so dropping it fell back to the default shop, which
+      // changed the per-shop client-session key (vero_client_<shop>) and dumped a just-booked client to
+      // the login/welcome screen (and reloaded the WRONG shop). Only the cache-bust key `u` changes.
+      let target;
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.set("u", String(Date.now()));
+        if (version) u.searchParams.set("v", String(version).slice(0, 8));
+        u.hash = ""; // match the prior behavior (no hash) — resolveShopId never reads the hash
+        target = u.toString();
+      } catch (e) {
+        const origin = (window.location && window.location.origin) ? window.location.origin : "https://gotvero.com";
+        const path = (window.location && window.location.pathname) ? window.location.pathname : "/";
+        target = origin + path + "?u=" + Date.now() + (version ? "&v=" + String(version).slice(0, 8) : "");
+      }
+      window.location.replace(target);
     };
     const doReload = (version) => {
       // Bounded auto-retry: try a few times, then STOP (surface the manual "Update now" button) — never
@@ -3686,6 +3700,18 @@ function App() {
       return;
     }
     let alive = true;
+    // [clients-cache-coldstart] Render the last-synced clients + appointments INSTANTLY from the offline
+    // cache while the authoritative mirror loads in the background. A cold open of a 2,900+ client shop
+    // used to sit on an empty "0 people / No clients yet" list for the whole multi-MB pull (full client
+    // records + all appointment history in one response). This only FILLS an empty list (never overwrites
+    // live data) and deliberately does NOT flip staffClients/ApptsLoadedRef — so the clients/appts SAVE
+    // effects stay gated (they require those refs) and the slim, photo-stripped cache can NEVER be written
+    // back over the server. The mirror then replaces it with full data (photos, galleries) seconds later.
+    // Set the mirror BASELINE (lastRemoteRef) to exactly what we display, so tableHasUnsavedWork sees no
+    // phantom "unsaved work" and the authoritative mirror below proceeds (and then replaces this) instead
+    // of bailing and stranding the app on the slim cache.
+    if (!(clientsRef.current || []).length) { const cc = readCache("clients"); if (cc && cc.length) { lastRemoteRef.current.clients = cc; setClients(cc); } }
+    if (!(apptsRef.current || []).length) { const ca = readCache("appointments"); if (ca && ca.length) { const rc = reconcileDoneOutbox(reconcileCheckinOutbox(ca)); lastRemoteRef.current.appointments = rc; setAppts(rc); } }
     (async () => { if (alive) await mirrorFromServer(); })();
     return () => { alive = false; };
   }, [sessionUid]);
@@ -4470,7 +4496,7 @@ function App() {
           ? <AccessDenied email={session?.user?.email || null} onSignOut={staffSignOut} onBooking={goBooking} />
           : masterMode
           ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={staffSignOut} />
-          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} apptsLoaded={staffApptsLoadedRef.current} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} flushServicesNow={flushServicesNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} syncHealth={syncHealth} />)
+          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} apptsLoaded={staffApptsLoadedRef.current} clientsLoaded={staffClientsLoadedRef.current} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={staffSignOut} onExit={() => { setView("shop"); }} pullLiveTables={pullLiveTables} flushApptsNow={flushApptsNow} flushServicesNow={flushServicesNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} syncHealth={syncHealth} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
@@ -5536,6 +5562,41 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // [session-crumbs] Tiny on-device event trail (last 40) for the recurring "bounced to login"
   // hunt — records which session path fired so a report becomes a read, not a guess.
   const _crumb = (ev) => { try { const k = "vero_crumbs_" + shopId; const list = JSON.parse(localStorage.getItem(k) || "[]"); list.push({ t: new Date().toISOString().slice(5, 19), ev }); localStorage.setItem(k, JSON.stringify(list.slice(-40))); } catch (e) {} };
+  // [session-cookie-fallback] Part of the fix for the recurring "booked, added a selfie/photos, got
+  // dumped to the login/welcome screen." Root cause (proven live by the [storage-self-heal] effect
+  // below): the signed-in client state (matched) was ONLY ever backed up to localStorage, and on real
+  // client devices that write silently THROWS or is wiped — normal Safari with full/wedged storage, iOS
+  // Private Mode, the in-app webviews an SMS/Instagram link opens in, and a WKWebView that memory-purges
+  // + reloads the page when the camera closes. Commits #503/#517/#518 only shrank the localStorage
+  // payload; none removed the sole-dependency on it. A first-party COOKIE is a second durable store that
+  // survives an in-session reload even when localStorage is dead, so we mirror the tiny identity record
+  // to a cookie and read it as a fallback at every restore site. Paired with [storage-self-heal] (frees
+  // wedged localStorage) this closes both the "storage full" and "storage unavailable" variants.
+  const _clientCookie = "vero_c_" + shopId;
+  const _cookieSecure = () => { try { return (typeof location !== "undefined" && location.protocol === "https:") ? "; Secure" : ""; } catch (e) { return ""; } };
+  const _writeClientCookie = (obj) => {
+    try {
+      const v = encodeURIComponent(JSON.stringify(obj));
+      if (v.length > 3800) return; // stay under the ~4KB cookie cap — localStorage still holds the full record
+      document.cookie = _clientCookie + "=" + v + "; path=/; max-age=31536000; SameSite=Lax" + _cookieSecure();
+    } catch (e) {}
+  };
+  const _readClientCookie = () => {
+    try {
+      const pre = _clientCookie + "=";
+      const parts = (document.cookie || "").split(";");
+      for (let i = 0; i < parts.length; i++) { const c = parts[i].trim(); if (c.indexOf(pre) === 0) return decodeURIComponent(c.slice(pre.length)); }
+    } catch (e) {}
+    return null;
+  };
+  const _clearClientCookie = () => { try { document.cookie = _clientCookie + "=; path=/; max-age=0; SameSite=Lax" + _cookieSecure(); } catch (e) {} };
+  // Best available DURABLE identity record — localStorage tiny first, then the cookie lifeline. Returns
+  // the parsed tiny object (or null). Used by every "restore the signed-in client" path below.
+  const _readTinyIdentity = () => {
+    try { const a = localStorage.getItem(_clientKey + "_id"); if (a) return JSON.parse(a); } catch (e) {}
+    try { const b = _readClientCookie(); if (b) return JSON.parse(b); } catch (e) {}
+    return null;
+  };
   // [storage-self-heal] Proven live: the flow worked in PRIVATE mode (clean storage) and bounced in
   // normal Safari — the device's stored data for this site was full/wedged, so every session write
   // silently died. On start: canary-write; if it throws, evict this app's bulkiest non-essential
@@ -5572,7 +5633,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       // per-appointment manage tokens). They must NEVER land back on the login screen while this exists.
       if (!raw) {
         try {
-          const t = JSON.parse(localStorage.getItem(_clientKey + "_id") || "null");
+          const t = _readTinyIdentity(); // localStorage tiny → cookie lifeline
           if (t && t.id) raw = JSON.stringify({ ...t, _localAppts: (t._localSession && Array.isArray(t._tok)) ? t._tok : undefined });
         } catch (e2) {}
       }
@@ -5618,7 +5679,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     // code entry is actually in progress). Explicit sign-outs deleted the keys first, so they pass.
     if (isStaff || matched || showHome || simpleStep || showCodeEntry || (step !== 0 && step !== 5)) return;
     let t = null;
-    try { t = JSON.parse(localStorage.getItem(_clientKey) || localStorage.getItem(_clientKey + "_id") || "null"); } catch (e) {}
+    try { const full = localStorage.getItem(_clientKey); t = full ? JSON.parse(full) : _readTinyIdentity(); } catch (e) {} // full localStorage → tiny → cookie lifeline
     if (!(t && t.id)) { _crumb("login-shown:no-stored-session:step" + step); return; }
     _crumb("welcome-guard:restored:" + t.id);
     const restored = { ...t, _localAppts: Array.isArray(t._localAppts) ? t._localAppts : ((t._localSession && Array.isArray(t._tok)) ? t._tok : undefined) };
@@ -5657,10 +5718,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     // on the next load, this alone keeps them SIGNED IN — the "saved my photos and got dumped to the
     // login screen" failure can't happen as long as this survives. Includes the per-appointment manage
     // tokens so a local (no-server-token) session can rebuild its visit list from the server.
-    try {
-      const tiny = { id: matched.id, name: matched.name, firstName: matched.firstName, lastName: matched.lastName, email: matched.email, phone: matched.phone, sessionToken: matched.sessionToken, _localSession: matched._localSession, _tok: (Array.isArray(matched._localAppts) ? matched._localAppts : []).filter((a) => a && a.manageToken).map((a) => ({ id: a.id, manageToken: a.manageToken, serviceId: a.serviceId, providerId: a.providerId, bookedFor: a.bookedFor, start: a.start, end: a.end, status: a.status, title: a.title, serviceName: a.serviceName, price: a.price })) };
-      localStorage.setItem(_clientKey + "_id", JSON.stringify(tiny));
-    } catch (e) {}
+    const tiny = { id: matched.id, name: matched.name, firstName: matched.firstName, lastName: matched.lastName, email: matched.email, phone: matched.phone, sessionToken: matched.sessionToken, _localSession: matched._localSession, _tok: (Array.isArray(matched._localAppts) ? matched._localAppts : []).filter((a) => a && a.manageToken).map((a) => ({ id: a.id, manageToken: a.manageToken, serviceId: a.serviceId, providerId: a.providerId, bookedFor: a.bookedFor, start: a.start, end: a.end, status: a.status, title: a.title, serviceName: a.serviceName, price: a.price })) };
+    try { localStorage.setItem(_clientKey + "_id", JSON.stringify(tiny)); } catch (e) {}
+    // [session-cookie-fallback] Mirror the SAME tiny record to the cookie lifeline (slice _tok so a
+    // returning client with many visits still fits the 4KB cap). This is what keeps them signed in when
+    // the localStorage writes below still throw (wedged/full storage, private mode, in-app webview, camera-purge reload).
+    _writeClientCookie((Array.isArray(tiny._tok) && tiny._tok.length > 6) ? { ...tiny, _tok: tiny._tok.slice(-6) } : tiny);
     // [session-always-slim] NEVER persist photo blobs on the device. The old "full first, slim on
     // failure" dance meant a device with bloated/wedged storage (proven live: private mode worked,
     // normal Safari bounced) could fail BOTH writes. Photos live on the server and re-pull on load;
@@ -6979,7 +7042,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     else bookForPerson({ id: null });
   };
   const signOutClient = () => {
-    try { localStorage.removeItem(_clientKey); localStorage.removeItem(_clientKey + "_id"); } catch (e) {} // [session-clear-explicit] the ONLY sanctioned session wipe (plus "It's my first time")
+    try { localStorage.removeItem(_clientKey); localStorage.removeItem(_clientKey + "_id"); } catch (e) {} _clearClientCookie(); // [session-clear-explicit] the ONLY sanctioned session wipe (plus "It's my first time")
     _crumb("signout:explicit");
     setShowHome(false); setMatched(null); setMyAppts([]); setShowAllVisits(false); setShowAllPast(false); setHomeAction(null); setReschedPrev(null);
     setBookingFor(null); setActiveMember(null); setCart([]); setShowWhoFor(false); setShowUsual(false);
@@ -7272,7 +7335,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </span>
                 <span className="wel-ar">&#8594;</span>
               </button>
-              <button onClick={() => { if ((business?.booking?.clientType) === "returning") { setClientTypeBlock("returning_only"); return; } try { localStorage.removeItem(_clientKey); localStorage.removeItem(_clientKey + "_id"); } catch (e) {} _crumb("signout:first-time-tap"); setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} className="wel-card wel-sec">
+              <button onClick={() => { if ((business?.booking?.clientType) === "returning") { setClientTypeBlock("returning_only"); return; } try { localStorage.removeItem(_clientKey); localStorage.removeItem(_clientKey + "_id"); } catch (e) {} _clearClientCookie(); _crumb("signout:first-time-tap"); setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} className="wel-card wel-sec">
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="wel-h" style={{ display: "block" }}>It's my first time</span>
                   <span className="wel-s" style={{ display: "block" }}>Welcome — let's take a look</span>
@@ -9638,7 +9701,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             // home anyway. Only a person with NO session anywhere exits to the storefront.
             if (matched && matched.id) { _crumb("exit8:matched:" + matched.id); goClientHome(); return; }
             let t = null;
-            try { t = JSON.parse(localStorage.getItem(_clientKey + "_id") || localStorage.getItem(_clientKey) || "null"); } catch (e) {}
+            try { const full = localStorage.getItem(_clientKey); t = _readTinyIdentity() || (full ? JSON.parse(full) : null); } catch (e) {} // tiny → cookie lifeline → full localStorage
             _crumb("exit8:" + (t && t.id ? "tiny-restore:" + t.id : "NO-SESSION"));
             if (t && t.id) {
               const restored = { ...t, _localAppts: (t._localSession && Array.isArray(t._tok)) ? t._tok : (Array.isArray(t._localAppts) ? t._localAppts : undefined) };
@@ -13485,7 +13548,7 @@ function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
   );
 }
 
-function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, apptsLoaded = true, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables, flushApptsNow, flushServicesNow, flushClientsNow, flushShopsNow, syncHealth }) {
+function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, apptsLoaded = true, clientsLoaded = true, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled, pullLiveTables, flushApptsNow, flushServicesNow, flushClientsNow, flushShopsNow, syncHealth }) {
   // Remember where the owner/staff was so leaving the app and coming back (iOS reloads the webview
   // on resume) restores the SAME screen instead of dumping them on the Pulse home. Persisted as
   // { tab, pulseDetail, activeClientId } in localStorage; mirrors the vero_signed_in_as pattern.
@@ -13965,7 +14028,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={navBack} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={navBack} />}
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} onWaitlistOpening={addOpeningNotif} />}
-        {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
+        {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} clientsLoaded={clientsLoaded} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} onOpenAppt={(a) => { setPulseOpenApptId(a.id); navTo({ tab: "calendar", activeClient: null }); }} flushApptsNow={flushApptsNow} flushClientsNow={flushClientsNow} flushShopsNow={flushShopsNow} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} appts={appts} setAppts={setAppts} clients={clients} business={business} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} flushServicesNow={flushServicesNow} />}
@@ -29567,7 +29630,7 @@ function clientListComparator(mode, paidByClient) {
   };
   return S[mode] || S.recent;
 }
-function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner, shopId, appts, setAppts, waitlist, setWaitlist }) {
+function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner, shopId, appts, setAppts, waitlist, setWaitlist, clientsLoaded = true }) {
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState("recent"); // recent | first | last | lastvisit | spend | newest | due | blocked
   const [adding, setAdding] = useState(false);
@@ -29708,7 +29771,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
           <div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, color: "var(--text)" }}>Clients</h2>
-            <div style={{ fontSize: 12.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{clients.length} {clients.length === 1 ? "person" : "people"}</div>
+            <div style={{ fontSize: 12.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{(clients.length === 0 && !clientsLoaded) ? "Loading…" : `${clients.length} ${clients.length === 1 ? "person" : "people"}`}</div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "stretch" }}>
             <button onClick={() => setShowNudgeFolder(true)} aria-label="Rebooking nudges" style={{ position: "relative", background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", height: 42, width: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
@@ -29742,7 +29805,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column" }}>{shown.slice(0, visLimit).map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1] || providers[0] || {}; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>{subFor(c, provider)}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}{shown.length > visLimit && <div ref={listSentinelRef} style={{ height: 1 }} />}</div>
-      {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : "No clients yet — tap + to add your first one."}</p>}
+      {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : (!clientsLoaded ? "Loading your clients…" : "No clients yet — tap + to add your first one.")}</p>}
     </div>
 
     {adding && (
