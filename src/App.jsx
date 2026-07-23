@@ -5852,6 +5852,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // Profile selfie — a photo of the CLIENT for their profile (the $5-off incentive), entirely
   // separate from the reference/inspiration photos above. Becomes client.photo on save.
   const [selfie, setSelfie] = useState(null);
+  const [selfieLocked, setSelfieLocked] = useState(false); // false = draft (can retake); true = saved & locked
   const selfieRef = useRef(null);  // front camera ("take a selfie")
   const uploadRef = useRef(null);  // photo library ("upload a photo")
   const onSelfiePick = (e) => {
@@ -6522,8 +6523,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     (matched && matched.id === bookedClientId && matched.selfieRewarded) ||
     (clients.find((c) => c.id === bookedClientId) || {}).selfieRewarded
   );
+  // Take / RETAKE a selfie → it's a DRAFT the client can redo until they hit Save. A fresh take always
+  // unlocks (so a blurry one can be retaken), applies the $5 for this visit, and writes the photo. The
+  // one-time `selfieRewarded` ledger is stamped on the FIRST take and never re-granted. Staff make the
+  // final clarity call at checkout (a blurry photo → remove the discount there) — we can't auto-detect blur.
   const applySelfie = (dataUrl) => {
     setSelfie(dataUrl);
+    setSelfieLocked(false);
     if (!bookedClientId) return;
     const rewarded = selfieAlreadyRewarded(); // already claimed once → keep the photo but grant no new $5
     setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, photo: dataUrl, selfieRewarded: true } : c));
@@ -6535,8 +6541,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     saveConfirmationExtras({ selfie: dataUrl });
     if (bookedToken && !rewarded) { try { supabase.rpc("set_selfie_discount_by_token", { p_token: bookedToken, p_on: true }).catch(() => {}); } catch (e) {} }
   };
+  // Save & LOCK the current selfie — no more retakes on this screen; it's now their profile photo.
+  const lockSelfie = () => { if (selfie) setSelfieLocked(true); };
   const clearSelfie = () => {
     setSelfie(null);
+    setSelfieLocked(false);
     if (!bookedClientId) return;
     setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, photo: undefined } : c));
     setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: undefined } : a));
@@ -7029,7 +7038,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setShowCodeEntry(false); setAddingMember(false); setBookingFor(null); setActiveMember(null);
     setCart([]); setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
     setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setBookedId(null); setCameFromUsual(false);
-    setPhotos([]); setClientNote(""); setSelfie(null); setBookedClientId(null); setBookedToken(null); galleryCapturedRef.current = false;
+    setPhotos([]); setClientNote(""); setSelfie(null); setSelfieLocked(false); setBookedClientId(null); setBookedToken(null); galleryCapturedRef.current = false;
     setConsult(null); setShowAllVisits(false); setShowAllPast(false); setHomeAction(null); setReschedPrev(null); setShowHome(true);
     refreshMyAppts();
   };
@@ -9724,7 +9733,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} mins={effMin} provider={provider} selectedDate={selectedDate} slot={slot}
           noteOn={business?.booking?.askNote !== false} photoOn={business?.bookingPhotos?.mode !== "off"}
           clientNote={clientNote} setClientNote={setClientNote} photoList={photos} setPhotos={setPhotos} clientPhotoRef={clientPhotoRef} onPhotoPick={onPhotoPick}
-          selfie={selfie} selfieRef={selfieRef} onSelfiePick={onSelfiePick} onClearSelfie={clearSelfie} selfieEligible={(() => { const r = (clients.find((c) => c.id === bookedClientId)) || (matched && matched.id === bookedClientId ? matched : null) || {}; return !r.photo && !r.selfieRewarded; })()}
+          selfie={selfie} selfieLocked={selfieLocked} onSaveSelfie={lockSelfie} selfieRef={selfieRef} onSelfiePick={onSelfiePick} onClearSelfie={clearSelfie} selfieEligible={(() => { const r = (clients.find((c) => c.id === bookedClientId)) || (matched && matched.id === bookedClientId ? matched : null) || {}; return !r.photo && !r.selfieRewarded; })()}
           saveState={extrasSave}
           onManage={async () => { const ok = await flushBookingDetails(); captureBookingGallery(); if (ok) setStep(9); }} onExit={async () => {
             const ok = await flushBookingDetails(); captureBookingGallery(); if (!ok) return;
@@ -9856,7 +9865,7 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
   );
 }
 
-function ConfirmationScreen({ business, cart, describeEntry, cartPrice, mins, provider, selectedDate, slot, noteOn, photoOn, clientNote, setClientNote, photoList, setPhotos, clientPhotoRef, onPhotoPick, selfie, selfieRef, onSelfiePick, onClearSelfie, selfieEligible, saveState, onManage, onExit }) {
+function ConfirmationScreen({ business, cart, describeEntry, cartPrice, mins, provider, selectedDate, slot, noteOn, photoOn, clientNote, setClientNote, photoList, setPhotos, clientPhotoRef, onPhotoPick, selfie, selfieLocked, onSaveSelfie, selfieRef, onSelfiePick, onClearSelfie, selfieEligible, saveState, onManage, onExit }) {
   const F = FONT_BODY; // this screen is intentionally single-font (all Jost)
   const relDate = relativeDate(selectedDate);
   const relPlus = relDate.includes(",") ? relDate : `${relDate}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
@@ -9898,21 +9907,40 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, mins, pr
       {(showSelfie || noteOn || photoOn) && (
         <>
           <span style={eyebrow}>Before you come in</span>
-          {showSelfie && (
-            <div style={{ ...card, display: "flex", alignItems: "center", gap: 13, padding: 16, marginBottom: 14 }}>
+          {showSelfie && (() => {
+            // Three states: (1) no selfie yet, (2) draft — added but not saved (can retake), (3) locked.
+            // The card carries a soft accent tint so this money-saving step stands out from the notes card.
+            const draft = !!selfie && !selfieLocked;
+            const locked = !!selfie && selfieLocked;
+            const openCam = () => selfieRef.current && selfieRef.current.click();
+            const title = locked ? "Selfie saved" : draft ? "Check your selfie" : "Add a selfie";
+            const sub = locked
+              ? "Locked in — this is your profile photo now."
+              : "Your selfie must be clear — a blurry one won't get the $5.";
+            return (
+            <div style={{ ...card, background: goldSoft, border: `1px solid ${goldLine}`, padding: 16, marginBottom: 14 }}>
               <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
-              {selfie
-                ? <img src={selfie} alt="" style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: `1px solid ${goldLine}` }} />
-                : <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: goldSoft, border: `1px solid ${goldLine}`, color: "var(--gold)" }}><Camera size={19} /></div>}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ ...rowTitle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{selfie ? "Selfie added" : "Add a selfie"}<span style={chip}>{selfie ? "$5 OFF" : "SAVE $5"}</span></div>
-                <div style={{ ...rowSub, fontSize: 13, marginTop: 3 }}>{selfie ? "Now your profile photo." : "So we see how you look today."}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
+                {selfie
+                  ? <img src={selfie} alt="" style={{ width: 46, height: 46, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: `1px solid ${goldLine}` }} />
+                  : <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--panel)", border: `1px solid ${goldLine}`, color: "var(--gold)" }}><Camera size={19} /></div>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ ...rowTitle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{title}<span style={chip}>{selfie ? "$5 OFF" : "SAVE $5"}</span></div>
+                  <div style={{ ...rowSub, fontSize: 13, marginTop: 3 }}>{sub}</div>
+                </div>
+                {!selfie && <button onClick={openCam} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "10px 15px", fontFamily: F, fontSize: 13.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Selfie</button>}
+                {locked && <div style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 5, color: "var(--gold)", fontFamily: F, fontSize: 13, fontWeight: 700 }} title="Saved & locked"><Check size={16} strokeWidth={2.6} /> Saved</div>}
               </div>
-              {selfie
-                ? <div style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 5, color: "var(--gold)", fontFamily: F, fontSize: 13, fontWeight: 700 }} title="Saved to your profile"><Check size={16} strokeWidth={2.6} /> Saved</div>
-                : <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "9px 14px", fontFamily: F, fontSize: 13.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Selfie</button>}
+              {/* draft: retake freely, then Save LOCKS it in. Save is the prominent primary action. */}
+              {draft && (
+                <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                  <button onClick={openCam} style={{ flexShrink: 0, background: "transparent", color: "var(--text)", border: `1px solid ${goldLine}`, borderRadius: 11, padding: "12px 16px", fontFamily: F, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Retake</button>
+                  <button onClick={onSaveSelfie} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "12px 16px", fontFamily: F, fontSize: 14.5, fontWeight: 700, letterSpacing: 0.2, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, boxShadow: "var(--shadow-sm)" }}><Check size={17} strokeWidth={2.6} /> Save &amp; lock in $5</button>
+                </div>
+              )}
             </div>
-          )}
+            );
+          })()}
           {(noteOn || photoOn) && (
             <div style={{ ...card, padding: "20px 18px 18px", marginBottom: 28 }}>
               <div style={{ fontFamily: F, fontSize: 16.5, fontWeight: 600, lineHeight: 1.2, color: "var(--text)", marginBottom: 4 }}>Inspiration &amp; notes</div>
