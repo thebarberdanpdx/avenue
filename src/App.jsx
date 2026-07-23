@@ -9913,22 +9913,23 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, mins, pr
             const draft = !!selfie && !selfieLocked;
             const locked = !!selfie && selfieLocked;
             const openCam = () => selfieRef.current && selfieRef.current.click();
-            const title = locked ? "Selfie saved" : draft ? "Selfie added" : "Upload a selfie & save $5";
+            const title = locked ? "Selfie saved" : draft ? "Selfie added" : "Get $5 off this appointment";
             const sub = locked
-              ? "Locked in — this is your profile photo now."
-              : "Your selfie must be clear — a blurry one won't get the $5.";
+              ? "Locked in — this is your profile photo."
+              : draft ? "Make sure it's clear — a blurry one won't count."
+              : "Just upload a selfie.";
             return (
-            <div style={{ ...card, border: `1px solid ${goldLine}`, padding: 16, marginBottom: 14 }}>
+            <div onClick={!selfie ? openCam : undefined} style={{ ...card, border: `1px solid ${goldLine}`, padding: 16, marginBottom: 14, cursor: !selfie ? "pointer" : "default" }}>
               <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
               <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
                 {selfie
                   ? <img src={selfie} alt="" style={{ width: 46, height: 46, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: `1px solid ${goldLine}` }} />
-                  : <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: `1px solid ${goldLine}`, color: "var(--gold)" }}><Camera size={19} /></div>}
+                  : <div style={{ width: 46, height: 46, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: `1px solid ${goldLine}`, color: "var(--gold)" }}><Camera size={20} /></div>}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ ...rowTitle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{title}{selfie && <span style={chip}>$5 OFF</span>}</div>
-                  <div style={{ ...rowSub, fontSize: 13, marginTop: 3 }}>{sub}</div>
+                  <div style={{ ...rowTitle, fontSize: selfie ? 14.5 : 16.5, fontWeight: selfie ? 600 : 700, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{title}{selfie && <span style={chip}>$5 OFF</span>}</div>
+                  <div style={{ ...rowSub, fontSize: 13.5, marginTop: 3 }}>{sub}</div>
                 </div>
-                {!selfie && <button onClick={openCam} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "10px 15px", fontFamily: F, fontSize: 13.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Upload</button>}
+                {!selfie && <button onClick={openCam} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "11px 17px", fontFamily: F, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Upload</button>}
                 {locked && <div style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 5, color: "var(--gold)", fontFamily: F, fontSize: 13, fontWeight: 700 }} title="Saved & locked"><Check size={16} strokeWidth={2.6} /> Saved</div>}
               </div>
               {/* draft: retake freely, then Save LOCKS it in. Save is the prominent primary action. */}
