@@ -5718,7 +5718,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     // on the next load, this alone keeps them SIGNED IN — the "saved my photos and got dumped to the
     // login screen" failure can't happen as long as this survives. Includes the per-appointment manage
     // tokens so a local (no-server-token) session can rebuild its visit list from the server.
-    const tiny = { id: matched.id, name: matched.name, firstName: matched.firstName, lastName: matched.lastName, email: matched.email, phone: matched.phone, sessionToken: matched.sessionToken, _localSession: matched._localSession, _tok: (Array.isArray(matched._localAppts) ? matched._localAppts : []).filter((a) => a && a.manageToken).map((a) => ({ id: a.id, manageToken: a.manageToken, serviceId: a.serviceId, providerId: a.providerId, bookedFor: a.bookedFor, start: a.start, end: a.end, status: a.status, title: a.title, serviceName: a.serviceName, price: a.price })) };
+    const tiny = { id: matched.id, name: matched.name, firstName: matched.firstName, lastName: matched.lastName, email: matched.email, phone: matched.phone, sessionToken: matched.sessionToken, _localSession: matched._localSession, _tok: (Array.isArray(matched._localAppts) ? matched._localAppts : []).filter((a) => a && a.manageToken).map((a) => ({ id: a.id, manageToken: a.manageToken, serviceId: a.serviceId, providerId: a.providerId, bookedFor: a.bookedFor, start: a.start, end: a.end, status: a.status, title: a.title, serviceName: a.serviceName, price: a.price, note: a.note, hasNote: a.hasNote, photos: a.photos, hasPhotos: a.hasPhotos })) };
     try { localStorage.setItem(_clientKey + "_id", JSON.stringify(tiny)); } catch (e) {}
     // [session-cookie-fallback] Mirror the SAME tiny record to the cookie lifeline (slice _tok so a
     // returning client with many visits still fits the 4KB cap). This is what keeps them signed in when
@@ -6483,7 +6483,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (step !== 8 || bookedId == null) return;
     const note = (clientNote || "").trim();
     const pd = Array.isArray(photos) ? photos : [];
-    setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, note, hasNote: !!note, photos: pd.length, hasPhotos: pd.length > 0, photoData: pd } : a));
+    const patch = { note, hasNote: !!note, photos: pd.length, hasPhotos: pd.length > 0, photoData: pd };
+    setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, ...patch } : a));
+    // [extras-into-session] Also fold the note/photos into the SIGNED-IN client's own view — myAppts,
+    // the local-session snapshot (matched._localAppts), so the home card reads "Edit photos & notes"
+    // (not "Add") and the edit sheet opens PRE-FILLED with what was just entered. Without this the
+    // confirmation-screen extras lived only on the parent `appts`, never the client's home, so a
+    // just-booked client saw a blank sheet ("looks like I'm entering notes for the first time").
+    setMyAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, ...patch } : a));
+    setMatched((m) => (m && m._localSession && Array.isArray(m._localAppts)) ? { ...m, _localAppts: m._localAppts.map((a) => a.id === bookedId ? { ...a, ...patch } : a) } : m);
     if (isStaff || !bookedToken) return;
     const t = setTimeout(() => saveConfirmationExtras(), 900);
     return () => clearTimeout(t);
@@ -6975,7 +6983,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         const { data, error } = await supabase.rpc("manage_lookup_by_token", { p_token: a.manageToken });
         if (error) return a;                                  // transient — keep the local copy
         if (!data || !data.id) return { ...a, status: "cancelled" }; // released/gone on the server
-        return { ...a, ...data };                             // fresh time/status over the local copy
+        let merged = { ...a, ...data };                        // fresh time/status over the local copy
+        // [extras-reload] manage_lookup_by_token returns time/status only — NOT the note/photos. Pull
+        // those from the token-gated extras read so the home button says "Edit" and the sheet pre-fills
+        // even on a fresh device (photos are stripped from local storage for quota, so the SERVER is the
+        // only place to get them back). Best-effort: no-ops if the RPC isn't deployed yet.
+        try {
+          const ex = await supabase.rpc("get_booking_extras_by_token", { p_token: a.manageToken });
+          if (ex && !ex.error && ex.data) { const e = ex.data; merged = { ...merged, note: e.note || "", hasNote: !!e.hasNote, photos: e.photos || 0, hasPhotos: !!e.hasPhotos, photoData: Array.isArray(e.photoData) ? e.photoData : [] }; }
+        } catch (e2) {}
+        return merged;
       } catch (e) { return a; }
     }));
     setMyAppts(fresh);
