@@ -5852,6 +5852,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // Profile selfie — a photo of the CLIENT for their profile (the $5-off incentive), entirely
   // separate from the reference/inspiration photos above. Becomes client.photo on save.
   const [selfie, setSelfie] = useState(null);
+  const [selfieLocked, setSelfieLocked] = useState(false); // false = draft (can retake); true = saved & locked
   const selfieRef = useRef(null);  // front camera ("take a selfie")
   const uploadRef = useRef(null);  // photo library ("upload a photo")
   const onSelfiePick = (e) => {
@@ -6512,18 +6513,39 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // Selfie taken on the CONFIRMATION screen → the client's PROFILE photo + gallery (persisted by the
   // extras RPC, passing the fresh dataURL since state isn't updated yet) and $5 off THIS visit.
   const SELFIE_DISCOUNT = { id: "selfie", name: "Profile photo", type: "amount", value: 5 };
+  // [selfie-reward-ledger] The $5 selfie credit is a ONE-TIME-per-client reward. It used to be gated
+  // only by "does this client already have a profile photo?" — mutable state (a photo can be removed
+  // or fail to persist), so the $5 could be farmed on repeat bookings. Now a durable per-client
+  // `selfieRewarded` flag is the ledger: set the moment it's granted, checked before every offer and
+  // every write. The photo also locks on add (no in-session Remove — see ConfirmationScreen). Server
+  // backstop (un-bypassable even via a direct RPC call) is in db/selfie-reward-ledger-2026-07-23.sql.
+  const selfieAlreadyRewarded = () => !!(
+    (matched && matched.id === bookedClientId && matched.selfieRewarded) ||
+    (clients.find((c) => c.id === bookedClientId) || {}).selfieRewarded
+  );
+  // Take / RETAKE a selfie → it's a DRAFT the client can redo until they hit Save. A fresh take always
+  // unlocks (so a blurry one can be retaken), applies the $5 for this visit, and writes the photo. The
+  // one-time `selfieRewarded` ledger is stamped on the FIRST take and never re-granted. Staff make the
+  // final clarity call at checkout (a blurry photo → remove the discount there) — we can't auto-detect blur.
   const applySelfie = (dataUrl) => {
     setSelfie(dataUrl);
+    setSelfieLocked(false);
     if (!bookedClientId) return;
-    setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, photo: dataUrl } : c));
-    setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a));
-    setMyAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a));
-    if (matched && matched.id === bookedClientId) setMatched((m) => m ? { ...m, photo: dataUrl, _localAppts: Array.isArray(m._localAppts) ? m._localAppts.map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a) : m._localAppts } : m);
+    const rewarded = selfieAlreadyRewarded(); // already claimed once → keep the photo but grant no new $5
+    setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, photo: dataUrl, selfieRewarded: true } : c));
+    if (!rewarded) {
+      setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a));
+      setMyAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a));
+    }
+    if (matched && matched.id === bookedClientId) setMatched((m) => m ? { ...m, photo: dataUrl, selfieRewarded: true, _localAppts: Array.isArray(m._localAppts) ? m._localAppts.map((a) => a.id === bookedId ? { ...a, discount: rewarded ? a.discount : SELFIE_DISCOUNT } : a) : m._localAppts } : m);
     saveConfirmationExtras({ selfie: dataUrl });
-    if (bookedToken) { try { supabase.rpc("set_selfie_discount_by_token", { p_token: bookedToken, p_on: true }).catch(() => {}); } catch (e) {} }
+    if (bookedToken && !rewarded) { try { supabase.rpc("set_selfie_discount_by_token", { p_token: bookedToken, p_on: true }).catch(() => {}); } catch (e) {} }
   };
+  // Save & LOCK the current selfie — no more retakes on this screen; it's now their profile photo.
+  const lockSelfie = () => { if (selfie) setSelfieLocked(true); };
   const clearSelfie = () => {
     setSelfie(null);
+    setSelfieLocked(false);
     if (!bookedClientId) return;
     setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, photo: undefined } : c));
     setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: undefined } : a));
@@ -6714,7 +6736,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         earlierAnyProvider: wantEarlier ? !!earlierPref.anyProvider : undefined,
         newClient: (pi === 0 && bookingIsNew) ? true : undefined, // audit #29: counts toward the barber's new-client-per-day cap
         address: (pi === 0 && newAddress.trim()) ? newAddress.trim() : undefined, // #11: home address for mobile/in-home services
-        discount: (pi === 0 && selfie) ? { id: "selfie", name: "Profile photo", type: "amount", value: 5 } : undefined, // $5 off for adding a profile selfie
+        discount: (pi === 0 && selfie && !(matched && matched.selfieRewarded)) ? { id: "selfie", name: "Profile photo", type: "amount", value: 5 } : undefined, // $5 off for adding a profile selfie — one-time per client (selfie-reward-ledger)
       });
       if (!isSame) cursor += person.durMin;
     });
@@ -7016,7 +7038,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setShowCodeEntry(false); setAddingMember(false); setBookingFor(null); setActiveMember(null);
     setCart([]); setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
     setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setBookedId(null); setCameFromUsual(false);
-    setPhotos([]); setClientNote(""); setSelfie(null); setBookedClientId(null); setBookedToken(null); galleryCapturedRef.current = false;
+    setPhotos([]); setClientNote(""); setSelfie(null); setSelfieLocked(false); setBookedClientId(null); setBookedToken(null); galleryCapturedRef.current = false;
     setConsult(null); setShowAllVisits(false); setShowAllPast(false); setHomeAction(null); setReschedPrev(null); setShowHome(true);
     refreshMyAppts();
   };
@@ -9711,7 +9733,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} mins={effMin} provider={provider} selectedDate={selectedDate} slot={slot}
           noteOn={business?.booking?.askNote !== false} photoOn={business?.bookingPhotos?.mode !== "off"}
           clientNote={clientNote} setClientNote={setClientNote} photoList={photos} setPhotos={setPhotos} clientPhotoRef={clientPhotoRef} onPhotoPick={onPhotoPick}
-          selfie={selfie} selfieRef={selfieRef} onSelfiePick={onSelfiePick} onClearSelfie={clearSelfie} selfieEligible={!((clients.find((c) => c.id === bookedClientId) || {}).photo)}
+          selfie={selfie} selfieLocked={selfieLocked} onSaveSelfie={lockSelfie} selfieRef={selfieRef} onSelfiePick={onSelfiePick} onClearSelfie={clearSelfie} selfieEligible={(() => { const r = (clients.find((c) => c.id === bookedClientId)) || (matched && matched.id === bookedClientId ? matched : null) || {}; return !r.photo && !r.selfieRewarded; })()}
           saveState={extrasSave}
           onManage={async () => { const ok = await flushBookingDetails(); captureBookingGallery(); if (ok) setStep(9); }} onExit={async () => {
             const ok = await flushBookingDetails(); captureBookingGallery(); if (!ok) return;
@@ -9843,7 +9865,7 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
   );
 }
 
-function ConfirmationScreen({ business, cart, describeEntry, cartPrice, mins, provider, selectedDate, slot, noteOn, photoOn, clientNote, setClientNote, photoList, setPhotos, clientPhotoRef, onPhotoPick, selfie, selfieRef, onSelfiePick, onClearSelfie, selfieEligible, saveState, onManage, onExit }) {
+function ConfirmationScreen({ business, cart, describeEntry, cartPrice, mins, provider, selectedDate, slot, noteOn, photoOn, clientNote, setClientNote, photoList, setPhotos, clientPhotoRef, onPhotoPick, selfie, selfieLocked, onSaveSelfie, selfieRef, onSelfiePick, onClearSelfie, selfieEligible, saveState, onManage, onExit }) {
   const F = FONT_BODY; // this screen is intentionally single-font (all Jost)
   const relDate = relativeDate(selectedDate);
   const relPlus = relDate.includes(",") ? relDate : `${relDate}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
@@ -9885,41 +9907,68 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, mins, pr
       {(showSelfie || noteOn || photoOn) && (
         <>
           <span style={eyebrow}>Before you come in</span>
-          {showSelfie && (
-            <div style={{ ...card, display: "flex", alignItems: "center", gap: 13, padding: 16, marginBottom: 14 }}>
+          {showSelfie && (() => {
+            // Three states: (1) no selfie yet, (2) draft — added but not saved (can retake), (3) locked.
+            // Clean panel card with an accent border (no grey fill) + a bold accent Save action.
+            const draft = !!selfie && !selfieLocked;
+            const locked = !!selfie && selfieLocked;
+            const openCam = () => selfieRef.current && selfieRef.current.click();
+            const title = locked ? "Selfie saved" : draft ? "Selfie added" : "Get $5 off this appointment";
+            const sub = locked
+              ? "Locked in — this is your profile photo."
+              : draft ? "Make sure it's clear — a blurry one won't count."
+              : "Just upload a selfie.";
+            return (
+            <div onClick={!selfie ? openCam : undefined} style={{ ...card, border: `1px solid ${goldLine}`, padding: 16, marginBottom: 14, cursor: !selfie ? "pointer" : "default" }}>
               <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
-              {selfie
-                ? <img src={selfie} alt="" style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: `1px solid ${goldLine}` }} />
-                : <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: goldSoft, border: `1px solid ${goldLine}`, color: "var(--gold)" }}><Camera size={19} /></div>}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ ...rowTitle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{selfie ? "Selfie added" : "Add a selfie"}<span style={chip}>{selfie ? "$5 OFF" : "SAVE $5"}</span></div>
-                <div style={{ ...rowSub, fontSize: 13, marginTop: 3 }}>{selfie ? "Now your profile photo." : "So we see how you look today."}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
+                {/* no icon in the empty state — the prompt uses the full width; the real selfie shows once uploaded */}
+                {selfie && <img src={selfie} alt="" style={{ width: 46, height: 46, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: `1px solid ${goldLine}` }} />}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ ...rowTitle, fontSize: selfie ? 14.5 : 16.5, fontWeight: selfie ? 600 : 700, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{title}{selfie && <span style={chip}>$5 OFF</span>}</div>
+                  <div style={{ ...rowSub, fontSize: 13.5, marginTop: 3 }}>{sub}</div>
+                  {!selfie && <div style={{ fontFamily: F, fontSize: 11.5, color: "var(--faint)", marginTop: 5 }}>One-time offer — one $5 discount per client.</div>}
+                </div>
+                {!selfie && <button onClick={openCam} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "11px 17px", fontFamily: F, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Upload</button>}
+                {locked && <div style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 5, color: "var(--gold)", fontFamily: F, fontSize: 13, fontWeight: 700 }} title="Saved & locked"><Check size={16} strokeWidth={2.6} /> Saved</div>}
               </div>
-              {selfie
-                ? <button onClick={onClearSelfie} style={{ flexShrink: 0, background: "none", border: "1px solid var(--border)", color: "var(--sub)", borderRadius: 10, padding: "9px 12px", fontFamily: F, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Remove</button>
-                : <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "9px 14px", fontFamily: F, fontSize: 13.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Selfie</button>}
+              {/* draft: retake freely, then Save LOCKS it in. Save is the prominent primary action. */}
+              {draft && (
+                <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                  <button onClick={openCam} style={{ flexShrink: 0, background: "transparent", color: "var(--text)", border: `1px solid ${goldLine}`, borderRadius: 11, padding: "12px 16px", fontFamily: F, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Retake</button>
+                  <button onClick={onSaveSelfie} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "12px 16px", fontFamily: F, fontSize: 14.5, fontWeight: 700, letterSpacing: 0.2, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, boxShadow: "var(--shadow-sm)" }}><Check size={17} strokeWidth={2.6} /> Save &amp; lock in $5</button>
+                </div>
+              )}
             </div>
-          )}
-          {(noteOn || photoOn) && (
+            );
+          })()}
+          {(noteOn || photoOn) && (() => {
+            const sectLabel = { fontFamily: F, fontSize: 13.5, fontWeight: 600, color: "var(--text)", marginBottom: 9, textAlign: "left" };
+            return (
             <div style={{ ...card, padding: "20px 18px 18px", marginBottom: 28 }}>
-              <div style={{ fontFamily: F, fontSize: 16.5, fontWeight: 600, lineHeight: 1.2, color: "var(--text)", marginBottom: 4 }}>Inspiration &amp; notes</div>
-              <div style={{ ...rowSub, marginBottom: 18 }}>Show your barber exactly what you're after — a few reference photos and a quick note go a long way.</div>
+              <div style={{ fontFamily: F, fontSize: 16.5, fontWeight: 600, lineHeight: 1.2, color: "var(--text)", marginBottom: 4 }}>Inspiration &amp; notes <span style={{ fontWeight: 500, fontSize: 14, color: "var(--faint)" }}>— all optional</span></div>
+              <div style={{ ...rowSub, marginBottom: 18 }}>Show your barber exactly what you're after — reference photos and a quick note go a long way.</div>
               {photoOn && (
-                <>
+                <div style={{ marginBottom: noteOn ? 20 : 0 }}>
+                  <div style={sectLabel}>Upload inspiration photos</div>
                   <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
-                  <div style={{ display: "flex", gap: 11, marginBottom: noteOn ? 14 : 0 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
+                  <div style={{ display: "flex", gap: 11 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
                     <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 13, overflow: "hidden", border: `1.5px ${src ? "solid" : "dashed"} ${src ? goldLine : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--panel2)", cursor: src ? "default" : "pointer" }}>
                       {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 23, height: 23, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={20} style={{ color: "var(--faint)" }} />}
                     </div>
                   ); })}</div>
-                </>
+                  <div style={{ fontFamily: F, fontSize: 13, color: "var(--faint)", marginTop: 10, textAlign: "left" }}>Up to 3 photos · saved to your profile for next time.</div>
+                </div>
               )}
               {noteOn && (
-                <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="Anything your barber should know — e.g. tighter on the sides, keep length on top." rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "13px 14px", color: "var(--text)", fontSize: 14.5, resize: "none", minHeight: 76, lineHeight: 1.5, fontFamily: F }} />
+                <div>
+                  <div style={sectLabel}>Add a note</div>
+                  <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="Anything your barber should know — e.g. tighter on the sides, keep length on top." rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "13px 14px", color: "var(--text)", fontSize: 14.5, resize: "none", minHeight: 76, lineHeight: 1.5, fontFamily: F }} />
+                </div>
               )}
-              <div style={{ fontFamily: F, fontSize: 13, color: "var(--faint)", marginTop: 11, textAlign: "left" }}>Up to 3 photos · saved to your profile for next time.</div>
             </div>
-          )}
+            );
+          })()}
         </>
       )}
 
