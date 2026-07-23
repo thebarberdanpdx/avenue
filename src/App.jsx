@@ -5582,6 +5582,25 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     } catch (e) {}
     return () => { alive = false; };
   }, []);
+  // [welcome-never-signed-in] THE DESTINATION GUARD — root-caused via structural audit: `matched` can
+  // ONLY go falsy through a full ClientFlow remount (key bump / view switch, e.g. tapping Terms or
+  // Privacy from the confirmation footer) — there is no in-place nulling path. A remount that fails to
+  // restore then falls through to the step-0 welcome ("login") screen. So the welcome screen itself now
+  // refuses to strand a signed-in device: if it renders while a stored session exists, restore and go
+  // home. Explicit sign-outs delete the stored session first, so they still land here normally.
+  useEffect(() => {
+    if (isStaff || matched || showHome || step !== 0 || simpleStep || showCodeEntry) return;
+    let t = null;
+    try { t = JSON.parse(localStorage.getItem(_clientKey) || localStorage.getItem(_clientKey + "_id") || "null"); } catch (e) {}
+    if (!(t && t.id)) return;
+    _crumb("welcome-guard:restored:" + t.id);
+    const restored = { ...t, _localAppts: Array.isArray(t._localAppts) ? t._localAppts : ((t._localSession && Array.isArray(t._tok)) ? t._tok : undefined) };
+    setMatched(restored);
+    if (Array.isArray(restored._localAppts) && restored._localAppts.length) setMyAppts(restored._localAppts);
+    setShowHome(true);
+    if (restored.sessionToken) { try { supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: restored.id, p_session: restored.sessionToken }).then(({ data }) => { if (Array.isArray(data)) setMyAppts(data); }).catch(() => {}); } catch (e) {} }
+    else if (Array.isArray(restored._localAppts) && restored._localAppts.length) refreshLocalAppts(restored);
+  }, [isStaff, matched, showHome, step, simpleStep, showCodeEntry]);
   // [client-session-slim] Keep the signed-in client's session persisted so they stay logged in across
   // reloads/remounts. ROOT-CAUSE FIX: a selfie + reference photos are base64 blobs; once they made this
   // record too big, localStorage.setItem threw QuotaExceeded, the old code swallowed it, and NOTHING
@@ -5600,14 +5619,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   useEffect(() => {
     if (isStaff) return;
     if (!_didInitClient.current) { _didInitClient.current = true; return; } // first pass is the restore above
-    if (!(matched && matched.id)) { try { localStorage.removeItem(_clientKey); localStorage.removeItem(_clientKey + "_id"); } catch (e) {} return; }
+    // [session-clear-explicit] `matched` going falsy is NOT proof of sign-out — a component remount
+    // or transient state reset also nulls it, and auto-deleting the stored session here made every
+    // such blip PERMANENT (the durable record erased itself, so no safety net could restore it).
+    // The stored session is now removed ONLY by the explicit sign-out taps (signOutClient /
+    // "It's my first time"), never as a side effect.
+    if (!(matched && matched.id)) return;
     // [session-id-durable] ALWAYS also write a tiny identity record (a few hundred bytes — immune to
     // quota, photo bloat, or a partial write). If the full session record is ever missing or unreadable
     // on the next load, this alone keeps them SIGNED IN — the "saved my photos and got dumped to the
     // login screen" failure can't happen as long as this survives. Includes the per-appointment manage
     // tokens so a local (no-server-token) session can rebuild its visit list from the server.
     try {
-      const tiny = { id: matched.id, name: matched.name, firstName: matched.firstName, lastName: matched.lastName, email: matched.email, phone: matched.phone, sessionToken: matched.sessionToken, _localSession: matched._localSession, _tok: (Array.isArray(matched._localAppts) ? matched._localAppts : []).filter((a) => a && a.manageToken).map((a) => ({ id: a.id, manageToken: a.manageToken })) };
+      const tiny = { id: matched.id, name: matched.name, firstName: matched.firstName, lastName: matched.lastName, email: matched.email, phone: matched.phone, sessionToken: matched.sessionToken, _localSession: matched._localSession, _tok: (Array.isArray(matched._localAppts) ? matched._localAppts : []).filter((a) => a && a.manageToken).map((a) => ({ id: a.id, manageToken: a.manageToken, serviceId: a.serviceId, providerId: a.providerId, bookedFor: a.bookedFor, start: a.start, end: a.end, status: a.status, title: a.title, serviceName: a.serviceName, price: a.price })) };
       localStorage.setItem(_clientKey + "_id", JSON.stringify(tiny));
     } catch (e) {}
     try { localStorage.setItem(_clientKey, JSON.stringify(matched)); }
@@ -6924,6 +6948,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     else bookForPerson({ id: null });
   };
   const signOutClient = () => {
+    try { localStorage.removeItem(_clientKey); localStorage.removeItem(_clientKey + "_id"); } catch (e) {} // [session-clear-explicit] the ONLY sanctioned session wipe (plus "It's my first time")
+    _crumb("signout:explicit");
     setShowHome(false); setMatched(null); setMyAppts([]); setShowAllVisits(false); setShowAllPast(false); setHomeAction(null); setReschedPrev(null);
     setBookingFor(null); setActiveMember(null); setCart([]); setShowWhoFor(false); setShowUsual(false);
     setSimpleStep(null); setSimpleCat(null); setSimplePref(null); setStep(0);
@@ -7215,7 +7241,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </span>
                 <span className="wel-ar">&#8594;</span>
               </button>
-              <button onClick={() => { if ((business?.booking?.clientType) === "returning") { setClientTypeBlock("returning_only"); return; } setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} className="wel-card wel-sec">
+              <button onClick={() => { if ((business?.booking?.clientType) === "returning") { setClientTypeBlock("returning_only"); return; } try { localStorage.removeItem(_clientKey); localStorage.removeItem(_clientKey + "_id"); } catch (e) {} _crumb("signout:first-time-tap"); setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} className="wel-card wel-sec">
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="wel-h" style={{ display: "block" }}>It's my first time</span>
                   <span className="wel-s" style={{ display: "block" }}>Welcome — let's take a look</span>
@@ -9573,6 +9599,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             if (t && t.id) {
               const restored = { ...t, _localAppts: (t._localSession && Array.isArray(t._tok)) ? t._tok : (Array.isArray(t._localAppts) ? t._localAppts : undefined) };
               setMatched(restored);
+              // Seed the visit list IMMEDIATELY (the tiny record carries the display fields) so the
+              // home never shows "No visit booked yet" while the server re-pull is in flight.
+              if (Array.isArray(restored._localAppts) && restored._localAppts.length) setMyAppts(restored._localAppts);
               setShowHome(true);
               if (restored.sessionToken) { try { supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: restored.id, p_session: restored.sessionToken }).then(({ data }) => { if (Array.isArray(data)) setMyAppts(data); }).catch(() => {}); } catch (e) {} }
               else if (Array.isArray(restored._localAppts) && restored._localAppts.length) refreshLocalAppts(restored);
@@ -9581,7 +9610,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             onExit();
           }} />}
 
-        {step === 9 && <ManageByToken token={(appts.find((a) => a.id === bookedId) || {}).manageToken} shopId={shopId} business={business} providers={providers} services={services} onExit={onExit} />}
+        {step === 9 && <ManageByToken token={bookedToken || (appts.find((a) => a.id === bookedId) || {}).manageToken} shopId={shopId} business={business} providers={providers} services={services} onExit={onExit} />} {/* bookedToken first — the appts feed is wholesale-replaced by availability refreshes and would drop the token */}
         </div>
 
         {/* Legal footer — pinned to the bottom of the booking page on every step (#terms / #privacy
