@@ -5562,16 +5562,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // [session-crumbs] Tiny on-device event trail (last 40) for the recurring "bounced to login"
   // hunt — records which session path fired so a report becomes a read, not a guess.
   const _crumb = (ev) => { try { const k = "vero_crumbs_" + shopId; const list = JSON.parse(localStorage.getItem(k) || "[]"); list.push({ t: new Date().toISOString().slice(5, 19), ev }); localStorage.setItem(k, JSON.stringify(list.slice(-40))); } catch (e) {} };
-  // [session-cookie-fallback] THE surviving root of the recurring "booked, added a selfie/photos, got
-  // dumped to the login/welcome screen": the signed-in client state (matched) was ONLY ever backed up
-  // to localStorage. On the browsers real clients actually use — iOS Private Mode, the in-app webviews
-  // an SMS/Instagram booking link opens in, and a WKWebView that memory-purges + RELOADS the page the
-  // instant the camera closes (taking a selfie/photo) — localStorage.setItem silently THROWS or is
-  // wiped on that reload, so nothing durable was stored and the next restore found no session → login.
-  // Commits #503/#517/#518 each only shrank the localStorage payload; none removed the sole-dependency
-  // on it. A first-party COOKIE is the one store that keeps working in exactly those environments and
-  // survives an in-session reload, so we mirror the tiny identity record to a cookie and read it as a
-  // fallback at every restore site. localStorage stays primary; the cookie is the lifeline when it's dead.
+  // [session-cookie-fallback] Part of the fix for the recurring "booked, added a selfie/photos, got
+  // dumped to the login/welcome screen." Root cause (proven live by the [storage-self-heal] effect
+  // below): the signed-in client state (matched) was ONLY ever backed up to localStorage, and on real
+  // client devices that write silently THROWS or is wiped — normal Safari with full/wedged storage, iOS
+  // Private Mode, the in-app webviews an SMS/Instagram link opens in, and a WKWebView that memory-purges
+  // + reloads the page when the camera closes. Commits #503/#517/#518 only shrank the localStorage
+  // payload; none removed the sole-dependency on it. A first-party COOKIE is a second durable store that
+  // survives an in-session reload even when localStorage is dead, so we mirror the tiny identity record
+  // to a cookie and read it as a fallback at every restore site. Paired with [storage-self-heal] (frees
+  // wedged localStorage) this closes both the "storage full" and "storage unavailable" variants.
   const _clientCookie = "vero_c_" + shopId;
   const _cookieSecure = () => { try { return (typeof location !== "undefined" && location.protocol === "https:") ? "; Secure" : ""; } catch (e) { return ""; } };
   const _writeClientCookie = (obj) => {
@@ -5597,6 +5597,31 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     try { const b = _readClientCookie(); if (b) return JSON.parse(b); } catch (e) {}
     return null;
   };
+  // [storage-self-heal] Proven live: the flow worked in PRIVATE mode (clean storage) and bounced in
+  // normal Safari — the device's stored data for this site was full/wedged, so every session write
+  // silently died. On start: canary-write; if it throws, evict this app's bulkiest non-essential
+  // entries (old caches, oversized leftovers — NEVER the session keys) and retry, so a wedged device
+  // fixes itself on the next visit.
+  useEffect(() => {
+    if (isStaff || typeof window === "undefined") return;
+    const canary = () => { localStorage.setItem("vero_canary", "1"); localStorage.removeItem("vero_canary"); };
+    try { canary(); return; } catch (e) {}
+    try {
+      const keep = new Set([_clientKey, _clientKey + "_id", "vero_crumbs_" + shopId]);
+      const victims = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || keep.has(k)) continue;
+        const v = localStorage.getItem(k) || "";
+        victims.push([k, v.length]);
+      }
+      victims.sort((a, b) => b[1] - a[1]); // biggest first
+      for (const [k] of victims) {
+        try { localStorage.removeItem(k); canary(); _crumb("selfheal:freed:" + k.slice(0, 28)); return; } catch (e) { /* keep evicting */ }
+      }
+      _crumb("selfheal:STILL-WEDGED");
+    } catch (e) {}
+  }, []);
   const _didInitClient = useRef(false);
   useEffect(() => {
     if (isStaff) return;
@@ -5650,10 +5675,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // refuses to strand a signed-in device: if it renders while a stored session exists, restore and go
   // home. Explicit sign-outs delete the stored session first, so they still land here normally.
   useEffect(() => {
-    if (isStaff || matched || showHome || step !== 0 || simpleStep || showCodeEntry) return;
+    // Covers BOTH login-type screens: the step-0 welcome AND the step-5 phone/email login (until a
+    // code entry is actually in progress). Explicit sign-outs deleted the keys first, so they pass.
+    if (isStaff || matched || showHome || simpleStep || showCodeEntry || (step !== 0 && step !== 5)) return;
     let t = null;
     try { const full = localStorage.getItem(_clientKey); t = full ? JSON.parse(full) : _readTinyIdentity(); } catch (e) {} // full localStorage → tiny → cookie lifeline
-    if (!(t && t.id)) return;
+    if (!(t && t.id)) { _crumb("login-shown:no-stored-session:step" + step); return; }
     _crumb("welcome-guard:restored:" + t.id);
     const restored = { ...t, _localAppts: Array.isArray(t._localAppts) ? t._localAppts : ((t._localSession && Array.isArray(t._tok)) ? t._tok : undefined) };
     setMatched(restored);
@@ -5695,10 +5722,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     try { localStorage.setItem(_clientKey + "_id", JSON.stringify(tiny)); } catch (e) {}
     // [session-cookie-fallback] Mirror the SAME tiny record to the cookie lifeline (slice _tok so a
     // returning client with many visits still fits the 4KB cap). This is what keeps them signed in when
-    // the localStorage writes just threw (iOS private mode / in-app webview / camera-purge reload).
+    // the localStorage writes below still throw (wedged/full storage, private mode, in-app webview, camera-purge reload).
     _writeClientCookie((Array.isArray(tiny._tok) && tiny._tok.length > 6) ? { ...tiny, _tok: tiny._tok.slice(-6) } : tiny);
-    try { localStorage.setItem(_clientKey, JSON.stringify(matched)); }
-    catch (e) { try { localStorage.setItem(_clientKey, JSON.stringify(stripSessionBlobs(matched))); } catch (e2) {} }
+    // [session-always-slim] NEVER persist photo blobs on the device. The old "full first, slim on
+    // failure" dance meant a device with bloated/wedged storage (proven live: private mode worked,
+    // normal Safari bounced) could fail BOTH writes. Photos live on the server and re-pull on load;
+    // the stored record stays small enough to write on any device, always.
+    try { localStorage.setItem(_clientKey, JSON.stringify(stripSessionBlobs(matched))); }
+    catch (e) { _crumb("persist:FAILED:" + String((e && e.name) || e).slice(0, 24)); }
   }, [matched]);
   // Hold the App's version auto-reload while the client is on the confirmation screen (step 8) so a
   // background version bump can't hard-reload the "You're confirmed" page out from under them.
@@ -7312,6 +7343,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <span className="wel-ar">&#8594;</span>
               </button>
             </div>
+            {/* [session-crumbs] Debug readout — ONLY with ?debug=1 in the URL. Shows the running bundle,
+                whether a stored session exists, and the last few session events, so a "bounced to login"
+                report can be diagnosed from one screenshot instead of guesswork. */}
+            {typeof location !== "undefined" && /[?&]debug=1/.test(location.search) && (() => {
+              let c = []; try { c = (JSON.parse(localStorage.getItem("vero_crumbs_" + shopId) || "[]") || []).slice(-8); } catch (e) {}
+              let sess = "err"; try { sess = localStorage.getItem(_clientKey) ? "full" : (localStorage.getItem(_clientKey + "_id") ? "tiny" : "none"); } catch (e) {}
+              return (
+                <div style={{ marginTop: 18, fontSize: 10.5, color: "var(--faint)", fontFamily: "monospace", lineHeight: 1.65, wordBreak: "break-all", textAlign: "left" }}>
+                  <div>v:{(typeof __BUILD_VERSION__ !== "undefined" ? String(__BUILD_VERSION__) : "dev").slice(0, 7)} · stored-session:{sess}</div>
+                  {c.map((x, i) => <div key={i}>{x.t} {x.ev}</div>)}
+                </div>
+              );
+            })()}
             {pubReviews.length > 0 && (() => {
               const feat = pubReviews.filter((r) => r.featured);
               const picks = (feat.length ? feat : pubReviews).slice(0, 3);
@@ -24667,19 +24711,26 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const focusedId = pulseView === "shop" ? null : (pulseView === "me" ? (me && me.id) : pulseView);
   const isOffDay = (p) => { const h = hoursForDate(p, selectedDate); return !h || !h.on; };
   // Display-only: open stretches between a barber's bookings during their shift, big enough to be worth filling.
-  const GAP_MIN = 20;
+  const GAP_MIN = 15; // show any open gap 15 min and up (owner request) — also drives the header "gaps to fill" count
   const gapsForProvider = (p) => {
-    const h = p && p.hours && p.hours[selectedDate.getDay()];
+    // Use the SAME shift hours the off-shift shading uses, so a gap can never land in the greyed area.
+    const h = hoursForDate(p, selectedDate);
     if (!h || !h.on) return [];
     const isTodayView = sameDay(selectedDate.toISOString(), today);
     const nowM = today.getHours() * 60 + today.getMinutes();
     const items = (appts || []).filter((a) => a.providerId === p.id && sameDay(a.bookedFor, selectedDate) && a.status !== "cancelled" && typeof a.start === "number" && typeof a.end === "number").sort((a, b) => a.start - b.start);
-    if (items.length < 1) return [];
     const out = [];
-    for (let i = 0; i < items.length - 1; i++) {
-      const gs = items[i].end, ge = items[i + 1].start;
+    // Every open window of GAP_MIN+ inside the shift is a gap: before the first client, BETWEEN
+    // clients, AND after the last client (the whole shift when the day is empty). `cursor` walks the
+    // shift; each stretch from cursor to the next appt's start (clamped to the shift) is an opening.
+    let cursor = h.start;
+    for (const a of items) {
+      const gs = Math.max(cursor, h.start), ge = Math.min(a.start, h.end);
       if (ge - gs >= GAP_MIN && !(isTodayView && ge <= nowM)) out.push({ start: gs, end: ge });
+      cursor = Math.max(cursor, a.end);
     }
+    const gs = Math.max(cursor, h.start);
+    if (h.end - gs >= GAP_MIN && !(isTodayView && h.end <= nowM)) out.push({ start: gs, end: h.end });
     return out;
   };
   const orderedStaff = [...staff].sort((a, b) => {
@@ -25047,7 +25098,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               {/* open-gap markers — display only, sit behind the tap layer so tapping a gap still opens a new appointment */}
               {gapsForProvider(p).map((g) => (
                 <div key={`gap-${g.start}`} style={{ position: "absolute", top: (g.start - DAY_START) * PPM + 1, left: 0, right: 0, height: (g.end - g.start) * PPM - 2, borderRadius: 3, background: "color-mix(in srgb, var(--text) 3.5%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12.5, fontWeight: 500, letterSpacing: 0.2, color: "var(--faint)", pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
-                  {(g.end - g.start) >= 30 ? `${g.end - g.start} min open` : ""}
+                  {(g.end - g.start) >= 15 ? `${g.end - g.start} min open` : ""}
                 </div>
               ))}
               {/* live "now" line — only on today, only within the visible grid window */}
