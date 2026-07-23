@@ -9942,26 +9942,33 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, mins, pr
             </div>
             );
           })()}
-          {(noteOn || photoOn) && (
+          {(noteOn || photoOn) && (() => {
+            const sectLabel = { fontFamily: F, fontSize: 13.5, fontWeight: 600, color: "var(--text)", marginBottom: 9, textAlign: "left" };
+            return (
             <div style={{ ...card, padding: "20px 18px 18px", marginBottom: 28 }}>
-              <div style={{ fontFamily: F, fontSize: 16.5, fontWeight: 600, lineHeight: 1.2, color: "var(--text)", marginBottom: 4 }}>Inspiration &amp; notes</div>
-              <div style={{ ...rowSub, marginBottom: 18 }}>Show your barber exactly what you're after — a few reference photos and a quick note go a long way.</div>
+              <div style={{ fontFamily: F, fontSize: 16.5, fontWeight: 600, lineHeight: 1.2, color: "var(--text)", marginBottom: 4 }}>Inspiration &amp; notes <span style={{ fontWeight: 500, fontSize: 14, color: "var(--faint)" }}>— all optional</span></div>
+              <div style={{ ...rowSub, marginBottom: 18 }}>Show your barber exactly what you're after — reference photos and a quick note go a long way.</div>
               {photoOn && (
-                <>
+                <div style={{ marginBottom: noteOn ? 20 : 0 }}>
+                  <div style={sectLabel}>Upload inspiration photos</div>
                   <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
-                  <div style={{ display: "flex", gap: 11, marginBottom: noteOn ? 14 : 0 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
+                  <div style={{ display: "flex", gap: 11 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
                     <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 13, overflow: "hidden", border: `1.5px ${src ? "solid" : "dashed"} ${src ? goldLine : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--panel2)", cursor: src ? "default" : "pointer" }}>
                       {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 23, height: 23, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={20} style={{ color: "var(--faint)" }} />}
                     </div>
                   ); })}</div>
-                </>
+                  <div style={{ fontFamily: F, fontSize: 13, color: "var(--faint)", marginTop: 10, textAlign: "left" }}>Up to 3 photos · saved to your profile for next time.</div>
+                </div>
               )}
               {noteOn && (
-                <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="Anything your barber should know — e.g. tighter on the sides, keep length on top." rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "13px 14px", color: "var(--text)", fontSize: 14.5, resize: "none", minHeight: 76, lineHeight: 1.5, fontFamily: F }} />
+                <div>
+                  <div style={sectLabel}>Add a note</div>
+                  <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="Anything your barber should know — e.g. tighter on the sides, keep length on top." rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "13px 14px", color: "var(--text)", fontSize: 14.5, resize: "none", minHeight: 76, lineHeight: 1.5, fontFamily: F }} />
+                </div>
               )}
-              <div style={{ fontFamily: F, fontSize: 13, color: "var(--faint)", marginTop: 11, textAlign: "left" }}>Up to 3 photos · saved to your profile for next time.</div>
             </div>
-          )}
+            );
+          })()}
         </>
       )}
 
