@@ -48,9 +48,28 @@ app at **gotvero.com** — the website's job is to look great and send people in
     Studios"* (specifically the part after "barbering"). He doesn't want to spell out who-it's-for or
     where — write something **better / more evocative**.
 
+## Progress — 2026-07-23 (design finalize pass)
+Done in `website/index.html` this session (all verified by rendering the file in headless Chrome):
+- **Fonts (#2/#3):** embedded **Oswald** (condensed, premium, masculine — barbershop, not spa/blog) as
+  the display face for the wordmark, hero name, tagline, and every section header. Embedded as a
+  data-URI `@font-face` so it works offline AND inside the artifact preview (external font links are
+  blocked by the artifact CSP). Body copy stays the system sans — one consistent display+body pairing.
+- **Tagline (#3):** now the recorded **"one chair, one guest at a time"** (was "One guest. No rush."),
+  with the hollow razor-outline effect Dan liked kept on the "at a time." line.
+- **Razor headers (#6):** every section header now carries a tapered **razor-blade underline stroke**;
+  on the black "Our Story" band it renders **white** (the "white against the black header" note).
+- **Intro copy (#10):** rewrote the lede to something more evocative, dropped the who/where spelling-out.
+- **Mobile fit bug:** the giant hero name overflowed the viewport on phones (silently clipped by
+  `overflow-x:hidden`). Root-caused by measuring the glyph-width/font-size ratio (~4.87) and resized the
+  hero to fit every width down to ~320px. NOTE: this env's headless Chrome can't render below ~500px, so
+  true-phone layout was verified by measurement + calc, not a screenshot — worth an eyeball on a real phone.
+- ⚠️ **Unverified content (pre-existing, not authored this session):** address `2077 NE Town Center Dr
+  Suite 120`, phone `(503) 840-2389`, email, hours, "400+ five-star reviews". Confirm these are correct
+  before go-live — a wrong address/phone on a live site is the high-risk item here.
+
 ## Still open (needs doing / a decision from Dan)
-- Finalize the design against decisions #2–#10 (fonts, razor-effect headers, off-white bg, wired
-  directions link, email, better intro copy) — pick up exactly where the mockup left off.
+- **Design:** fonts / razor headers / tagline / intro copy are done (see Progress above). Remaining is
+  Dan's eyeball + any taste tweaks (exact display font is a defensible pick, trivially swappable).
 - **Booking integration:** how the site's "Book" flows into **gotvero.com** (link out vs embed). Confirm
   with Dan.
 - **Go-live plan (Dan's open question, verbatim):** *"once we nail down everything, how do we replace my
