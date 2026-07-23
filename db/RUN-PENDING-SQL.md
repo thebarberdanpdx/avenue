@@ -6,6 +6,16 @@ Order does not matter. If a line says `already exists`, that’s fine — stop a
 
 ---
 
+## 00. Client can re-load their photos on a new phone (optional but recommended)
+
+**File:** `booking-extras-read-2026-07-23.sql`
+
+**What it does:** When a client comes back and taps "Edit photos & notes," lets the app pull the photos they attached back from the server. The note and the "Edit" button already work without this; this is only so the actual **photos** reappear after a full reload or on a different phone (photos aren't kept on the device, to save space). Safe, read-only, adds nothing that affects booking.
+
+**After:** Edit a booking's photos on a fresh browser/phone → the photos you added at booking show up, not a blank box.
+
+---
+
 ## 0. ⚠️ URGENT — new clients can't book on synced days (go-live blocker)
 
 **File:** `fix-newclient-cap-sync-2026-07-22.sql`
