@@ -14753,10 +14753,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <SectionLbl>Duration</SectionLbl>
-            <div style={moneyWrap}>
-              <input type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="45" style={{ ...moneyInput, paddingLeft: 16, width: "100%" }} />
-              <span style={unitSuffix}>min</span>
-            </div>
+            <HrMinField minutes={form.duration} placeholder={45} onChange={(v) => setForm({ ...form, duration: v == null ? "" : v })} />
           </div>
         </div>
       )}
@@ -14850,10 +14847,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                     </div>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ ...moneyWrap, borderColor: durOver ? "var(--text)" : "var(--border2)" }}>
-                      <input type="number" inputMode="numeric" value={e.duration ?? ""} placeholder={String(form.duration || "default")} onChange={(ev) => setStaff(p.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ ...moneyInput, minWidth: 0, padding: "12px 14px", paddingLeft: 14, fontWeight: durOver ? 600 : 400 }} />
-                      <span style={unitSuffix}>min</span>
-                    </div>
+                    <HrMinField minutes={e.duration} placeholder={Number(form.duration) || 45} onChange={(v) => setStaff(p.id, { duration: v })} />
                   </div>
                 </div>
               )}
@@ -18744,10 +18738,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                       </div>
                       {on && (
                         <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 13, background: "var(--panel2)", borderRadius: 11, padding: "10px 12px", flexWrap: "wrap" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <NumBox value={e.duration} placeholder={String(s.duration)} onChange={(v) => setSvc(s.id, { duration: v === "" ? null : Number(v) })} />
-                            <span style={{ fontSize: 13.5, color: "var(--sub)" }}>min</span>
-                          </div>
+                          <HrMinField minutes={e.duration} placeholder={s.duration} onChange={(v) => setSvc(s.id, { duration: v })} style={{ flex: 1, minWidth: 150 }} />
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <span style={{ fontSize: 13.5, color: "var(--sub)" }}>$</span>
                             <NumBox value={e.price} placeholder={s.price != null ? String(s.price) : "—"} onChange={(v) => setSvc(s.id, { price: v === "" ? null : Number(v) })} />
@@ -30100,6 +30091,37 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
       ) : (
         <div style={{ marginTop: 11, fontSize: 13, color: "var(--sub)" }}>Using the default — type above to customize</div>
       )}
+    </div>
+  );
+}
+
+// [hr-min-field] Reusable hours+minutes duration entry — Dan wants durations shown as hr + min everywhere,
+// not raw minutes. Value IN / OUT is TOTAL MINUTES (a number), or null when BOTH boxes are blank (the
+// caller decides what blank means — usually "fall back to the default"). Booking-critical: the
+// minutes → (hr, min) → minutes round-trip is exact, so a stored duration can never silently shift.
+function HrMinField({ minutes, placeholder, onChange, style }) {
+  const norm = (v) => (v == null || v === "" || isNaN(Number(v))) ? null : Number(v);
+  const [hr, setHr] = useState(() => { const m = norm(minutes); return m != null ? String(Math.floor(m / 60)) : ""; });
+  const [mn, setMn] = useState(() => { const m = norm(minutes); return m != null ? String(m % 60) : ""; });
+  // Re-seed from the prop ONLY on a genuine external change. When the parent just echoes back the value
+  // we ourselves emitted, skip it — otherwise re-deriving hr/min mid-type would snap "90" → "1 hr 30 min"
+  // and jump the cursor. (A caller that stores minutes exactly gets a no-op echo.)
+  useEffect(() => {
+    const m = norm(minutes);
+    const cur = (hr.trim() === "" && mn.trim() === "") ? null : Math.max(0, (parseInt(hr, 10) || 0) * 60 + (parseInt(mn, 10) || 0));
+    if (m === cur) return;
+    setHr(m != null ? String(Math.floor(m / 60)) : "");
+    setMn(m != null ? String(m % 60) : "");
+  }, [minutes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const emit = (h, m) => { const typed = h.trim() !== "" || m.trim() !== ""; onChange(typed ? Math.max(0, (parseInt(h, 10) || 0) * 60 + (parseInt(m, 10) || 0)) : null); };
+  const pm = norm(placeholder);
+  const box = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--bg)", flex: 1, minWidth: 0 };
+  const inp = { width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", padding: "11px 12px", fontFamily: FONT_BODY, fontSize: 15, color: "var(--text)" };
+  const suf = { padding: "0 11px 0 1px", color: "var(--sub)", fontSize: 13 };
+  return (
+    <div style={{ display: "flex", gap: 7, ...style }}>
+      <div style={box}><input value={hr} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ""); setHr(v); emit(v, mn); }} placeholder={pm != null ? String(Math.floor(pm / 60)) : "0"} inputMode="numeric" aria-label="hours" style={inp} /><span style={suf}>hr</span></div>
+      <div style={box}><input value={mn} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ""); setMn(v); emit(hr, v); }} placeholder={pm != null ? String(pm % 60) : "0"} inputMode="numeric" aria-label="minutes" style={inp} /><span style={suf}>min</span></div>
     </div>
   );
 }
