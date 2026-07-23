@@ -10117,6 +10117,31 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
         if (error || !data || !data.id) { setPhase("error"); return; }
         setAppt(data);
         setPhase(String(data.status || "").toLowerCase() === "cancelled" ? "cancelled" : (arriveFlag ? "arrive" : "view"));
+        // [manage-keeps-signed-in] Opening a manage link signs the client into a lightweight LOCAL session
+        // (built from THIS appointment + its possession token) WHEN they aren't already signed in — so
+        // after any manage action (reschedule / cancel / notes) the exit lands on their own home, never
+        // the login screen ("keep the client logged in after any update to the appt"). Written to the same
+        // key ClientFlow restores from. Never clobbers a richer existing session.
+        try {
+          const ck = "vero_client_" + shopId;
+          const cookieKey = "vero_c_" + shopId;
+          let existing = null;
+          try { existing = JSON.parse(localStorage.getItem(ck) || localStorage.getItem(ck + "_id") || "null"); } catch (e2) {}
+          if (!(existing && existing.id)) { // also honor a cookie-only session (wedged/cleared localStorage) so we never clobber a real login
+            try { const pre = cookieKey + "="; for (const c of (document.cookie || "").split(";")) { const cc = c.trim(); if (cc.indexOf(pre) === 0) { existing = JSON.parse(decodeURIComponent(cc.slice(pre.length))); break; } } } catch (e2) {}
+          }
+          if (!(existing && existing.id) && (data.phone || data.email)) {
+            const digits = String(data.phone || "").replace(/\D/g, "");
+            const cid = "mt_" + (digits || String(data.email || "").toLowerCase());
+            const ap = { id: data.id, manageToken: token, serviceId: data.serviceId, providerId: data.providerId, bookedFor: data.bookedFor, start: data.start, end: data.end, status: data.status, title: data.title, serviceName: data.serviceName, name: data.name };
+            const sess = { id: cid, name: data.name || "", firstName: "", lastName: "", email: data.email || "", phone: data.phone || "", family: [], gallery: [], _localSession: true, _localAppts: [ap] };
+            const tiny = { id: cid, name: sess.name, email: sess.email, phone: sess.phone, _localSession: true, _tok: [{ id: ap.id, manageToken: ap.manageToken, serviceId: ap.serviceId, providerId: ap.providerId, bookedFor: ap.bookedFor, start: ap.start, end: ap.end, status: ap.status, title: ap.title, serviceName: ap.serviceName }] };
+            try { localStorage.setItem(ck, JSON.stringify(sess)); } catch (e2) {}
+            try { localStorage.setItem(ck + "_id", JSON.stringify(tiny)); } catch (e2) {}
+            // Cookie lifeline too — survives wedged/full localStorage (the exact failure behind the recurring bounce).
+            try { const v = encodeURIComponent(JSON.stringify(tiny)); if (v.length <= 3800) { const sec = (typeof location !== "undefined" && location.protocol === "https:") ? "; Secure" : ""; document.cookie = cookieKey + "=" + v + "; path=/; max-age=31536000; SameSite=Lax" + sec; } } catch (e2) {}
+          }
+        } catch (e2) {}
       } catch (e) { if (alive) setPhase("error"); return; }
       try { const av = await supabase.rpc("get_availability", { p_shop: shopId }); if (alive && av && av.data) setAvail(av.data); } catch (e) {}
       finally { if (alive) setAvailLoaded(true); }
