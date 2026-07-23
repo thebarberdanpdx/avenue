@@ -5533,6 +5533,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // Restored on mount → lands them on their home; synced whenever `matched` changes;
   // cleared on sign-out. Skipped for staff, who use the dashboard, not a client session.
   const _clientKey = "vero_client_" + shopId;
+  // [session-crumbs] Tiny on-device event trail (last 40) for the recurring "bounced to login"
+  // hunt — records which session path fired so a report becomes a read, not a guess.
+  const _crumb = (ev) => { try { const k = "vero_crumbs_" + shopId; const list = JSON.parse(localStorage.getItem(k) || "[]"); list.push({ t: new Date().toISOString().slice(5, 19), ev }); localStorage.setItem(k, JSON.stringify(list.slice(-40))); } catch (e) {} };
   const _didInitClient = useRef(false);
   useEffect(() => {
     if (isStaff) return;
@@ -6721,6 +6724,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         // appts come from a local snapshot, and manage actions run through the secure per-appointment link.
         if (!matched) {
           const _sessAppts = newAppts.map((a) => ({ ...a }));
+          _crumb("book-ok:new-session:" + clientId);
           setMatched({ id: clientId, name: (newName || "").trim() || (newFirst + " " + newLast).trim(), firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), family: [], gallery: [], _localSession: true, _localAppts: _sessAppts });
           setMyAppts(_sessAppts);
         } else {
@@ -9555,7 +9559,27 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           clientNote={clientNote} setClientNote={setClientNote} photoList={photos} setPhotos={setPhotos} clientPhotoRef={clientPhotoRef} onPhotoPick={onPhotoPick}
           selfie={selfie} selfieRef={selfieRef} onSelfiePick={onSelfiePick} onClearSelfie={clearSelfie} selfieEligible={!((clients.find((c) => c.id === bookedClientId) || {}).photo)}
           saveState={extrasSave}
-          onManage={async () => { const ok = await flushBookingDetails(); captureBookingGallery(); if (ok) setStep(9); }} onExit={async () => { const ok = await flushBookingDetails(); captureBookingGallery(); if (ok) (matched ? goClientHome : onExit)(); }} />}
+          onManage={async () => { const ok = await flushBookingDetails(); captureBookingGallery(); if (ok) setStep(9); }} onExit={async () => {
+            const ok = await flushBookingDetails(); captureBookingGallery(); if (!ok) return;
+            // [exit-signed-in] Leaving the confirmation must NEVER land a just-booked client on the
+            // login/welcome screen. The old branch keyed ONLY on in-memory `matched` — any hiccup that
+            // nulled it (observed live: instant bounce on tap, no reload) exited to the storefront.
+            // Now: if in-memory is gone, restore the session from the durable identity record and go
+            // home anyway. Only a person with NO session anywhere exits to the storefront.
+            if (matched && matched.id) { _crumb("exit8:matched:" + matched.id); goClientHome(); return; }
+            let t = null;
+            try { t = JSON.parse(localStorage.getItem(_clientKey + "_id") || localStorage.getItem(_clientKey) || "null"); } catch (e) {}
+            _crumb("exit8:" + (t && t.id ? "tiny-restore:" + t.id : "NO-SESSION"));
+            if (t && t.id) {
+              const restored = { ...t, _localAppts: (t._localSession && Array.isArray(t._tok)) ? t._tok : (Array.isArray(t._localAppts) ? t._localAppts : undefined) };
+              setMatched(restored);
+              setShowHome(true);
+              if (restored.sessionToken) { try { supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: restored.id, p_session: restored.sessionToken }).then(({ data }) => { if (Array.isArray(data)) setMyAppts(data); }).catch(() => {}); } catch (e) {} }
+              else if (Array.isArray(restored._localAppts) && restored._localAppts.length) refreshLocalAppts(restored);
+              return;
+            }
+            onExit();
+          }} />}
 
         {step === 9 && <ManageByToken token={(appts.find((a) => a.id === bookedId) || {}).manageToken} shopId={shopId} business={business} providers={providers} services={services} onExit={onExit} />}
         </div>
