@@ -8656,10 +8656,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             ? (myAppts || []).filter((a) => a.familyMemberId === activeMember.id && a.serviceId && a.status !== "block")
             : (myAppts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block");
           const lastAppt = mine.length ? mine[mine.length - 1] : null;
-          const usualSvc = lastAppt ? services.find((s) => s.id === lastAppt.serviceId) : null;
-          const usualProv = providers.find((p) => p.id === (lastAppt?.providerId || who.provider)) || providers[1];
+          // [client-usual] a usual PINNED on the card wins over the last-visit guess; falls back to last visit when unset.
+          const savedUsual = (who.usual && who.usual.serviceId) ? who.usual : null;
+          const usualSvc = savedUsual ? services.find((s) => s.id === savedUsual.serviceId) : (lastAppt ? services.find((s) => s.id === lastAppt.serviceId) : null);
+          const usualProv = providers.find((p) => p.id === ((savedUsual && savedUsual.providerId) || lastAppt?.providerId || who.provider)) || providers[1];
           if (!usualSvc) { setShowUsual(false); setStep(1); return null; }
-          const usualLine2 = lastAppt && lastAppt.lineItems && lastAppt.lineItems[0] ? lastAppt.lineItems[0] : null;
+          const usualLine2 = savedUsual ? { addons: savedUsual.addons || {}, cutType: savedUsual.cutType || null, beardType: savedUsual.beardType || null } : (lastAppt && lastAppt.lineItems && lastAppt.lineItems[0] ? lastAppt.lineItems[0] : null);
           // Build the cart entry for their usual (used by every action). Re-validate the saved cut style /
           // add-on answers against the service's CURRENT groups so a since-removed option can't linger.
           const validAddons = {};
@@ -30102,6 +30104,147 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
   );
 }
 
+// [client-usual] "Their usual" — pin a client's regular combo (service + cut style + add-ons) right on
+// the card. Price/time SHOWN are the LIVE computed combo total at THIS client's rates (never frozen) via
+// the same module resolvers checkout uses (mirrors staffItemCalc), so the card can't drift from what's
+// charged. Optional time/price boxes let the owner hard-set a flat number. A since-removed menu option
+// self-drops (re-validated against the current menu), so a deleted add-on can never linger or break.
+function usualLineCalc(client, usual, services, providers) {
+  const empty = { service: null, provider: null, pid: null, price: 0, min: 0, labels: [] };
+  if (!usual || !usual.serviceId) return empty;
+  const s = (services || []).find((x) => x.id === usual.serviceId);
+  if (!s) return empty;
+  const want = usual.providerId || (client && client.provider);
+  const pid = ((providers || []).find((x) => x.id === want && x.id !== "anyone") || (providers || []).find((x) => x.id && x.id !== "anyone") || {}).id || want || "dan";
+  const addons = usual.addons || {};
+  let price = (client && client.customPrices && client.customPrices[s.id] != null && client.customPrices[s.id] !== "") ? Number(client.customPrices[s.id]) : getPrice(s, pid);
+  let min = getDuration(client, s, pid);
+  const labels = [];
+  // A setsPrice cut style's absolute per-barber price/time REPLACES the base (same rule as checkout).
+  const _pg = (s.addonGroups || []).find((g) => g && g.type === "choice" && g.setsPrice && addons[g.id]);
+  if (_pg) { const opt = (_pg.options || []).find((o) => o.id === addons[_pg.id]); if (opt) { price = choiceStylePrice(s, pid, _pg, opt); min = choiceStyleDuration(client, s, pid, _pg, opt); } }
+  (s.addonGroups || []).forEach((g) => {
+    const sel = addons[g.id];
+    if (!sel) return;
+    if (g.type === "choice" && g.setsPrice) { const opt = (g.options || []).find((o) => o.id === sel); if (opt && opt.label) labels.push(opt.label); return; }
+    if (g.type === "choice") { const opt = (g.options || []).find((o) => o.id === sel); if (opt) { price += answerPriceFor(s, pid, g, opt); min += answerDuration(s, pid, g, opt); if (opt.label) labels.push(opt.label); } }
+    else { price += addonPriceFor(s, pid, g); min += addonDuration(s, pid, g); if (g.item && g.item.name) labels.push(g.item.name); }
+  });
+  return { service: s, provider: (providers || []).find((x) => x.id === pid) || null, pid, price, min, labels };
+}
+
+function UsualEditor({ client, services, providers, onSave, onClear }) {
+  const saved = client.usual && client.usual.serviceId ? client.usual : null;
+  const [svcId, setSvcId] = useState(saved ? saved.serviceId : "");
+  const [addons, setAddons] = useState(() => ({ ...((saved && saved.addons) || {}) }));
+  const [durOverride, setDurOverride] = useState(saved && saved.duration != null ? String(saved.duration) : "");
+  const [priceOverride, setPriceOverride] = useState(saved && saved.price != null ? String(saved.price) : "");
+  const [flash, setFlash] = useState(false);
+  useEffect(() => { if (!flash) return; const id = setTimeout(() => setFlash(false), 2600); return () => clearTimeout(id); }, [flash]);
+  const svc = (services || []).find((s) => s.id === svcId) || null;
+  const firstName = ((client.name || "").split(" ")[0]) || "them";
+  // Re-validate selected options against the CURRENT menu when the service changes (drop anything removed).
+  useEffect(() => {
+    setAddons((prev) => {
+      if (!svc) return Object.keys(prev).length ? {} : prev;
+      const clean = {};
+      Object.keys(prev).forEach((gid) => {
+        const g = (svc.addonGroups || []).find((x) => x.id === gid);
+        if (!g) return;
+        const v = prev[gid];
+        if (g.type === "choice") { if ((g.options || []).some((o) => o.id === v)) clean[gid] = v; }
+        else if (v) clean[gid] = true;
+      });
+      return JSON.stringify(clean) === JSON.stringify(prev) ? prev : clean;
+    });
+  }, [svcId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cutGroup = svc ? (svc.addonGroups || []).find((g) => g.type === "choice" && g.id === "cutchoice") : null;
+  const otherChoice = svc ? (svc.addonGroups || []).filter((g) => g.type === "choice" && g.id !== "cutchoice") : [];
+  const addonGroups = svc ? (svc.addonGroups || []).filter((g) => g.type === "addon") : [];
+  const calc = usualLineCalc(client, { serviceId: svcId, addons, providerId: client.provider }, services, providers);
+  const effMin = durOverride.trim() !== "" ? Math.max(0, parseInt(durOverride, 10) || 0) : calc.min;
+  const effPrice = priceOverride.trim() !== "" ? Math.max(0, Math.round((parseFloat(priceOverride) || 0) * 100) / 100) : calc.price;
+  const setChoice = (gid, val) => setAddons((p) => { const n = { ...p }; if (val) n[gid] = val; else delete n[gid]; return n; });
+  const toggleAddon = (gid) => setAddons((p) => { const n = { ...p }; if (n[gid]) delete n[gid]; else n[gid] = true; return n; });
+  const save = () => {
+    if (!svcId) return;
+    onSave({ serviceId: svcId, addons: { ...addons }, cutType: null, beardType: null, providerId: client.provider || null,
+      duration: durOverride.trim() === "" ? null : Math.max(0, parseInt(durOverride, 10) || 0),
+      price: priceOverride.trim() === "" ? null : Math.max(0, Math.round((parseFloat(priceOverride) || 0) * 100) / 100) });
+    setFlash(true);
+  };
+  const clear = () => { setSvcId(""); setAddons({}); setDurOverride(""); setPriceOverride(""); onClear(); };
+  const fl = { fontSize: 13, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, marginBottom: 6 };
+  const selStyle = { width: "100%", boxSizing: "border-box", border: "1px solid var(--border2)", borderRadius: 11, background: "var(--bg)", padding: "11px 12px", fontFamily: FONT_BODY, fontSize: 15, color: "var(--text)", appearance: "none", WebkitAppearance: "none" };
+  const ipt = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--bg)" };
+  const inp = { width: "100%", border: "none", outline: "none", background: "transparent", padding: "11px 12px", fontFamily: FONT_BODY, fontSize: 15, color: "var(--text)" };
+  return (
+    <div style={{ padding: "16px 18px" }}>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, margin: "0 0 14px" }}>What {firstName} gets almost every time. Save it once — it shows as their one-tap “usual” when they book online.</p>
+      <div style={{ marginBottom: 13 }}>
+        <div style={fl}>Service</div>
+        <select value={svcId} onChange={(e) => setSvcId(e.target.value)} style={selStyle}>
+          <option value="">Pick a service…</option>
+          {(services || []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+      </div>
+      {cutGroup && (
+        <div style={{ marginBottom: 13 }}>
+          <div style={fl}>{cutGroup.label || "Cut style"}</div>
+          <select value={addons[cutGroup.id] || ""} onChange={(e) => setChoice(cutGroup.id, e.target.value)} style={selStyle}>
+            <option value="">No specific style</option>
+            {(cutGroup.options || []).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+        </div>
+      )}
+      {otherChoice.map((g) => (
+        <div key={g.id} style={{ marginBottom: 13 }}>
+          <div style={fl}>{g.label || "Option"}</div>
+          <select value={addons[g.id] || ""} onChange={(e) => setChoice(g.id, e.target.value)} style={selStyle}>
+            <option value="">None</option>
+            {(g.options || []).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+        </div>
+      ))}
+      {addonGroups.length > 0 && (
+        <div style={{ marginBottom: 13 }}>
+          <div style={fl}>Add-ons</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {addonGroups.map((g) => {
+              const on = !!addons[g.id];
+              const nm = (g.item && g.item.name) || g.label || "Add-on";
+              return (
+                <button key={g.id} onClick={() => toggleAddon(g.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 13px", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, borderRadius: 11, background: on ? "color-mix(in srgb, var(--text) 7%, var(--bg))" : "var(--bg)", cursor: "pointer", textAlign: "left" }}>
+                  <span style={{ width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <Check size={13} strokeWidth={3} style={{ color: "var(--bg)" }} />}</span>
+                  <span style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>{nm}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {svcId && (
+        <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+          <div style={{ flex: 1 }}>
+            <div style={fl}>Time</div>
+            <div style={ipt}><input value={durOverride} onChange={(e) => setDurOverride(e.target.value.replace(/[^0-9]/g, ""))} placeholder={String(calc.min)} inputMode="numeric" style={inp} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13.5 }}>min</span></div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={fl}>Price</div>
+            <div style={ipt}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input value={priceOverride} onChange={(e) => setPriceOverride(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={String(calc.price)} inputMode="decimal" style={inp} /></div>
+          </div>
+        </div>
+      )}
+      {svcId && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 11, lineHeight: 1.5 }}>{svc ? svc.name : ""}{calc.labels.length ? " · " + calc.labels.join(" · ") : ""} — books at <strong style={{ color: "var(--text)" }}>{fmtDur(effMin)} · ${effPrice}</strong>{(durOverride.trim() !== "" || priceOverride.trim() !== "") ? " (your set rate)" : " (from your menu)"}</div>}
+      <div style={{ display: "flex", gap: 12, marginTop: 15, alignItems: "center" }}>
+        <button className="lift" onClick={save} disabled={!svcId} style={{ background: svcId ? "var(--gold)" : "var(--panel2)", color: svcId ? "var(--on-gold)" : "var(--faint)", border: "none", borderRadius: 10, padding: "11px 20px", fontSize: 14.5, fontWeight: 700, cursor: svcId ? "pointer" : "default" }}>Save usual</button>
+        {saved && <button onClick={clear} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>Clear</button>}
+        {flash && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#3FA968", fontSize: 13.5, fontWeight: 600 }}><Check size={14} strokeWidth={3} /> Saved</span>}
+      </div>
+    </div>
+  );
+}
+
 function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, setAppts, business, setBusiness, me, shopId, onBack, showToast, onRebook, onOpenAppt, flushApptsNow, flushClientsNow, flushShopsNow }) {
   const live = clients.find((c) => c.id === client.id) || client;
   const provider = providers.find((p) => p.id === live.provider) || providers[1] || providers[0] || {};
@@ -30187,6 +30330,18 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   }));
   const clearOverride = (sid) => saveOverride(sid, { dur: null, price: null });
   const baseDurFor = (s) => (s.staff && s.staff[live.provider] && s.staff[live.provider].duration != null) ? s.staff[live.provider].duration : s.duration;
+  // [client-usual] pin / clear this client's regular combo — durable write (survives an immediate swipe-away).
+  const saveUsual = (usual) => {
+    const next = clients.map((c) => c.id === live.id ? { ...c, usual } : c);
+    setClients(next);
+    if (flushClientsNow) queueMicrotask(() => flushClientsNow(next));
+    showToast(`Saved ${firstName}'s usual.`);
+  };
+  const clearUsual = () => {
+    const next = clients.map((c) => c.id === live.id ? { ...c, usual: undefined } : c);
+    setClients(next);
+    if (flushClientsNow) queueMicrotask(() => flushClientsNow(next));
+  };
 
   // ---- editable owner note ----
   const [noteDraft, setNoteDraft] = useState(live.notes || "");
@@ -30541,6 +30696,10 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {/* ============ PRICING ============ */}
       {pfTab === "pricing" && <div style={{ paddingBottom: 24 }}>
+        <div style={tabLabel}>Their usual</div>
+        <div style={{ ...cardStyle, marginBottom: 22 }}>
+          <UsualEditor client={live} services={services} providers={providers} onSave={saveUsual} onClear={clearUsual} />
+        </div>
         <div style={tabLabel}>What {firstName} books at</div>
         <div style={cardStyle}>
           {services.map((s, i) => (
