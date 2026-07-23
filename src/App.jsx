@@ -24709,28 +24709,50 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   //  2. Anyone OFF the selected day sinks to the far right and renders greyed.
   //  3. Otherwise keep existing order (later: a business-defined drag order — Step C).
   const focusedId = pulseView === "shop" ? null : (pulseView === "me" ? (me && me.id) : pulseView);
-  const isOffDay = (p) => { const h = hoursForDate(p, selectedDate); return !h || !h.on; };
+  // "Off" only when there's NO Vero shift AND no real bookings that day — a barber scheduled in
+  // Mangomint on a Vero day-off is working, not off (keeps the header label, greying, and column
+  // ordering consistent with the shading + gap markers, which use the same shift-∪-appts window).
+  const isOffDay = (p) => {
+    const h = hoursForDate(p, selectedDate);
+    if (h && h.on) return false;
+    return !(appts || []).some((a) => a.providerId === p.id && sameDay(a.bookedFor, selectedDate) && a.status !== "cancelled" && a.status !== "block" && typeof a.start === "number");
+  };
   // Display-only: open stretches between a barber's bookings during their shift, big enough to be worth filling.
   const GAP_MIN = 15; // show any open gap 15 min and up (owner request) — also drives the header "gaps to fill" count
-  const gapsForProvider = (p) => {
-    // Use the SAME shift hours the off-shift shading uses, so a gap can never land in the greyed area.
+  // The day's effective working window for a provider, as [start, end] minutes — or null if they're
+  // genuinely not working. It's the UNION of the set Vero shift (when "on") and the span of that day's
+  // real appointments. This is the ONE definition of "when is this barber working today," so the gap
+  // markers, the gap COUNT, and the off-shift shading all agree — the source of the inconsistency was
+  // that gaps keyed off Vero hours while the actual work came from synced appts (a barber "off" in Vero
+  // but scheduled in Mangomint showed real openings as dead grey instead of labeled gaps).
+  const workWindowFor = (p, dayItems) => {
     const h = hoursForDate(p, selectedDate);
-    if (!h || !h.on) return [];
+    let ws = (h && h.on) ? h.start : null, we = (h && h.on) ? h.end : null;
+    if (dayItems && dayItems.length) {
+      const aStart = dayItems[0].start, aEnd = dayItems[dayItems.length - 1].end;
+      ws = ws == null ? aStart : Math.min(ws, aStart);
+      we = we == null ? aEnd : Math.max(we, aEnd);
+    }
+    return (ws == null || we == null || we <= ws) ? null : { start: ws, end: we };
+  };
+  const dayItemsFor = (p) => (appts || []).filter((a) => a.providerId === p.id && sameDay(a.bookedFor, selectedDate) && a.status !== "cancelled" && a.status !== "block" && typeof a.start === "number" && typeof a.end === "number").sort((a, b) => a.start - b.start);
+  const gapsForProvider = (p) => {
+    const items = dayItemsFor(p);
+    const win = workWindowFor(p, items);
+    if (!win) return [];
     const isTodayView = sameDay(selectedDate.toISOString(), today);
     const nowM = today.getHours() * 60 + today.getMinutes();
-    const items = (appts || []).filter((a) => a.providerId === p.id && sameDay(a.bookedFor, selectedDate) && a.status !== "cancelled" && typeof a.start === "number" && typeof a.end === "number").sort((a, b) => a.start - b.start);
     const out = [];
-    // Every open window of GAP_MIN+ inside the shift is a gap: before the first client, BETWEEN
-    // clients, AND after the last client (the whole shift when the day is empty). `cursor` walks the
-    // shift; each stretch from cursor to the next appt's start (clamped to the shift) is an opening.
-    let cursor = h.start;
+    // Every open window of GAP_MIN+ inside the working window is a gap: before the first client,
+    // BETWEEN clients, and after the last (the whole window when empty). `cursor` walks the window.
+    let cursor = win.start;
     for (const a of items) {
-      const gs = Math.max(cursor, h.start), ge = Math.min(a.start, h.end);
+      const gs = Math.max(cursor, win.start), ge = Math.min(a.start, win.end);
       if (ge - gs >= GAP_MIN && !(isTodayView && ge <= nowM)) out.push({ start: gs, end: ge });
       cursor = Math.max(cursor, a.end);
     }
-    const gs = Math.max(cursor, h.start);
-    if (h.end - gs >= GAP_MIN && !(isTodayView && h.end <= nowM)) out.push({ start: gs, end: h.end });
+    const gs = Math.max(cursor, win.start);
+    if (win.end - gs >= GAP_MIN && !(isTodayView && win.end <= nowM)) out.push({ start: gs, end: win.end });
     return out;
   };
   const orderedStaff = [...staff].sort((a, b) => {
@@ -25061,14 +25083,17 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           return (
             <div key={p.id}
               style={{ flex: 1, position: "relative", height: gridHeight, background: "var(--panel)", overflow: "hidden", marginLeft: pIdx ? 8 : 0 }}>
-              {/* off-shift shade: dim the hours outside this barber's shift for the selected day (behind cards, ignores taps) */}
+              {/* off-shift shade: dim the hours outside this barber's WORKING WINDOW (Vero shift ∪ today's
+                  appts — same definition the gap markers use, so shading and gaps always agree). A barber
+                  "off" in Vero but scheduled in Mangomint is shaded only outside their booked span, and the
+                  open time between those bookings reads as a labeled gap, not dead grey. */}
               {(() => {
-                const h = hoursForDate(p, selectedDate);
                 const shade = "color-mix(in srgb, var(--text) 12%, transparent)"; // closed hours read as a REAL grey (approved calendar-contrast pass)
-                if (!h || !h.on) return <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: gridHeight, background: shade, pointerEvents: "none" }} />;
+                const win = workWindowFor(p, dayItemsFor(p));
+                if (!win) return <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: gridHeight, background: shade, pointerEvents: "none" }} />;
                 const segs = [];
-                const sStart = Math.max(DAY_START, h.start);
-                const sEnd = Math.min(DAY_END, h.end);
+                const sStart = Math.max(DAY_START, win.start);
+                const sEnd = Math.min(DAY_END, win.end);
                 if (sStart > DAY_START) segs.push(<div key="b" style={{ position: "absolute", left: 0, right: 0, top: 0, height: (sStart - DAY_START) * PPM, background: shade, pointerEvents: "none" }} />);
                 if (sEnd < DAY_END) segs.push(<div key="a" style={{ position: "absolute", left: 0, right: 0, top: (sEnd - DAY_START) * PPM, height: (DAY_END - sEnd) * PPM, background: shade, pointerEvents: "none" }} />);
                 return segs;
