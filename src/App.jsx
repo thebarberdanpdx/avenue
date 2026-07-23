@@ -14753,10 +14753,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <SectionLbl>Duration</SectionLbl>
-            <div style={moneyWrap}>
-              <input type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="45" style={{ ...moneyInput, paddingLeft: 16, width: "100%" }} />
-              <span style={unitSuffix}>min</span>
-            </div>
+            <HrMinField minutes={form.duration} placeholder={45} onChange={(v) => setForm({ ...form, duration: v == null ? "" : v })} />
           </div>
         </div>
       )}
@@ -14850,10 +14847,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                     </div>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ ...moneyWrap, borderColor: durOver ? "var(--text)" : "var(--border2)" }}>
-                      <input type="number" inputMode="numeric" value={e.duration ?? ""} placeholder={String(form.duration || "default")} onChange={(ev) => setStaff(p.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ ...moneyInput, minWidth: 0, padding: "12px 14px", paddingLeft: 14, fontWeight: durOver ? 600 : 400 }} />
-                      <span style={unitSuffix}>min</span>
-                    </div>
+                    <HrMinField minutes={e.duration} placeholder={Number(form.duration) || 45} onChange={(v) => setStaff(p.id, { duration: v })} />
                   </div>
                 </div>
               )}
@@ -18744,10 +18738,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                       </div>
                       {on && (
                         <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 13, background: "var(--panel2)", borderRadius: 11, padding: "10px 12px", flexWrap: "wrap" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <NumBox value={e.duration} placeholder={String(s.duration)} onChange={(v) => setSvc(s.id, { duration: v === "" ? null : Number(v) })} />
-                            <span style={{ fontSize: 13.5, color: "var(--sub)" }}>min</span>
-                          </div>
+                          <HrMinField minutes={e.duration} placeholder={s.duration} onChange={(v) => setSvc(s.id, { duration: v })} style={{ flex: 1, minWidth: 150 }} />
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <span style={{ fontSize: 13.5, color: "var(--sub)" }}>$</span>
                             <NumBox value={e.price} placeholder={s.price != null ? String(s.price) : "—"} onChange={(v) => setSvc(s.id, { price: v === "" ? null : Number(v) })} />
@@ -30104,6 +30095,37 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
   );
 }
 
+// [hr-min-field] Reusable hours+minutes duration entry — Dan wants durations shown as hr + min everywhere,
+// not raw minutes. Value IN / OUT is TOTAL MINUTES (a number), or null when BOTH boxes are blank (the
+// caller decides what blank means — usually "fall back to the default"). Booking-critical: the
+// minutes → (hr, min) → minutes round-trip is exact, so a stored duration can never silently shift.
+function HrMinField({ minutes, placeholder, onChange, style }) {
+  const norm = (v) => (v == null || v === "" || isNaN(Number(v))) ? null : Number(v);
+  const [hr, setHr] = useState(() => { const m = norm(minutes); return m != null ? String(Math.floor(m / 60)) : ""; });
+  const [mn, setMn] = useState(() => { const m = norm(minutes); return m != null ? String(m % 60) : ""; });
+  // Re-seed from the prop ONLY on a genuine external change. When the parent just echoes back the value
+  // we ourselves emitted, skip it — otherwise re-deriving hr/min mid-type would snap "90" → "1 hr 30 min"
+  // and jump the cursor. (A caller that stores minutes exactly gets a no-op echo.)
+  useEffect(() => {
+    const m = norm(minutes);
+    const cur = (hr.trim() === "" && mn.trim() === "") ? null : Math.max(0, (parseInt(hr, 10) || 0) * 60 + (parseInt(mn, 10) || 0));
+    if (m === cur) return;
+    setHr(m != null ? String(Math.floor(m / 60)) : "");
+    setMn(m != null ? String(m % 60) : "");
+  }, [minutes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const emit = (h, m) => { const typed = h.trim() !== "" || m.trim() !== ""; onChange(typed ? Math.max(0, (parseInt(h, 10) || 0) * 60 + (parseInt(m, 10) || 0)) : null); };
+  const pm = norm(placeholder);
+  const box = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--bg)", flex: 1, minWidth: 0 };
+  const inp = { width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", padding: "11px 12px", fontFamily: FONT_BODY, fontSize: 15, color: "var(--text)" };
+  const suf = { padding: "0 11px 0 1px", color: "var(--sub)", fontSize: 13 };
+  return (
+    <div style={{ display: "flex", gap: 7, ...style }}>
+      <div style={box}><input value={hr} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ""); setHr(v); emit(v, mn); }} placeholder={pm != null ? String(Math.floor(pm / 60)) : "0"} inputMode="numeric" aria-label="hours" style={inp} /><span style={suf}>hr</span></div>
+      <div style={box}><input value={mn} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ""); setMn(v); emit(hr, v); }} placeholder={pm != null ? String(pm % 60) : "0"} inputMode="numeric" aria-label="minutes" style={inp} /><span style={suf}>min</span></div>
+    </div>
+  );
+}
+
 // [client-usual] "Their usual" — pin a client's regular combo (service + cut style + add-ons) right on
 // the card. Price/time SHOWN are the LIVE computed combo total at THIS client's rates (never frozen) via
 // the same module resolvers checkout uses (mirrors staffItemCalc), so the card can't drift from what's
@@ -30137,7 +30159,9 @@ function UsualEditor({ client, services, providers, onSave, onClear }) {
   const saved = client.usual && client.usual.serviceId ? client.usual : null;
   const [svcId, setSvcId] = useState(saved ? saved.serviceId : "");
   const [addons, setAddons] = useState(() => ({ ...((saved && saved.addons) || {}) }));
-  const [durOverride, setDurOverride] = useState(saved && saved.duration != null ? String(saved.duration) : "");
+  // [usual-hr-min] time is entered as HOURS + MINUTES (Dan doesn't want to think in raw minutes); stored as total minutes.
+  const [hrStr, setHrStr] = useState(saved && saved.duration != null ? String(Math.floor(saved.duration / 60)) : "");
+  const [minStr, setMinStr] = useState(saved && saved.duration != null ? String(saved.duration % 60) : "");
   const [priceOverride, setPriceOverride] = useState(saved && saved.price != null ? String(saved.price) : "");
   const [flash, setFlash] = useState(false);
   useEffect(() => { if (!flash) return; const id = setTimeout(() => setFlash(false), 2600); return () => clearTimeout(id); }, [flash]);
@@ -30162,18 +30186,20 @@ function UsualEditor({ client, services, providers, onSave, onClear }) {
   const otherChoice = svc ? (svc.addonGroups || []).filter((g) => g.type === "choice" && g.id !== "cutchoice") : [];
   const addonGroups = svc ? (svc.addonGroups || []).filter((g) => g.type === "addon") : [];
   const calc = usualLineCalc(client, { serviceId: svcId, addons, providerId: client.provider }, services, providers);
-  const effMin = durOverride.trim() !== "" ? Math.max(0, parseInt(durOverride, 10) || 0) : calc.min;
+  const durTyped = hrStr.trim() !== "" || minStr.trim() !== "";
+  const durOverrideMin = durTyped ? Math.max(0, (parseInt(hrStr, 10) || 0) * 60 + (parseInt(minStr, 10) || 0)) : null;
+  const effMin = durOverrideMin != null ? durOverrideMin : calc.min;
   const effPrice = priceOverride.trim() !== "" ? Math.max(0, Math.round((parseFloat(priceOverride) || 0) * 100) / 100) : calc.price;
   const setChoice = (gid, val) => setAddons((p) => { const n = { ...p }; if (val) n[gid] = val; else delete n[gid]; return n; });
   const toggleAddon = (gid) => setAddons((p) => { const n = { ...p }; if (n[gid]) delete n[gid]; else n[gid] = true; return n; });
   const save = () => {
     if (!svcId) return;
     onSave({ serviceId: svcId, addons: { ...addons }, cutType: null, beardType: null, providerId: client.provider || null,
-      duration: durOverride.trim() === "" ? null : Math.max(0, parseInt(durOverride, 10) || 0),
+      duration: durTyped ? durOverrideMin : null,
       price: priceOverride.trim() === "" ? null : Math.max(0, Math.round((parseFloat(priceOverride) || 0) * 100) / 100) });
     setFlash(true);
   };
-  const clear = () => { setSvcId(""); setAddons({}); setDurOverride(""); setPriceOverride(""); onClear(); };
+  const clear = () => { setSvcId(""); setAddons({}); setHrStr(""); setMinStr(""); setPriceOverride(""); onClear(); };
   const fl = { fontSize: 13, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, marginBottom: 6 };
   const selStyle = { width: "100%", boxSizing: "border-box", border: "1px solid var(--border2)", borderRadius: 11, background: "var(--bg)", padding: "11px 12px", fontFamily: FONT_BODY, fontSize: 15, color: "var(--text)", appearance: "none", WebkitAppearance: "none" };
   const ipt = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--bg)" };
@@ -30224,18 +30250,17 @@ function UsualEditor({ client, services, providers, onSave, onClear }) {
         </div>
       )}
       {svcId && (
-        <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-          <div style={{ flex: 1 }}>
-            <div style={fl}>Time</div>
-            <div style={ipt}><input value={durOverride} onChange={(e) => setDurOverride(e.target.value.replace(/[^0-9]/g, ""))} placeholder={String(calc.min)} inputMode="numeric" style={inp} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13.5 }}>min</span></div>
+        <div style={{ marginTop: 4 }}>
+          <div style={fl}>Time</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 13 }}>
+            <div style={{ ...ipt, flex: 1 }}><input value={hrStr} onChange={(e) => setHrStr(e.target.value.replace(/[^0-9]/g, ""))} placeholder={String(Math.floor(calc.min / 60))} inputMode="numeric" style={inp} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13.5 }}>hr</span></div>
+            <div style={{ ...ipt, flex: 1 }}><input value={minStr} onChange={(e) => setMinStr(e.target.value.replace(/[^0-9]/g, ""))} placeholder={String(calc.min % 60)} inputMode="numeric" style={inp} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13.5 }}>min</span></div>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={fl}>Price</div>
-            <div style={ipt}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input value={priceOverride} onChange={(e) => setPriceOverride(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={String(calc.price)} inputMode="decimal" style={inp} /></div>
-          </div>
+          <div style={fl}>Price</div>
+          <div style={ipt}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input value={priceOverride} onChange={(e) => setPriceOverride(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={String(calc.price)} inputMode="decimal" style={inp} /></div>
         </div>
       )}
-      {svcId && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 11, lineHeight: 1.5 }}>{svc ? svc.name : ""}{calc.labels.length ? " · " + calc.labels.join(" · ") : ""} — books at <strong style={{ color: "var(--text)" }}>{fmtDur(effMin)} · ${effPrice}</strong>{(durOverride.trim() !== "" || priceOverride.trim() !== "") ? " (your set rate)" : " (from your menu)"}</div>}
+      {svcId && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 11, lineHeight: 1.5 }}>{svc ? svc.name : ""}{calc.labels.length ? " · " + calc.labels.join(" · ") : ""} — books at <strong style={{ color: "var(--text)" }}>{fmtDur(effMin)} · ${effPrice}</strong>{(durTyped || priceOverride.trim() !== "") ? " (your set rate)" : " (from your menu)"}</div>}
       <div style={{ display: "flex", gap: 12, marginTop: 15, alignItems: "center" }}>
         <button className="lift" onClick={save} disabled={!svcId} style={{ background: svcId ? "var(--gold)" : "var(--panel2)", color: svcId ? "var(--on-gold)" : "var(--faint)", border: "none", borderRadius: 10, padding: "11px 20px", fontSize: 14.5, fontWeight: 700, cursor: svcId ? "pointer" : "default" }}>Save usual</button>
         {saved && <button onClick={clear} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>Clear</button>}
